@@ -1,7 +1,8 @@
 import { Plugin, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
-import { Transformer } from "@style-this/core/compiler";
 import * as StyleThis from "@style-this/core/compiler";
+
+import { createRequire } from "node:module";
 
 interface Options {
   include?: RegExp[];
@@ -27,7 +28,7 @@ const vitePlugin = (options: Options = {}) => {
   let resolve: (id: string) => Promise<string | undefined>;
   let router: string;
   let server: ViteDevServer | undefined;
-  let styleThis: Transformer;
+  let styleThis: StyleThis.Transformer;
 
   return {
     name: "vite:style-this",
@@ -61,6 +62,7 @@ const vitePlugin = (options: Options = {}) => {
       await StyleThis.initializeStyleThisCompiler();
 
       const cwd = process.cwd();
+      const require = createRequire(cwd + "/package.json");
 
       const loadFile = async (importSourceId: string) => {
         let filepathWithQuery = await resolve(importSourceId);
@@ -68,11 +70,13 @@ const vitePlugin = (options: Options = {}) => {
         if (!filepathWithQuery)
           throw new Error(`vite failed to resolve import '${importSourceId}'`);
 
-        console.log("resolve", importSourceId, filepathWithQuery);
+        let [filepath, _query] = filepathWithQuery.split("?", 2);
 
-        const [filepath, _query] = filepathWithQuery.split("?", 2);
-
+        // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
+        // bundled one (that might not yet exist on disk)
+        // also do not load the contents, the transformer should require(...) it as-is
         if (filepath.startsWith(`${cwd}/node_modules/`)) {
+          filepath = require.resolve(importSourceId);
           return [filepath, ""];
         }
 
@@ -138,16 +142,25 @@ const vitePlugin = (options: Options = {}) => {
       const cssFilepath = `${filepath}.${cssExtension}`;
       cssFiles.delete(cssFilepath);
 
-      const transformedCode = await styleThis.transform(code, filepath);
+      try {
+        const transformedCode = await styleThis.transform(code, filepath);
 
-      // during dev, invalidate the virtual CSS module
-      if (server) {
-        const virtualModuleId = resolvedVirtualModulePrefix + cssFilepath;
-        const module = server.moduleGraph.getModuleById(virtualModuleId);
-        if (module) server.reloadModule(module);
+        // during dev, invalidate the virtual CSS module
+        if (server) {
+          const virtualModuleId = resolvedVirtualModulePrefix + cssFilepath;
+          const module = server.moduleGraph.getModuleById(virtualModuleId);
+          if (module) server.reloadModule(module);
+        }
+
+        return transformedCode;
+      } catch (err) {
+        if (!(err instanceof Error)) throw err;
+
+        // vite doesn't print cause, add it to the message
+        if (err.cause) err.message += `\nCause:\n${err.cause}`;
+
+        throw err;
       }
-
-      return transformedCode;
     },
   } satisfies Plugin & ExtraFields;
 };

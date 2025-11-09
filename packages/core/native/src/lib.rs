@@ -808,10 +808,32 @@ pub async fn evaluate_program<'alloc>(
                             0,
                             make_require(
                                 &ast_builder,
-                                BindingPatternKind::BindingIdentifier(
-                                    ast_builder.alloc_binding_identifier(
+                                BindingPatternKind::ObjectPattern(
+                                    ast_builder.alloc_object_pattern(
                                         span,
-                                        ast_builder.atom(&local_name),
+                                        ast_builder.vec1(
+                                            ast_builder.binding_property(
+                                                span,
+                                                PropertyKey::StaticIdentifier(
+                                                    ast_builder.alloc_identifier_name(
+                                                        span,
+                                                        ast_builder.atom("default"),
+                                                    ),
+                                                ),
+                                                ast_builder.binding_pattern(
+                                                    ast_builder
+                                                        .binding_pattern_kind_binding_identifier(
+                                                            span,
+                                                            ast_builder.atom(&local_name),
+                                                        ),
+                                                    None as Option<oxc_allocator::Box<_>>,
+                                                    false,
+                                                ),
+                                                true,
+                                                false,
+                                            ),
+                                        ),
+                                        None as Option<oxc_allocator::Box<_>>,
                                     ),
                                 ),
                                 &remote_filepath,
