@@ -1,44 +1,30 @@
 {
-  "name": "@style-this/core",
+  "name": "style-this",
   "version": "0.1.0",
-  "description": "A simple example library built by tsdown",
+  "description": "CSS-in-JS library for the modern web",
+  "private": true,
   "type": "module",
-  "files": [
-    "dist"
-  ],
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.cjs",
-  "types": "./dist/index.d.cts",
-  "exports": {
-    ".": "./dist/index.cjs",
-    "./vite": {
-      "import": "./dist/vite.cjs",
-      "types": "./dist/vite.d.cts"
-    },
-    "./package.json": "./package.json"
-  },
   "scripts": {
-    "build": "pnpm build:native && pnpm build:js",
-    "build:native": "cd native && wasm-pack build -t web",
-    "build:js": "tsdown",
-    "dev": "tsdown --watch",
-    "lint": "eslint",
-    "lint:fix": "pnpm lint --fix",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "build": "pnpm -r build",
+    "build:core": "pnpm --filter @style-this/core build",
+    "build:vite": "pnpm --filter @style-this/vite build",
+    "dev": "pnpm -r dev",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r test:watch"
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
+    "@eslint/js": "9.39.1",
     "@vitest/eslint-plugin": "1.4.1",
     "eslint": "9.39.1",
-    "proxyquire": "^2.1.3",
     "tsdown": "0.16.1",
     "typescript-eslint": "8.46.3",
     "vitest": "4.0.8"
   },
   "dependencies": {
     "@rollup/plugin-wasm": "6.2.2",
-    "typescript": "5.9.3",
-    "vite": "7.2.2"
+    "typescript": "5.9.3"
   }
 }
