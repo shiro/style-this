@@ -2,6 +2,8 @@ mod utils;
 use js_sys::Array;
 use std::collections::HashMap;
 use std::panic;
+use std::path::PathBuf;
+use std::str::FromStr;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
@@ -320,6 +322,12 @@ fn transform_tagged_literal(
     class_name
 }
 
+#[derive(PartialEq)]
+pub enum EvaluateProgramReturnStatus {
+    Transfomred,
+    NotTransformed,
+}
+
 pub async fn evaluate_program<'alloc>(
     allocator: &'alloc Allocator,
     transformer: &Transformer,
@@ -328,7 +336,7 @@ pub async fn evaluate_program<'alloc>(
     raw_program: &str,
     program: &mut Program<'alloc>,
     mut referenced_idents: HashSet<String>,
-) -> Result<(), TransformError> {
+) -> Result<EvaluateProgramReturnStatus, TransformError> {
     // find "css" import or quit early if entrypoint
     let return_early = entrypoint
         && program.body.iter().all(|import| {
@@ -352,7 +360,7 @@ pub async fn evaluate_program<'alloc>(
             true
         });
     if return_early {
-        return Ok(());
+        return Ok(EvaluateProgramReturnStatus::NotTransformed);
     }
 
     let ast_builder = AstBuilder::new(allocator);
@@ -986,7 +994,7 @@ pub async fn evaluate_program<'alloc>(
         })?;
 
     if !entrypoint {
-        return Ok(());
+        return Ok((EvaluateProgramReturnStatus::NotTransformed));
     }
 
     if !css_content_expressions.is_empty() {
@@ -1012,7 +1020,7 @@ pub async fn evaluate_program<'alloc>(
             .replace("'", "\\'")
             .replace("\n", "\\n")
     ));
-    Ok(())
+    Ok(EvaluateProgramReturnStatus::Transfomred)
 }
 
 #[wasm_bindgen]
@@ -1021,7 +1029,7 @@ impl Transformer {
         &self,
         code: String,
         filepath: String,
-    ) -> Result<String, TransformError> {
+    ) -> Result<Option<JsValue>, TransformError> {
         let allocator = Allocator::default();
         let source_type =
             SourceType::from_path(&filepath).map_err(|_| TransformError::UknownExtension {
@@ -1046,7 +1054,7 @@ impl Transformer {
         ))
         .unwrap();
 
-        evaluate_program(
+        let status = evaluate_program(
             &allocator,
             self,
             true,
@@ -1057,11 +1065,31 @@ impl Transformer {
         )
         .await?;
 
-        let output_js = Codegen::new()
-            .with_options(CodegenOptions::default())
-            .build(&ast.program);
+        if (status == EvaluateProgramReturnStatus::NotTransformed) {
+            return Ok(None);
+        }
 
-        Ok(output_js.code)
+        let options = CodegenOptions {
+            source_map_path: Some(PathBuf::from_str(&filepath).unwrap()),
+            ..Default::default()
+        };
+        let output_js = Codegen::new().with_options(options).build(&ast.program);
+
+        let result = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("code"),
+            &JsValue::from_str(&output_js.code),
+        )
+        .unwrap();
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("sourcemap"),
+            &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
+        )
+        .unwrap();
+
+        Ok(Some(result.into()))
     }
 }
 

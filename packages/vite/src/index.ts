@@ -154,7 +154,9 @@ const vitePlugin = (options: Options = {}) => {
       cssFiles.delete(cssFilepath);
 
       try {
-        const transformedCode = await styleThis.transform(code, filepath);
+        const transformedResult = await styleThis.transform(code, filepath);
+
+        if (!transformedResult) return;
 
         // during dev, invalidate the virtual CSS module
         if (server) {
@@ -163,7 +165,12 @@ const vitePlugin = (options: Options = {}) => {
           if (module) server.reloadModule(module);
         }
 
-        return transformedCode;
+        console.log(transformedResult.sourcemap);
+
+        return {
+          code: transformedResult.code,
+          map: transformedResult.sourcemap,
+        };
       } catch (err) {
         if (!(err instanceof Error)) throw err;
 
