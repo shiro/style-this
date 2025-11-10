@@ -209,11 +209,13 @@ pub fn initialize(opts: JsValue) -> Transformer {
     )
     .unwrap();
 
+    let export_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("exportCache")).unwrap();
+
     let export_cache_ref = format!("{PREFIX}{}", generate_random_id(8));
     js_sys::Reflect::set(
         &global,
         &JsValue::from_str(&export_cache_ref),
-        &js_sys::Object::new(),
+        &export_cache,
     )
     .unwrap();
 
@@ -269,22 +271,19 @@ pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a
     t.build_with_scoping(scoping, program);
 }
 
-fn transform_tagged_literal(
+fn read_css_block(
     tagged_template_expression: &mut TaggedTemplateExpression,
     raw_program: &str,
-    variable_name: &str,
+    class_name: &str,
     referenced_idents: &mut HashSet<String>,
     css_content_parts: &mut Vec<String>,
     css_content_insert_expressions: &mut Vec<(usize, String)>,
-) -> String {
+) {
     let oxc_ast::ast::TemplateLiteral {
         quasis,
         expressions,
         ..
     } = &mut tagged_template_expression.quasi;
-
-    let random_suffix = generate_random_id(6);
-    let class_name = format!("{variable_name}-{random_suffix}");
     css_content_parts.push(format!(".{class_name} {{"));
 
     loop {
@@ -318,8 +317,6 @@ fn transform_tagged_literal(
     }
 
     css_content_parts.push("}\n".to_string());
-
-    class_name
 }
 
 #[derive(PartialEq)]
@@ -438,6 +435,7 @@ pub async fn evaluate_program<'alloc>(
             expr_counter += 1;
             let idx = expr_counter;
 
+            // get class name from the store or compute
             let class_name = entrypoint
                 .then(|| {
                     js_sys::eval(&format!("{store}?.__css_{idx}"))
@@ -446,20 +444,27 @@ pub async fn evaluate_program<'alloc>(
                 })
                 .flatten()
                 .unwrap_or_else(|| {
-                    let class_name = transform_tagged_literal(
-                        tagged_template_expression,
-                        raw_program,
-                        &variable_name.name,
-                        &mut referenced_idents,
-                        &mut css_content_parts,
-                        &mut css_content_insert_expressions,
-                    );
+                    let random_suffix = generate_random_id(6);
+                    let class_name = format!("{variable_name}-{random_suffix}");
+
                     js_sys::eval(&format!(
                         "{store} = {{...({store} ?? {{}}), __css_{idx}: \"{class_name}\"}};",
                     ))
                     .unwrap();
                     class_name
                 });
+
+            // append css blocks and expressions
+            if entrypoint {
+                read_css_block(
+                    tagged_template_expression,
+                    raw_program,
+                    &class_name,
+                    &mut referenced_idents,
+                    &mut css_content_parts,
+                    &mut css_content_insert_expressions,
+                );
+            }
 
             // if the right side references any idents, add them
             referenced_idents.extend(expression_get_references(init));
@@ -517,10 +522,10 @@ pub async fn evaluate_program<'alloc>(
                                 // for our meta variable
                                 let variable_declaration = ast_builder.alloc_variable_declaration(
                                     span,
-                                    VariableDeclarationKind::Const,
+                                    VariableDeclarationKind::Let,
                                     ast_builder.vec1(ast_builder.variable_declarator(
                                         span,
-                                        VariableDeclarationKind::Const,
+                                        VariableDeclarationKind::Let,
                                         ast_builder.binding_pattern(
                                             BindingPatternKind::BindingIdentifier(
                                                 ast_builder.alloc_binding_identifier(
@@ -994,7 +999,7 @@ pub async fn evaluate_program<'alloc>(
         })?;
 
     if !entrypoint {
-        return Ok((EvaluateProgramReturnStatus::NotTransformed));
+        return Ok(EvaluateProgramReturnStatus::NotTransformed);
     }
 
     if !css_content_expressions.is_empty() {
@@ -1048,11 +1053,11 @@ impl Transformer {
         }
 
         // clear css export cache
-        let cache_ref = &self.export_cache_ref;
-        js_sys::eval(&format!(
-            "global.__styleThisClearCache('{cache_ref}', '{filepath}');"
-        ))
-        .unwrap();
+        // let cache_ref = &self.export_cache_ref;
+        // js_sys::eval(&format!(
+        //     "global.__styleThisClearCache('{cache_ref}', '{filepath}');"
+        // ))
+        // .unwrap();
 
         let status = evaluate_program(
             &allocator,

@@ -30,6 +30,8 @@ const vitePlugin = (options: Options = {}) => {
   const resolvedVirtualModulePrefix = "\0" + virtualModulePrefix;
 
   const cssFiles = new Map<string, string>();
+  const exportCache = new Map<string, Record<string, any>>();
+  const filesContainingStyledTemplates = new Set<string>();
   let resolve: (id: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
   let styleThis: StyleThis.Transformer;
@@ -50,21 +52,21 @@ const vitePlugin = (options: Options = {}) => {
         include: [...(config.optimizeDeps?.include ?? []), "@style-this/core"],
       };
 
-      (global as any).__styleThisClearCache = (
-        cacheId: string,
-        filepath: string,
-      ) => {
-        const cache = (global as any)[cacheId]?.[filepath] as
-          | Record<string, any>
-          | undefined;
-
-        if (!cache) return;
-
-        const filtered = Object.fromEntries(
-          Object.entries(cache).filter(([k]) => !k.startsWith("__css")),
-        );
-        (global as any)[cacheId][filepath] = filtered;
-      };
+      // (global as any).__styleThisClearCache = (
+      //   cacheId: string,
+      //   filepath: string,
+      // ) => {
+      //   const cache = (global as any)[cacheId]?.[filepath] as
+      //     | Record<string, any>
+      //     | undefined;
+      //
+      //   if (!cache) return;
+      //
+      //   const filtered = Object.fromEntries(
+      //     Object.entries(cache).filter(([k]) => !k.startsWith("__css")),
+      //   );
+      //   (global as any)[cacheId][filepath] = filtered;
+      // };
 
       await StyleThis.initializeStyleThisCompiler();
 
@@ -95,6 +97,7 @@ const vitePlugin = (options: Options = {}) => {
       styleThis = StyleThis.initialize({
         loadFile,
         cssFileStore: cssFiles,
+        exportCache,
 
         cssExtension,
       });
@@ -118,14 +121,29 @@ const vitePlugin = (options: Options = {}) => {
             `failed to load virtual CSS file '${filepath}' from id '${id}'`,
           );
 
-        // Tell Vite that this virtual CSS module depends on the source file
-        // Remove the css extension to get the original source file path
+        // tell Vite that this virtual CSS module depends on the source file
+        // remove the css extension to get the original source file path
         const sourceFilepath = filepath.endsWith(cssExtension)
           ? filepath.slice(0, -cssExtension.length)
           : filepath;
         this.addWatchFile(sourceFilepath);
 
         return raw;
+      }
+    },
+
+    async handleHotUpdate(ctx) {
+      if (!filesContainingStyledTemplates.has(ctx.file)) return;
+
+      // reset cache
+      exportCache.set(ctx.file, {});
+
+      // invalidate all modules that import this one
+      const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
+      if (sourceModule) {
+        for (const importer of sourceModule.importers) {
+          ctx.server.reloadModule(importer);
+        }
       }
     },
 
@@ -162,7 +180,11 @@ const vitePlugin = (options: Options = {}) => {
       try {
         const transformedResult = await styleThis.transform(code, filepath);
 
-        if (!transformedResult) return;
+        if (!transformedResult) {
+          filesContainingStyledTemplates.delete(filepath);
+          return;
+        }
+        filesContainingStyledTemplates.add(filepath);
 
         // during dev, invalidate the virtual CSS module
         if (server) {
