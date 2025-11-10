@@ -957,14 +957,14 @@ pub async fn evaluate_program<'alloc>(
     let css_content_expressions = css_content_insert_expressions
         .iter()
         .cloned()
-        .map(|(_pos, v)| format!("typeof ({v}) === 'function' ? ({v})() : {v}"))
+        .map(|(_pos, v)| format!("  typeof ({v}) === 'function' ? ({v})() : {v}"))
         .collect::<Vec<String>>();
 
     // evaluate expressions
     if !css_content_expressions.is_empty() {
         tmp_program_js.push_str(&format!(
-            "\nPromise.all([{}]).then((v) => v.map(String))",
-            css_content_expressions.join(",")
+            "\nPromise.all([\n{}\n]).then((v) => v.map(String))",
+            css_content_expressions.join(",\n")
         ));
     } else {
         tmp_program_js.push_str("Promise.resolve([])");
