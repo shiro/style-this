@@ -1,4 +1,4 @@
-import { Plugin, ViteDevServer } from "vite";
+import { Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
 import * as StyleThis from "@style-this/core/compiler";
 
@@ -13,7 +13,7 @@ interface Options {
   filter?: Filter | Filter[];
 }
 
-interface ViteConfig {
+interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {
   // router?: string;
 }
 
@@ -44,6 +44,12 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async config(config: ViteConfig) {
+      // this is a CJS library, need to bundle it
+      config.optimizeDeps = {
+        ...(config.optimizeDeps ?? {}),
+        include: [...(config.optimizeDeps?.include ?? []), "@style-this/core"],
+      };
+
       (global as any).__styleThisClearCache = (
         cacheId: string,
         filepath: string,
