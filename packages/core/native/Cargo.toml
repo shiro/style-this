@@ -32,6 +32,7 @@ oxc_semantic = "0.95.0"
 oxc_ast = "0.95.0"
 oxc_ast_visit = "0.95.0"
 oxc_syntax = "0.95.0"
+oxc_sourcemap = "6.0.1"
 
 js-sys = "0.3.82"
 
