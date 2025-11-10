@@ -4,10 +4,13 @@ import * as StyleThis from "@style-this/core/compiler";
 
 import { createRequire } from "node:module";
 
+type Filter = RegExp | ((filepath: string) => boolean);
+
 interface Options {
   include?: RegExp[];
   exclude?: RegExp[];
   cssExtension?: string;
+  filter?: Filter | Filter[];
 }
 
 interface ViteConfig {
@@ -19,14 +22,15 @@ interface ExtraFields {
 }
 
 const vitePlugin = (options: Options = {}) => {
-  const { cssExtension = "css" } = options;
+  let { cssExtension = "css", filter = [] } = options;
+
+  if (!Array.isArray(filter)) filter = [filter];
 
   const virtualModulePrefix = "virtual:style-this:";
   const resolvedVirtualModulePrefix = "\0" + virtualModulePrefix;
 
   const cssFiles = new Map<string, string>();
   let resolve: (id: string) => Promise<string | undefined>;
-  let router: string;
   let server: ViteDevServer | undefined;
   let styleThis: StyleThis.Transformer;
 
@@ -40,9 +44,6 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async config(config: ViteConfig) {
-      // TODO move out solid start
-      router = (config as any).router?.name;
-
       (global as any).__styleThisClearCache = (
         cacheId: string,
         filepath: string,
@@ -130,14 +131,24 @@ const vitePlugin = (options: Options = {}) => {
         };
       }
 
-      if (router && router != "client") return;
-
       if (
         !filepath ||
-        filepath.includes("node_modules") ||
-        (!filepath.endsWith(".tsx") && !filepath.endsWith(".jsx"))
+        filepath.includes("/node_modules/") ||
+        (!filepath.endsWith(".ts") &&
+          !filepath.endsWith(".tsx") &&
+          !filepath.endsWith(".js") &&
+          !filepath.endsWith(".jsx"))
       )
         return;
+
+      if (
+        filter.length != 0 &&
+        !filter.some((filter) =>
+          filter instanceof RegExp ? filter.test(filepath) : filter(filepath),
+        )
+      ) {
+        return;
+      }
 
       const cssFilepath = `${filepath}.${cssExtension}`;
       cssFiles.delete(cssFilepath);
