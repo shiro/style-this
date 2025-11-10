@@ -31,7 +31,6 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
-    "@eslint/js": "9.39.1",
     "@vitest/eslint-plugin": "1.4.1",
     "eslint": "9.39.1",
     "tsdown": "0.16.1",

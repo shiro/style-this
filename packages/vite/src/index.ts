@@ -165,8 +165,6 @@ const vitePlugin = (options: Options = {}) => {
           if (module) server.reloadModule(module);
         }
 
-        console.log(transformedResult.sourcemap);
-
         return {
           code: transformedResult.code,
           map: transformedResult.sourcemap,

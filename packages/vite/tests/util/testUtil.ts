@@ -26,11 +26,15 @@ export const evaluateProgram = async (
 ) => {
   const entryFilepath = `${testDir}/${entry}`;
   const code = await readFile(entryFilepath, "utf-8");
-  let jsRaw = await plugin.transform(code, entryFilepath);
+  let transformResult = await plugin.transform(code, entryFilepath);
 
-  jsRaw = jsRaw?.replace(testDir, "");
+  if (transformResult) {
+    transformResult.code = transformResult.code.replace(testDir, "");
+  }
 
-  await expect(jsRaw).toMatchFileSnapshot(`${testDir}/out/${entry}`);
+  await expect(transformResult?.code).toMatchFileSnapshot(
+    `${testDir}/out/${entry}`,
+  );
 
   const id = plugin.resolveId(
     `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`,
