@@ -5,16 +5,8 @@ export default defineConfig({
   dts: {
     sourcemap: true,
   },
-  // target: "node18",
-  // target: "node16",
   target: "esnext",
-  // format: "es",
-  format: "cjs",
+  format: "esm",
   entry: ["src/index.ts", "src/solid-js.ts"],
-  plugins: [
-    wasm({
-      maxFileSize: 10000000,
-      //
-    }),
-  ],
+  plugins: [wasm({ maxFileSize: 10000000 })],
 });

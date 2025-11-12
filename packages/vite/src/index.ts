@@ -1,5 +1,5 @@
 import { Plugin, UserConfig, ViteDevServer } from "vite";
-import { readFile } from "fs/promises";
+import { readFile, stat } from "fs/promises";
 import * as StyleThis from "@style-this/core/compiler";
 
 import { createRequire } from "node:module";
@@ -63,17 +63,20 @@ const vitePlugin = (options: Options = {}) => {
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
 
+        console.log("resolve", importSourceId, filepathWithQuery);
+
+        if (!filepath.startsWith(`${cwd}/node_modules/`)) {
+          try {
+            const raw = await readFile(filepath, "utf-8");
+            return [filepath, raw];
+          } catch (err) {}
+        }
+
         // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
         // bundled one (that might not yet exist on disk)
         // also do not load the contents, the transformer should require(...) it as-is
-        if (filepath.startsWith(`${cwd}/node_modules/`)) {
-          filepath = require.resolve(importSourceId);
-          return [filepath, ""];
-        }
-
-        const raw = await readFile(filepath, "utf-8");
-
-        return [filepath, raw];
+        filepath = require.resolve(importSourceId);
+        return [filepath, ""];
       };
 
       styleThis = StyleThis.initialize({
@@ -158,6 +161,8 @@ const vitePlugin = (options: Options = {}) => {
 
       const cssFilepath = `${filepath}.${cssExtension}`;
       cssFiles.delete(cssFilepath);
+
+      // console.log(code);
 
       try {
         const transformedResult = await styleThis.transform(code, filepath);

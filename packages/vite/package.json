@@ -6,16 +6,16 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.cjs",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "exports": {
-    ".": "./dist/index.cjs",
+    ".": "./dist/index.mjs",
     "./solid-js": {
-      "import": "./dist/solid-js.cjs",
-      "require": "./dist/solid-js.cjs",
+      "import": "./dist/solid-js.mjs",
+      "require": "./dist/solid-js.mjs",
       "types": "./dist/solid-js.d.cts",
-      "default": "./dist/solid-js.cjs"
+      "default": "./dist/solid-js.mjs"
     },
     "./package.json": "./package.json"
   },

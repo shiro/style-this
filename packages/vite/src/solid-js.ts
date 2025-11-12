@@ -1,4 +1,8 @@
 import { Plugin, UserConfig } from "vite";
+import {
+  SolidJsTransformer,
+  initializeStyleThisCompiler,
+} from "@style-this/core/compiler";
 
 type Filter = RegExp | ((filepath: string) => boolean);
 
@@ -13,8 +17,17 @@ const vitePlugin = (options: Options = {}) => {
 
   if (!Array.isArray(filter)) filter = [filter];
 
+  let transformer: SolidJsTransformer;
+
   return {
     name: "vite:style-this:solid-js",
+    enforce: "pre",
+
+    async config(config: ViteConfig) {
+      await initializeStyleThisCompiler();
+
+      transformer = new SolidJsTransformer();
+    },
 
     async transform(code, filepath) {
       if (
@@ -31,6 +44,22 @@ const vitePlugin = (options: Options = {}) => {
         )
       ) {
         return;
+      }
+
+      try {
+        const transformedResult = await transformer.transform(code, filepath);
+
+        return {
+          code: transformedResult.code,
+          map: transformedResult.sourcemap,
+        };
+      } catch (err) {
+        if (!(err instanceof Error)) throw err;
+
+        // vite doesn't print cause, add it to the message
+        if (err.cause) err.message += `\nCause:\n${err.cause}`;
+
+        throw err;
       }
     },
   } satisfies Plugin;
