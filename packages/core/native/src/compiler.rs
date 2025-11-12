@@ -759,13 +759,21 @@ pub async fn evaluate_program<'alloc>(
     let css_content_expressions = css_content_insert_expressions
         .iter()
         .cloned()
-        .map(|(_pos, v)| format!("  typeof ({v}) === 'function' ? ({v})() : {v}"))
+        .map(|(_pos, v)| format!("  ({v})"))
         .collect::<Vec<String>>();
 
     // evaluate expressions
     if !css_content_expressions.is_empty() {
         tmp_program_js.push_str(&format!(
-            "\nPromise.all([\n{}\n]).then((v) => v.map(String))",
+            r#"
+function {PREFIX}_handle_expr(v) {{
+    if (v.hasOwnProperty("toString")) return v.toString();
+    if (typeof v == "function") return v();
+    return v;
+}}"#
+        ));
+        tmp_program_js.push_str(&format!(
+            "\nPromise.all([\n{}\n].map({PREFIX}_handle_expr)).then((v) => v.map(v => v?.toString() ?? 'undefined'))",
             css_content_expressions.join(",\n")
         ));
     } else {

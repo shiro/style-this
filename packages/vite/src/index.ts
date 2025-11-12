@@ -111,6 +111,7 @@ const vitePlugin = (options: Options = {}) => {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
         const raw = cssFiles.get(filepath);
+
         if (raw == undefined)
           throw new Error(
             `failed to load virtual CSS file '${filepath}' from id '${id}'`,
@@ -136,6 +137,7 @@ const vitePlugin = (options: Options = {}) => {
       // invalidate all modules that import this one
       const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
       if (sourceModule) {
+        // TODO get the files who evaluted this one from rust only
         for (const importer of sourceModule.importers) {
           ctx.server.reloadModule(importer);
         }

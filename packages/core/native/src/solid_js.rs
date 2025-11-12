@@ -338,6 +338,58 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                     ),
                 ));
 
+            let assign_to_string_statement =
+                Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
+                    span,
+                    Expression::AssignmentExpression(
+                        ast_builder.alloc_assignment_expression(
+                            span,
+                            oxc_ast::ast::AssignmentOperator::Assign,
+                            oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
+                                ast_builder.alloc_static_member_expression(
+                                    span,
+                                    Expression::Identifier(ast_builder.alloc_identifier_reference(
+                                        span,
+                                        ast_builder.atom("comp"),
+                                    )),
+                                    ast_builder.identifier_name(span, ast_builder.atom("toString")),
+                                    false,
+                                ),
+                            ),
+                            Expression::ArrowFunctionExpression(
+                                ast_builder.alloc_arrow_function_expression(
+                                    span,
+                                    true,
+                                    false,
+                                    None as Option<oxc_allocator::Box<_>>,
+                                    ast_builder.alloc_formal_parameters(
+                                        span,
+                                        oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
+                                        ast_builder.vec(),
+                                        None as Option<oxc_allocator::Box<_>>,
+                                    ),
+                                    None as Option<oxc_allocator::Box<_>>,
+                                    ast_builder.alloc_function_body(
+                                        span,
+                                        ast_builder.vec(),
+                                        ast_builder.vec1(Statement::ExpressionStatement(
+                                            ast_builder.alloc_expression_statement(
+                                                span,
+                                                Expression::Identifier(
+                                                    ast_builder.alloc_identifier_reference(
+                                                        span,
+                                                        ast_builder.atom(&class_variable_name),
+                                                    ),
+                                                ),
+                                            ),
+                                        )),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ));
+
             let return_statement = Statement::ReturnStatement(ast_builder.alloc_return_statement(
                 span,
                 Some(Expression::Identifier(
@@ -354,9 +406,11 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
             //   const comp = (props: any) => {
             //     return <div {...props} class={testStyle} />;
             //   };
-            //   comp.clas = testStyle;
+            //   comp.class = testStyle;
+            //   comp.toString = () => testStyle;
             //   return comp;
-            //
+            // })()
+            // ```
             *init = Expression::CallExpression(ast_builder.alloc_call_expression(
                 span,
                 Expression::ArrowFunctionExpression(ast_builder.alloc_arrow_function_expression(
@@ -377,6 +431,7 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                         ast_builder.vec_from_array([
                             define_jsx_element_statement,
                             assign_class_statement,
+                            assign_to_string_statement,
                             return_statement,
                         ]),
                     ),
