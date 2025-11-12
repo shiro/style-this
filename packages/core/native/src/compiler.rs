@@ -1,4 +1,4 @@
-use oxc_ast::ast::VariableDeclarator;
+use oxc_ast::ast::{IdentifierName, VariableDeclarator};
 use oxc_syntax::identifier;
 
 use crate::utils::{binding_pattern_kind_get_idents, generate_random_id};
@@ -323,16 +323,27 @@ pub async fn evaluate_program<'alloc>(
     for stmt in program.body.iter().rev() {
         if let Statement::ImportDeclaration(import_declaration) = stmt {
             let module_id = import_declaration.source.value.to_string();
-            let Some(specifiers) = import_declaration.specifiers.clone_in(allocator) else {
+            let Some(specifiers) = &import_declaration.specifiers else {
                 continue;
             };
 
-            // ignore imports from this library
+            let entry = imports.entry(module_id.clone()).or_insert_with(Vec::new);
+
+            // ignore `css` import from this library
             if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME {
+                entry.extend(specifiers.iter().filter(|specifier| match specifier {
+                    oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
+                        !matches!(
+                            &import_specifier.imported,
+                            oxc_ast::ast::ModuleExportName::IdentifierName(identifier_name)
+                            if identifier_name.name == "css"
+                        )
+                    }
+                    _ => false,
+                }));
                 continue;
             }
 
-            let entry = imports.entry(module_id.clone()).or_insert_with(Vec::new);
             entry.extend(specifiers);
             continue;
         };

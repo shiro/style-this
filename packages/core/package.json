@@ -6,11 +6,11 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.cjs",
-  "types": "./dist/index.d.cts",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.cjs",
+    ".": "./dist/index.mjs",
     "./compiler": {
       "import": "./dist/compiler.cjs",
       "require": "./dist/compiler.cjs",

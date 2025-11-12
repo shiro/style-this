@@ -49,7 +49,10 @@ const vitePlugin = (options: Options = {}) => {
       // this is a CJS library, need to bundle it
       config.optimizeDeps = {
         ...(config.optimizeDeps ?? {}),
-        include: [...(config.optimizeDeps?.include ?? []), "@style-this/core"],
+        include: [
+          ...(config.optimizeDeps?.include ?? []),
+          "@style-this/core/compiler",
+        ],
       };
 
       await initializeStyleThis();
@@ -72,7 +75,10 @@ const vitePlugin = (options: Options = {}) => {
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
 
-        if (!filepath.startsWith(`${cwd}/node_modules/`)) {
+        if (
+          !filepath.startsWith(`${cwd}/node_modules/`) &&
+          !importSourceId.startsWith("@style-this/")
+        ) {
           try {
             const raw = await readFile(filepath, "utf-8");
             return [filepath, raw];
