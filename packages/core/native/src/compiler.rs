@@ -59,7 +59,7 @@ pub fn initialize(opts: JsValue) -> Transformer {
         .as_string()
         .unwrap();
 
-    let css_file_store_ref = format!("{PREFIX}{}", generate_random_id(8));
+    let css_file_store_ref = format!("{PREFIX}_{}", generate_random_id(8));
     let css_file_store = js_sys::Reflect::get(&opts, &JsValue::from_str("cssFileStore")).unwrap();
     js_sys::Reflect::set(
         &global,
@@ -70,7 +70,7 @@ pub fn initialize(opts: JsValue) -> Transformer {
 
     let export_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("exportCache")).unwrap();
 
-    let export_cache_ref = format!("{PREFIX}{}", generate_random_id(8));
+    let export_cache_ref = format!("{PREFIX}_{}", generate_random_id(8));
     js_sys::Reflect::set(
         &global,
         &JsValue::from_str(&export_cache_ref),

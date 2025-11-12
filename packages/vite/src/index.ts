@@ -13,6 +13,13 @@ interface Options {
   filter?: Filter | Filter[];
 }
 
+// exports.template = () => {};
+const solidMock = `
+export const template = () => () => {};
+export const spread = () => {};
+export const mergeProps = () => {};
+`;
+
 interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
 
 interface ExtraFields {
@@ -56,14 +63,17 @@ const vitePlugin = (options: Options = {}) => {
       const require = createRequire(cwd + "/package.json");
 
       const loadFile = async (importSourceId: string) => {
+        if (importSourceId == "solid-js/web") {
+          const filepath = require.resolve(importSourceId);
+          return [filepath, solidMock];
+        }
+
         let filepathWithQuery = await resolve(importSourceId);
 
         if (!filepathWithQuery)
           throw new Error(`vite failed to resolve import '${importSourceId}'`);
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
-
-        console.log("resolve", importSourceId, filepathWithQuery);
 
         if (!filepath.startsWith(`${cwd}/node_modules/`)) {
           try {

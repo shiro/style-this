@@ -165,9 +165,7 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                 continue;
             }
 
-            if static_member_expression.property.name != "div" {
-                continue;
-            }
+            let jsx_tag = static_member_expression.property.name;
 
             let component_variable_name = match &variable_declarator.id.kind {
                 BindingPatternKind::BindingIdentifier(binding_identifier) => {
@@ -212,6 +210,44 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                 )),
             ));
 
+            let jsx_element_expression = Expression::JSXElement(
+                ast_builder.alloc_jsx_element(
+                    span,
+                    ast_builder.alloc_jsx_opening_element(
+                        span,
+                        ast_builder.jsx_element_name_identifier(span, jsx_tag),
+                        None as Option<oxc_allocator::Box<_>>,
+                        ast_builder.vec_from_array([
+                            ast_builder.jsx_attribute_item_spread_attribute(
+                                span,
+                                Expression::Identifier(
+                                    ast_builder.alloc_identifier_reference(
+                                        span,
+                                        ast_builder.atom("props"),
+                                    ),
+                                ),
+                            ),
+                            ast_builder.jsx_attribute_item_attribute(
+                                span,
+                                ast_builder
+                                    .jsx_attribute_name_identifier(span, ast_builder.atom("class")),
+                                Some(ast_builder.jsx_attribute_value_expression_container(
+                                    span,
+                                    JSXExpression::Identifier(
+                                        ast_builder.alloc_identifier_reference(
+                                            span,
+                                            ast_builder.atom(&class_variable_name),
+                                        ),
+                                    ),
+                                )),
+                            ),
+                        ]),
+                    ),
+                    ast_builder.vec(),
+                    None as Option<oxc_allocator::Box<_>>,
+                ),
+            );
+
             let define_jsx_element_statement = Statement::VariableDeclaration(
                 ast_builder.alloc_variable_declaration(
                     span,
@@ -228,52 +264,45 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                                 None as Option<oxc_allocator::Box<_>>,
                                 false,
                             ),
-                            Some(Expression::JSXElement(
-                                ast_builder.alloc_jsx_element(
+                            Some(Expression::ArrowFunctionExpression(
+                                ast_builder.alloc_arrow_function_expression(
                                     span,
-                                    ast_builder.alloc_jsx_opening_element(
+                                    true,
+                                    false,
+                                    None as Option<oxc_allocator::Box<_>>,
+                                    ast_builder.alloc_formal_parameters(
                                         span,
-                                        ast_builder.jsx_element_name_identifier(
+                                        oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
+                                        ast_builder.vec1(ast_builder.formal_parameter(
                                             span,
-                                            ast_builder.atom("div"),
-                                        ),
-                                        None as Option<oxc_allocator::Box<_>>,
-                                        ast_builder.vec_from_array([
-                                            ast_builder.jsx_attribute_item_spread_attribute(
-                                                span,
-                                                Expression::Identifier(
-                                                    ast_builder.alloc_identifier_reference(
+                                            ast_builder.vec(),
+                                            ast_builder.binding_pattern(
+                                                BindingPatternKind::BindingIdentifier(
+                                                    ast_builder.alloc_binding_identifier(
                                                         span,
                                                         ast_builder.atom("props"),
                                                     ),
                                                 ),
+                                                None as Option<oxc_allocator::Box<_>>,
+                                                false,
                                             ),
-                                            ast_builder.jsx_attribute_item_attribute(
-                                                span,
-                                                ast_builder.jsx_attribute_name_identifier(
-                                                    span,
-                                                    ast_builder.atom("class"),
-                                                ),
-                                                Some(
-                                                    ast_builder
-                                                        .jsx_attribute_value_expression_container(
-                                                            span,
-                                                            JSXExpression::Identifier(
-                                                                ast_builder
-                                                                    .alloc_identifier_reference(
-                                                                        span,
-                                                                        ast_builder.atom(
-                                                                            &class_variable_name,
-                                                                        ),
-                                                                    ),
-                                                            ),
-                                                        ),
-                                                ),
-                                            ),
-                                        ]),
+                                            None,
+                                            false,
+                                            false,
+                                        )),
+                                        None as Option<oxc_allocator::Box<_>>,
                                     ),
-                                    ast_builder.vec(),
                                     None as Option<oxc_allocator::Box<_>>,
+                                    ast_builder.function_body(
+                                        span,
+                                        ast_builder.vec(),
+                                        ast_builder.vec1(Statement::ExpressionStatement(
+                                            ast_builder.alloc_expression_statement(
+                                                span,
+                                                jsx_element_expression,
+                                            ),
+                                        )),
+                                    ),
                                 ),
                             )),
                             false,
@@ -293,7 +322,6 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                             oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
                                 ast_builder.alloc_static_member_expression(
                                     span,
-                                    // ast_builder.atom("props"),
                                     Expression::Identifier(ast_builder.alloc_identifier_reference(
                                         span,
                                         ast_builder.atom("comp"),
@@ -302,10 +330,9 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                                     false,
                                 ),
                             ),
-                            Expression::StringLiteral(ast_builder.alloc_string_literal(
+                            Expression::Identifier(ast_builder.alloc_identifier_reference(
                                 span,
                                 ast_builder.atom(&class_variable_name),
-                                None,
                             )),
                         ),
                     ),
