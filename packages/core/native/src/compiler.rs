@@ -1,3 +1,6 @@
+use oxc_ast::ast::VariableDeclarator;
+use oxc_syntax::identifier;
+
 use crate::utils::{binding_pattern_kind_get_idents, generate_random_id};
 use crate::*;
 
@@ -115,6 +118,51 @@ impl Transformer {
     }
 }
 
+fn build_decorated_string<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    content: &str,
+) -> Expression<'alloc> {
+    Expression::NewExpression(ast_builder.alloc_new_expression(
+        span,
+        Expression::Identifier(
+            ast_builder.alloc_identifier_reference(span, ast_builder.atom("String")),
+        ),
+        None as Option<oxc_allocator::Box<_>>,
+        ast_builder.vec1(oxc_ast::ast::Argument::StringLiteral(
+            ast_builder.alloc_string_literal(span, ast_builder.atom(content), None),
+        )),
+    ))
+}
+
+fn build_variable_declaration_ident<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    variable_name: &str,
+    identifier: &str,
+) -> Statement<'alloc> {
+    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+        span,
+        VariableDeclarationKind::Let,
+        ast_builder.vec1(ast_builder.variable_declarator(
+            span,
+            VariableDeclarationKind::Const,
+            ast_builder.binding_pattern(
+                BindingPatternKind::BindingIdentifier(
+                    ast_builder.alloc_binding_identifier(span, ast_builder.atom(variable_name)),
+                ),
+                None as Option<oxc_allocator::Box<_>>,
+                false,
+            ),
+            Some(Expression::Identifier(
+                ast_builder.alloc_identifier_reference(span, ast_builder.atom(identifier)),
+            )),
+            false,
+        )),
+        false,
+    ))
+}
+
 pub async fn evaluate_program<'alloc>(
     allocator: &'alloc Allocator,
     transformer: &Transformer,
@@ -200,6 +248,7 @@ pub async fn evaluate_program<'alloc>(
             _ => continue,
         };
 
+        // TODO throw if more than 1
         for variable_declarator in variable_declaration.declarations.iter_mut().rev() {
             let span = variable_declarator.span;
             let Some(init) = &mut variable_declarator.init else {
@@ -265,209 +314,171 @@ pub async fn evaluate_program<'alloc>(
                 ast_builder.atom(&class_name),
                 None,
             ));
+            // *init = build_decorated_string(&ast_builder, variable_declarator.span, &class_name)
         }
     }
 
     // build a new minimal program
     let mut tmp_program = build_new_ast(allocator);
     for stmt in program.body.iter().rev() {
-        match stmt {
-            Statement::ImportDeclaration(import_declaration) => {
-                let module_id = import_declaration.source.value.to_string();
-                let Some(specifiers) = import_declaration.specifiers.clone_in(allocator) else {
+        if let Statement::ImportDeclaration(import_declaration) = stmt {
+            let module_id = import_declaration.source.value.to_string();
+            let Some(specifiers) = import_declaration.specifiers.clone_in(allocator) else {
+                continue;
+            };
+
+            // ignore imports from this library
+            if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME {
+                continue;
+            }
+
+            let entry = imports.entry(module_id.clone()).or_insert_with(Vec::new);
+            entry.extend(specifiers);
+            continue;
+        };
+
+        let mut exported = false;
+        let variable_declaration = match stmt {
+            Statement::ExportNamedDeclaration(export_named_declaration) => {
+                let Some(declaration) = &export_named_declaration.declaration else {
                     continue;
                 };
-
-                // ignore imports from this library
-                if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME {
-                    continue;
-                }
-
-                let entry = imports.entry(module_id.clone()).or_insert_with(Vec::new);
-                entry.extend(specifiers);
-            }
-            _ => {
-                let mut exported = false;
-                let variable_declaration = match stmt {
-                    Statement::ExportNamedDeclaration(export_named_declaration) => {
-                        let Some(declaration) = &export_named_declaration.declaration else {
-                            continue;
-                        };
-                        exported = true;
-                        match declaration {
-                            oxc_ast::ast::Declaration::VariableDeclaration(
-                                variable_declaration,
-                            ) => Some(variable_declaration.clone_in(allocator)),
-                            // TODO functions
-                            // TODO class
-                            _ => continue,
-                        }
-                    }
-                    Statement::ExportDefaultDeclaration(export_default_declaration) => {
-                        exported = true;
-                        match &export_default_declaration.declaration {
-                            ExportDefaultDeclarationKind::Identifier(identifier) => {
-                                let span = export_default_declaration.span;
-
-                                // pretend the default export is actually a variable declaration
-                                // for our meta variable
-                                let variable_declaration = ast_builder.alloc_variable_declaration(
-                                    span,
-                                    VariableDeclarationKind::Let,
-                                    ast_builder.vec1(ast_builder.variable_declarator(
-                                        span,
-                                        VariableDeclarationKind::Let,
-                                        ast_builder.binding_pattern(
-                                            BindingPatternKind::BindingIdentifier(
-                                                ast_builder.alloc_binding_identifier(
-                                                    span,
-                                                    ast_builder.atom("__global__export__"),
-                                                ),
-                                            ),
-                                            None as Option<oxc_allocator::Box<_>>,
-                                            false,
-                                        ),
-                                        Some(Expression::Identifier(
-                                            ast_builder.alloc_identifier_reference(
-                                                span,
-                                                ast_builder.atom(&identifier.name),
-                                            ),
-                                        )),
-                                        false,
-                                    )),
-                                    false,
-                                );
-                                Some(variable_declaration)
-                            }
-                            ExportDefaultDeclarationKind::CallExpression(call_expression) => {
-                                let span = call_expression.span;
-
-                                // pretend the default export is actually a variable declaration
-                                // for our meta variable
-                                let variable_declaration = ast_builder.alloc_variable_declaration(
-                                    span,
-                                    VariableDeclarationKind::Let,
-                                    ast_builder.vec1(ast_builder.variable_declarator(
-                                        span,
-                                        VariableDeclarationKind::Let,
-                                        ast_builder.binding_pattern(
-                                            BindingPatternKind::BindingIdentifier(
-                                                ast_builder.alloc_binding_identifier(
-                                                    span,
-                                                    ast_builder.atom("__global__export__"),
-                                                ),
-                                            ),
-                                            None as Option<oxc_allocator::Box<_>>,
-                                            false,
-                                        ),
-                                        Some(Expression::CallExpression(
-                                            call_expression.clone_in(allocator),
-                                        )),
-                                        false,
-                                    )),
-                                    false,
-                                );
-                                Some(variable_declaration)
-                            }
-                            ExportDefaultDeclarationKind::FunctionDeclaration(
-                                _function_declaration,
-                            ) => {
-                                // TODO
-                                continue;
-                            }
-                            _ => continue,
-                        }
-                    }
-                    Statement::VariableDeclaration(variable_declaration) => {
+                exported = true;
+                match declaration {
+                    oxc_ast::ast::Declaration::VariableDeclaration(variable_declaration) => {
                         Some(variable_declaration.clone_in(allocator))
                     }
-                    _ => None,
-                };
-                if let Some(variable_declaration) = variable_declaration {
-                    for variable_declarator in variable_declaration.declarations.iter().rev() {
-                        let Some(init) = &variable_declarator.init else {
-                            continue;
-                        };
-                        let idents = binding_pattern_kind_get_idents(&variable_declarator.id.kind);
+                    // TODO functions
+                    // TODO class
+                    _ => continue,
+                }
+            }
+            Statement::ExportDefaultDeclaration(export_default_declaration) => {
+                exported = true;
+                match &export_default_declaration.declaration {
+                    ExportDefaultDeclarationKind::Identifier(identifier) => {
+                        let span = export_default_declaration.span;
 
-                        if !idents.iter().any(|ident| referenced_idents.contains(ident)) {
-                            continue;
-                        }
-
-                        let all_cached = idents.iter().all(|ident| {
-                            js_sys::eval(&format!("{store}?.hasOwnProperty('{ident}')",))
-                                .unwrap()
-                                .is_truthy()
-                        });
-
-                        if all_cached {
-                            // if cached, grab from cache
-                            for ident in idents.iter() {
-                                if !referenced_idents.contains(ident) {
-                                    continue;
-                                }
-                                let variable_declaration = Statement::VariableDeclaration(
-                                    ast_builder.alloc_variable_declaration(
-                                        variable_declarator.span,
-                                        VariableDeclarationKind::Let,
-                                        ast_builder.vec1(
-                                            ast_builder.variable_declarator(
-                                                variable_declarator.span,
-                                                VariableDeclarationKind::Const,
-                                                ast_builder.binding_pattern(
-                                                    BindingPatternKind::BindingIdentifier(
-                                                        ast_builder.alloc_binding_identifier(
-                                                            variable_declarator.span,
-                                                            ast_builder.atom(ident),
-                                                        ),
-                                                    ),
-                                                    None as Option<oxc_allocator::Box<_>>,
-                                                    false,
-                                                ),
-                                                Some(Expression::Identifier(
-                                                    ast_builder.alloc_identifier_reference(
-                                                        variable_declarator.span,
-                                                        ast_builder
-                                                            .atom(&format!("{store}['{ident}']")),
-                                                    ),
-                                                )),
-                                                false,
-                                            ),
-                                        ),
-                                        false,
-                                    ),
-                                );
-                                tmp_program.program.body.insert(0, variable_declaration);
-                            }
-
-                            continue;
-                        }
-
-                        if exported {
-                            exports.extend(
-                                idents
-                                    .iter()
-                                    .filter(|ident| referenced_idents.contains(*ident))
-                                    .cloned()
-                                    .collect::<HashSet<String>>(),
-                            );
-                        }
-
-                        // copy the entire variable declaration verbatim
-                        tmp_program.program.body.insert(
-                            0,
-                            Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
-                                variable_declarator.span,
+                        // pretend the default export is actually a variable declaration
+                        // for our meta variable
+                        let variable_declaration = ast_builder.alloc_variable_declaration(
+                            span,
+                            VariableDeclarationKind::Let,
+                            ast_builder.vec1(ast_builder.variable_declarator(
+                                span,
                                 VariableDeclarationKind::Let,
-                                ast_builder.vec1(variable_declarator.clone_in(allocator)),
+                                ast_builder.binding_pattern(
+                                    BindingPatternKind::BindingIdentifier(
+                                        ast_builder.alloc_binding_identifier(
+                                            span,
+                                            ast_builder.atom("__global__export__"),
+                                        ),
+                                    ),
+                                    None as Option<oxc_allocator::Box<_>>,
+                                    false,
+                                ),
+                                Some(Expression::Identifier(
+                                    ast_builder.alloc_identifier_reference(
+                                        span,
+                                        ast_builder.atom(&identifier.name),
+                                    ),
+                                )),
                                 false,
                             )),
+                            false,
                         );
-
-                        // if the right side references any idents, add them
-                        referenced_idents.extend(expression_get_references(init));
+                        Some(variable_declaration)
                     }
+                    ExportDefaultDeclarationKind::CallExpression(call_expression) => {
+                        let span = call_expression.span;
+
+                        // pretend the default export is actually a variable declaration
+                        // for our meta variable
+                        let variable_declaration = ast_builder.alloc_variable_declaration(
+                            span,
+                            VariableDeclarationKind::Let,
+                            ast_builder.vec1(ast_builder.variable_declarator(
+                                span,
+                                VariableDeclarationKind::Let,
+                                ast_builder.binding_pattern(
+                                    BindingPatternKind::BindingIdentifier(
+                                        ast_builder.alloc_binding_identifier(
+                                            span,
+                                            ast_builder.atom("__global__export__"),
+                                        ),
+                                    ),
+                                    None as Option<oxc_allocator::Box<_>>,
+                                    false,
+                                ),
+                                Some(Expression::CallExpression(
+                                    call_expression.clone_in(allocator),
+                                )),
+                                false,
+                            )),
+                            false,
+                        );
+                        Some(variable_declaration)
+                    }
+                    ExportDefaultDeclarationKind::FunctionDeclaration(_function_declaration) => {
+                        // TODO
+                        continue;
+                    }
+                    _ => continue,
                 }
+            }
+            Statement::VariableDeclaration(variable_declaration) => {
+                Some(variable_declaration.clone_in(allocator))
+            }
+            _ => None,
+        };
+        if let Some(variable_declaration) = variable_declaration {
+            for variable_declarator in variable_declaration.declarations.iter().rev() {
+                let Some(init) = &variable_declarator.init else {
+                    continue;
+                };
+                let ident = match &variable_declarator.id.kind {
+                    BindingPatternKind::BindingIdentifier(binding_identifier) => {
+                        binding_identifier.name
+                    }
+                    _ => panic!("invalid 'css`...`' usage"),
+                };
+
+                if !referenced_idents.contains(ident.as_str()) {
+                    continue;
+                }
+
+                // if cached, grab from cache
+                let cached = js_sys::eval(&format!("{store}?.hasOwnProperty('{ident}')",))
+                    .unwrap()
+                    .is_truthy();
+                if cached {
+                    let variable_declaration = build_variable_declaration_ident(
+                        &ast_builder,
+                        variable_declarator.span,
+                        &ident,
+                        &format!("{store}['{ident}']"),
+                    );
+
+                    tmp_program.program.body.insert(0, variable_declaration);
+                    continue;
+                }
+
+                if exported {
+                    exports.insert(ident.to_string());
+                }
+
+                let variable_declaration =
+                    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+                        variable_declarator.span,
+                        VariableDeclarationKind::Let,
+                        ast_builder.vec1(variable_declarator.clone_in(allocator)),
+                        false,
+                    ));
+                // copy the entire variable declaration verbatim
+                tmp_program.program.body.insert(0, variable_declaration);
+
+                // if the right side references any idents, add them
+                referenced_idents.extend(expression_get_references(init));
             }
         }
     }
@@ -873,7 +884,7 @@ impl Transformer {
         )
         .await?;
 
-        if (status == EvaluateProgramReturnStatus::NotTransformed) {
+        if status == EvaluateProgramReturnStatus::NotTransformed {
             return Ok(None);
         }
 
