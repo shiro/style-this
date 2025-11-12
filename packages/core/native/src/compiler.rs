@@ -181,7 +181,6 @@ pub async fn evaluate_program<'alloc>(
 
     // transform all css`...` expresisons into classname strings
     let mut expr_counter = 0u32;
-
     for stmt in program.body.iter_mut() {
         let variable_declaration = match stmt {
             Statement::VariableDeclaration(it) => it,
@@ -389,9 +388,8 @@ pub async fn evaluate_program<'alloc>(
                         let Some(init) = &variable_declarator.init else {
                             continue;
                         };
-                        let variable_declarator = variable_declarator.clone_in(allocator);
-
                         let idents = binding_pattern_kind_get_idents(&variable_declarator.id.kind);
+
                         if !idents.iter().any(|ident| referenced_idents.contains(ident)) {
                             continue;
                         }
@@ -976,7 +974,11 @@ fn expression_get_references<'a>(expression: &Expression<'a>) -> Vec<String> {
         pub scopes_references: Vec<HashSet<String>>,
     }
 
+    use oxc_ast_visit::walk::walk_formal_parameter;
+    use oxc_ast_visit::walk::walk_identifier_reference;
+    use oxc_ast_visit::walk::walk_variable_declarator;
     use oxc_syntax::scope::{ScopeFlags, ScopeId};
+
     impl<'a> Visit<'a> for Visitor {
         fn enter_scope(
             &mut self,
@@ -988,26 +990,33 @@ fn expression_get_references<'a>(expression: &Expression<'a>) -> Vec<String> {
         fn leave_scope(&mut self) {
             self.scopes_references.pop();
         }
+
         fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
             let Some(scope) = self.scopes_references.last_mut() else {
                 return;
             };
             scope.extend(binding_pattern_kind_get_idents(&it.id.kind));
+
+            walk_variable_declarator(self, it);
         }
         fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
             let Some(scope) = self.scopes_references.last_mut() else {
                 return;
             };
             scope.extend(binding_pattern_kind_get_idents(&it.pattern.kind));
+
+            walk_formal_parameter(self, it);
         }
         fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
-            let variable_name = it.name.to_string();
+            let variable_name = &it.name;
             for scope in self.scopes_references.iter() {
-                if scope.contains(&variable_name) {
+                if scope.contains(variable_name.as_str()) {
                     return;
                 }
             }
-            self.references.push(variable_name);
+            self.references.push(variable_name.to_string());
+
+            walk_identifier_reference(self, it);
         }
     }
 

@@ -1,5 +1,5 @@
 import { Plugin, UserConfig, ViteDevServer } from "vite";
-import { readFile, stat } from "fs/promises";
+import { readFile } from "fs/promises";
 import * as StyleThis from "@style-this/core/compiler";
 
 import { createRequire } from "node:module";
@@ -162,8 +162,6 @@ const vitePlugin = (options: Options = {}) => {
       const cssFilepath = `${filepath}.${cssExtension}`;
       cssFiles.delete(cssFilepath);
 
-      // console.log(code);
-
       try {
         const transformedResult = await styleThis.transform(code, filepath);
 
@@ -188,7 +186,12 @@ const vitePlugin = (options: Options = {}) => {
         if (!(err instanceof Error)) throw err;
 
         // vite doesn't print cause, add it to the message
-        if (err.cause) err.message += `\nCause:\n${err.cause}`;
+        if (err.cause instanceof Error) {
+          err.message += `\nCause:\n${err.cause.message}`;
+          if (err.cause.stack) {
+            err.message += `\nStack:\n${err.cause.stack.toString()}`;
+          }
+        }
 
         throw err;
       }
