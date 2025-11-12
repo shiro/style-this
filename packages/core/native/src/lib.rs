@@ -42,3 +42,8 @@ const LIBRARY_SOLID_JS_IMPORT_NAME: &str = "@style-this/solid-js";
 
 pub use compiler::Transformer;
 pub use solid_js::SolidJsTransformer;
+
+#[wasm_bindgen]
+pub fn initialize() {
+    utils::set_panic_hook();
+}

@@ -12,9 +12,9 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./solid-js": {
+      "types": "./dist/solid-js.d.cts",
       "import": "./dist/solid-js.mjs",
       "require": "./dist/solid-js.mjs",
-      "types": "./dist/solid-js.d.cts",
       "default": "./dist/solid-js.mjs"
     },
     "./package.json": "./package.json"

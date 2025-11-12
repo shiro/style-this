@@ -1,10 +1,9 @@
 import { Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
-import * as StyleThis from "@style-this/core/compiler";
-
+import { Transformer, initializeStyleThis } from "@style-this/core/compiler";
 import { createRequire } from "node:module";
-
-type Filter = RegExp | ((filepath: string) => boolean);
+import { Filter, filterMatches } from "./util";
+import { handleTransformError } from "./util";
 
 interface Options {
   include?: RegExp[];
@@ -13,17 +12,11 @@ interface Options {
   filter?: Filter | Filter[];
 }
 
-// exports.template = () => {};
-const solidMock = `
-export const template = () => () => {};
-export const spread = () => {};
-export const mergeProps = () => {};
-`;
-
 interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
 
-interface ExtraFields {
+export interface ExtraFields {
   cssExtension: string;
+  __mocks: Map<string, string>;
 }
 
 const vitePlugin = (options: Options = {}) => {
@@ -39,12 +32,14 @@ const vitePlugin = (options: Options = {}) => {
   const filesContainingStyledTemplates = new Set<string>();
   let resolve: (id: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
-  let styleThis: StyleThis.Transformer;
+  let styleThis: Transformer;
+  const mocks = new Map<string, string>();
 
   return {
     name: "vite:style-this",
 
     cssExtension,
+    __mocks: mocks,
 
     configureServer(viteServer) {
       server = viteServer;
@@ -57,15 +52,17 @@ const vitePlugin = (options: Options = {}) => {
         include: [...(config.optimizeDeps?.include ?? []), "@style-this/core"],
       };
 
-      await StyleThis.initializeStyleThisCompiler();
+      await initializeStyleThis();
 
       const cwd = process.cwd();
       const require = createRequire(cwd + "/package.json");
 
-      const loadFile = async (importSourceId: string) => {
-        if (importSourceId == "solid-js/web") {
+      const loadFile = async (
+        importSourceId: string,
+      ): Promise<[string, string]> => {
+        if (mocks.has(importSourceId)) {
           const filepath = require.resolve(importSourceId);
-          return [filepath, solidMock];
+          return [filepath, mocks.get(importSourceId)!];
         }
 
         let filepathWithQuery = await resolve(importSourceId);
@@ -89,7 +86,7 @@ const vitePlugin = (options: Options = {}) => {
         return [filepath, ""];
       };
 
-      styleThis = StyleThis.initialize({
+      styleThis = new Transformer({
         loadFile,
         cssFileStore: cssFiles,
         exportCache,
@@ -162,12 +159,7 @@ const vitePlugin = (options: Options = {}) => {
       )
         return;
 
-      if (
-        filter.length != 0 &&
-        !filter.some((filter) =>
-          filter instanceof RegExp ? filter.test(filepath) : filter(filepath),
-        )
-      ) {
+      if (!filterMatches(filter, filepath)) {
         return;
       }
 
@@ -195,17 +187,7 @@ const vitePlugin = (options: Options = {}) => {
           map: transformedResult.sourcemap,
         };
       } catch (err) {
-        if (!(err instanceof Error)) throw err;
-
-        // vite doesn't print cause, add it to the message
-        if (err.cause instanceof Error) {
-          err.message += `\nCause:\n${err.cause.message}`;
-          if (err.cause.stack) {
-            err.message += `\nStack:\n${err.cause.stack.toString()}`;
-          }
-        }
-
-        throw err;
+        handleTransformError(err);
       }
     },
   } satisfies Plugin & ExtraFields;

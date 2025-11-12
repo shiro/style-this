@@ -1,16 +1,14 @@
-import { Plugin, UserConfig } from "vite";
+import { Plugin } from "vite";
 import {
   SolidJsTransformer,
-  initializeStyleThisCompiler,
+  initializeStyleThis,
 } from "@style-this/core/compiler";
-
-type Filter = RegExp | ((filepath: string) => boolean);
+import { Filter, filterMatches, handleTransformError } from "./util";
+import * as CompilerPlugin from ".";
 
 interface Options {
   filter?: Filter | Filter[];
 }
-
-interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
 
 const vitePlugin = (options: Options = {}) => {
   let { filter = [] } = options;
@@ -23,10 +21,27 @@ const vitePlugin = (options: Options = {}) => {
     name: "vite:style-this:solid-js",
     enforce: "pre",
 
-    async config(config: ViteConfig) {
-      await initializeStyleThisCompiler();
+    async config(config) {
+      await initializeStyleThis();
 
       transformer = new SolidJsTransformer();
+
+      const compilerPlugin = config.plugins?.find((p) => {
+        if (!p || typeof p != "object" || !p.hasOwnProperty("name")) return;
+        return (p as any).name == "vite:style-this";
+      }) as (Plugin & CompilerPlugin.ExtraFields) | undefined;
+
+      if (!compilerPlugin)
+        throw new Error(
+          "failed to find 'styleThisVitePlugin', is it included in 'config.plugins'?",
+        );
+
+      const solidMock = `
+export const template = () => () => {};
+export const spread = () => {};
+export const mergeProps = () => {};
+`;
+      compilerPlugin.__mocks.set("solid-js/web", solidMock);
     },
 
     async transform(code, filepath) {
@@ -37,12 +52,7 @@ const vitePlugin = (options: Options = {}) => {
       )
         return;
 
-      if (
-        filter.length != 0 &&
-        !filter.some((filter) =>
-          filter instanceof RegExp ? filter.test(filepath) : filter(filepath),
-        )
-      ) {
+      if (!filterMatches(filter, filepath)) {
         return;
       }
 
@@ -54,12 +64,7 @@ const vitePlugin = (options: Options = {}) => {
           map: transformedResult.sourcemap,
         };
       } catch (err) {
-        if (!(err instanceof Error)) throw err;
-
-        // vite doesn't print cause, add it to the message
-        if (err.cause) err.message += `\nCause:\n${err.cause}`;
-
-        throw err;
+        handleTransformError(err);
       }
     },
   } satisfies Plugin;

@@ -44,50 +44,50 @@ pub struct Transformer {
 }
 
 #[wasm_bindgen]
-pub fn initialize(opts: JsValue) -> Transformer {
-    utils::set_panic_hook();
-
-    let global = js_sys::global();
-
-    let load_file = js_sys::Reflect::get(&opts, &JsValue::from_str("loadFile"))
-        .unwrap()
-        .dyn_into::<js_sys::Function>()
-        .unwrap();
-
-    let css_extension = js_sys::Reflect::get(&opts, &JsValue::from_str("cssExtension"))
-        .unwrap()
-        .as_string()
-        .unwrap();
-
-    let css_file_store_ref = format!("{PREFIX}_{}", generate_random_id(8));
-    let css_file_store = js_sys::Reflect::get(&opts, &JsValue::from_str("cssFileStore")).unwrap();
-    js_sys::Reflect::set(
-        &global,
-        &JsValue::from_str(&css_file_store_ref),
-        &css_file_store,
-    )
-    .unwrap();
-
-    let export_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("exportCache")).unwrap();
-
-    let export_cache_ref = format!("{PREFIX}_{}", generate_random_id(8));
-    js_sys::Reflect::set(
-        &global,
-        &JsValue::from_str(&export_cache_ref),
-        &export_cache,
-    )
-    .unwrap();
-
-    Transformer {
-        load_file,
-        css_file_store_ref,
-        export_cache_ref,
-        css_extension,
-    }
-}
-
-#[wasm_bindgen]
 impl Transformer {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new(opts: JsValue) -> Self {
+        let global = js_sys::global();
+
+        let load_file = js_sys::Reflect::get(&opts, &JsValue::from_str("loadFile"))
+            .unwrap()
+            .dyn_into::<js_sys::Function>()
+            .unwrap();
+
+        let css_extension = js_sys::Reflect::get(&opts, &JsValue::from_str("cssExtension"))
+            .unwrap()
+            .as_string()
+            .unwrap();
+
+        let css_file_store_ref = format!("{PREFIX}_{}", generate_random_id(8));
+        let css_file_store =
+            js_sys::Reflect::get(&opts, &JsValue::from_str("cssFileStore")).unwrap();
+        js_sys::Reflect::set(
+            &global,
+            &JsValue::from_str(&css_file_store_ref),
+            &css_file_store,
+        )
+        .unwrap();
+
+        let export_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("exportCache")).unwrap();
+
+        let export_cache_ref = format!("{PREFIX}_{}", generate_random_id(8));
+        js_sys::Reflect::set(
+            &global,
+            &JsValue::from_str(&export_cache_ref),
+            &export_cache,
+        )
+        .unwrap();
+
+        Self {
+            load_file,
+            css_file_store_ref,
+            export_cache_ref,
+            css_extension,
+        }
+    }
+
     /// loads file contents and id
     async fn load_file(&self, id: &str) -> Result<(String, String), TransformError> {
         let promise = self
