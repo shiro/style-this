@@ -169,23 +169,6 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                 continue;
             }
 
-            // js_sys::eval(&format!("console.log('\\nfound', '{:?}')", "yes")).unwrap();
-
-            // let jsx_return_expression = Expression::JSXElement(ast_builder.alloc_jsx_element(
-            //     span,
-            //     ast_builder.alloc_jsx_opening_element(
-            //         span,
-            //         ast_builder.jsx_element_name_identifier(span, ast_builder.atom("div")),
-            //         None as Option<oxc_allocator::Box<_>>,
-            //         ast_builder.vec(),
-            //     ),
-            //     ast_builder.vec1(ast_builder.jsx_child_expression_container(span, todo!())),
-            //     Some(ast_builder.jsx_closing_element(
-            //         span,
-            //         ast_builder.jsx_element_name_identifier(span, ast_builder.atom("div")),
-            //     )),
-            // ));
-
             let component_variable_name = match &variable_declarator.id.kind {
                 BindingPatternKind::BindingIdentifier(binding_identifier) => {
                     binding_identifier.name
@@ -229,74 +212,126 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                 )),
             ));
 
-            // also add `.class` string property to component
-            statements_to_insert.push((
-                idx + 2,
-                Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
+            let define_jsx_element_statement = Statement::VariableDeclaration(
+                ast_builder.alloc_variable_declaration(
                     span,
-                    Expression::AssignmentExpression(ast_builder.alloc_assignment_expression(
-                        span,
-                        oxc_ast::ast::AssignmentOperator::Assign,
-                        oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
-                            ast_builder.alloc_static_member_expression(
-                                span,
-                                // ast_builder.atom("props"),
-                                Expression::Identifier(ast_builder.alloc_identifier_reference(
-                                    span,
-                                    ast_builder.atom(&component_variable_name),
-                                )),
-                                ast_builder.identifier_name(span, ast_builder.atom("class")),
+                    VariableDeclarationKind::Let,
+                    ast_builder.vec1(
+                        ast_builder.variable_declarator(
+                            span,
+                            VariableDeclarationKind::Let,
+                            ast_builder.binding_pattern(
+                                BindingPatternKind::BindingIdentifier(
+                                    ast_builder
+                                        .alloc_binding_identifier(span, ast_builder.atom("comp")),
+                                ),
+                                None as Option<oxc_allocator::Box<_>>,
                                 false,
                             ),
-                        ),
-                        Expression::StringLiteral(ast_builder.alloc_string_literal(
-                            span,
-                            ast_builder.atom(&class_variable_name),
-                            None,
-                        )),
-                    )),
-                )),
-            ));
-
-            let jsx_return_expression = Expression::JSXElement(
-                ast_builder.alloc_jsx_element(
-                    span,
-                    ast_builder.alloc_jsx_opening_element(
-                        span,
-                        ast_builder.jsx_element_name_identifier(span, ast_builder.atom("div")),
-                        None as Option<oxc_allocator::Box<_>>,
-                        ast_builder.vec_from_array([
-                            ast_builder.jsx_attribute_item_spread_attribute(
-                                span,
-                                Expression::Identifier(
-                                    ast_builder.alloc_identifier_reference(
-                                        span,
-                                        ast_builder.atom("props"),
-                                    ),
-                                ),
-                            ),
-                            ast_builder.jsx_attribute_item_attribute(
-                                span,
-                                ast_builder
-                                    .jsx_attribute_name_identifier(span, ast_builder.atom("class")),
-                                Some(ast_builder.jsx_attribute_value_expression_container(
+                            Some(Expression::JSXElement(
+                                ast_builder.alloc_jsx_element(
                                     span,
-                                    JSXExpression::Identifier(
-                                        ast_builder.alloc_identifier_reference(
+                                    ast_builder.alloc_jsx_opening_element(
+                                        span,
+                                        ast_builder.jsx_element_name_identifier(
                                             span,
-                                            ast_builder.atom(&class_variable_name),
+                                            ast_builder.atom("div"),
                                         ),
+                                        None as Option<oxc_allocator::Box<_>>,
+                                        ast_builder.vec_from_array([
+                                            ast_builder.jsx_attribute_item_spread_attribute(
+                                                span,
+                                                Expression::Identifier(
+                                                    ast_builder.alloc_identifier_reference(
+                                                        span,
+                                                        ast_builder.atom("props"),
+                                                    ),
+                                                ),
+                                            ),
+                                            ast_builder.jsx_attribute_item_attribute(
+                                                span,
+                                                ast_builder.jsx_attribute_name_identifier(
+                                                    span,
+                                                    ast_builder.atom("class"),
+                                                ),
+                                                Some(
+                                                    ast_builder
+                                                        .jsx_attribute_value_expression_container(
+                                                            span,
+                                                            JSXExpression::Identifier(
+                                                                ast_builder
+                                                                    .alloc_identifier_reference(
+                                                                        span,
+                                                                        ast_builder.atom(
+                                                                            &class_variable_name,
+                                                                        ),
+                                                                    ),
+                                                            ),
+                                                        ),
+                                                ),
+                                            ),
+                                        ]),
                                     ),
-                                )),
-                            ),
-                        ]),
+                                    ast_builder.vec(),
+                                    None as Option<oxc_allocator::Box<_>>,
+                                ),
+                            )),
+                            false,
+                        ),
                     ),
-                    ast_builder.vec(),
-                    None as Option<oxc_allocator::Box<_>>,
+                    false,
                 ),
             );
 
-            *init =
+            let assign_class_statement =
+                Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
+                    span,
+                    Expression::AssignmentExpression(
+                        ast_builder.alloc_assignment_expression(
+                            span,
+                            oxc_ast::ast::AssignmentOperator::Assign,
+                            oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
+                                ast_builder.alloc_static_member_expression(
+                                    span,
+                                    // ast_builder.atom("props"),
+                                    Expression::Identifier(ast_builder.alloc_identifier_reference(
+                                        span,
+                                        ast_builder.atom("comp"),
+                                    )),
+                                    ast_builder.identifier_name(span, ast_builder.atom("class")),
+                                    false,
+                                ),
+                            ),
+                            Expression::StringLiteral(ast_builder.alloc_string_literal(
+                                span,
+                                ast_builder.atom(&class_variable_name),
+                                None,
+                            )),
+                        ),
+                    ),
+                ));
+
+            let return_statement = Statement::ReturnStatement(ast_builder.alloc_return_statement(
+                span,
+                Some(Expression::Identifier(
+                    ast_builder.alloc_identifier_reference(span, ast_builder.atom("comp")),
+                )),
+            ));
+
+            // build this schema:
+            // ```.ts
+            // const testStyle = css`
+            //   color: white;
+            // `;
+            // const Test: Component<any> & { class: string } = (() => {
+            //   const comp = (props: any) => {
+            //     return <div {...props} class={testStyle} />;
+            //   };
+            //   comp.clas = testStyle;
+            //   return comp;
+            //
+            *init = Expression::CallExpression(ast_builder.alloc_call_expression(
+                span,
                 Expression::ArrowFunctionExpression(ast_builder.alloc_arrow_function_expression(
                     span,
                     false,
@@ -305,34 +340,24 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                     ast_builder.alloc_formal_parameters(
                         span,
                         oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-                        ast_builder.vec1(ast_builder.formal_parameter(
-                            span,
-                            ast_builder.vec(),
-                            ast_builder.binding_pattern(
-                                BindingPatternKind::BindingIdentifier(
-                                    ast_builder.alloc_binding_identifier(
-                                        variable_declarator.span,
-                                        ast_builder.atom("props"),
-                                    ),
-                                ),
-                                None as Option<oxc_allocator::Box<_>>,
-                                false,
-                            ),
-                            None,
-                            false,
-                            false,
-                        )),
+                        ast_builder.vec(),
                         None as Option<oxc_allocator::Box<_>>,
                     ),
                     None as Option<oxc_allocator::Box<_>>,
                     ast_builder.alloc_function_body(
                         span,
                         ast_builder.vec(),
-                        ast_builder.vec1(Statement::ReturnStatement(
-                            ast_builder.alloc_return_statement(span, Some(jsx_return_expression)),
-                        )),
+                        ast_builder.vec_from_array([
+                            define_jsx_element_statement,
+                            assign_class_statement,
+                            return_statement,
+                        ]),
                     ),
-                ));
+                )),
+                None as Option<oxc_allocator::Box<_>>,
+                ast_builder.vec(),
+                false,
+            ));
         }
     }
 
