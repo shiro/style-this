@@ -1,0 +1,27 @@
+{
+  "name": "@style-this/solid-js",
+  "version": "0.1.0",
+  "description": "CSS-in-JS library for the modern web - solid-js module",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "lint": "eslint",
+    "lint:fix": "pnpm lint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "solid-js": "1.9.10"
+  }
+}

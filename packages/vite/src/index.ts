@@ -13,9 +13,7 @@ interface Options {
   filter?: Filter | Filter[];
 }
 
-interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {
-  // router?: string;
-}
+interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
 
 interface ExtraFields {
   cssExtension: string;
@@ -51,22 +49,6 @@ const vitePlugin = (options: Options = {}) => {
         ...(config.optimizeDeps ?? {}),
         include: [...(config.optimizeDeps?.include ?? []), "@style-this/core"],
       };
-
-      // (global as any).__styleThisClearCache = (
-      //   cacheId: string,
-      //   filepath: string,
-      // ) => {
-      //   const cache = (global as any)[cacheId]?.[filepath] as
-      //     | Record<string, any>
-      //     | undefined;
-      //
-      //   if (!cache) return;
-      //
-      //   const filtered = Object.fromEntries(
-      //     Object.entries(cache).filter(([k]) => !k.startsWith("__css")),
-      //   );
-      //   (global as any)[cacheId][filepath] = filtered;
-      // };
 
       await StyleThis.initializeStyleThisCompiler();
 

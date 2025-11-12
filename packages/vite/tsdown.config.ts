@@ -10,7 +10,7 @@ export default defineConfig({
   target: "esnext",
   // format: "es",
   format: "cjs",
-  entry: ["src/index.ts"],
+  entry: ["src/index.ts", "src/solid-js.ts"],
   plugins: [
     wasm({
       maxFileSize: 10000000,

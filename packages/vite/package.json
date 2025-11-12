@@ -11,6 +11,12 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./dist/index.cjs",
+    "./solid-js": {
+      "import": "./dist/solid-js.cjs",
+      "require": "./dist/solid-js.cjs",
+      "types": "./dist/solid-js.d.cts",
+      "default": "./dist/solid-js.cjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -24,5 +30,13 @@
   "dependencies": {
     "@style-this/core": "workspace:*",
     "vite": "7.2.2"
+  },
+  "peerDependencies": {
+    "solid-js": "*"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": true
+    }
   }
 }
