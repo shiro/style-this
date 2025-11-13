@@ -156,6 +156,22 @@ fn build_object_member_string_assignment<'alloc>(
     ))
 }
 
+fn build_assignment<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    variable_name: &str,
+    value: Expression<'alloc>,
+) -> Expression<'alloc> {
+    Expression::AssignmentExpression(ast_builder.alloc_assignment_expression(
+        span,
+        oxc_ast::ast::AssignmentOperator::Assign,
+        oxc_ast::ast::AssignmentTarget::AssignmentTargetIdentifier(
+            ast_builder.alloc_identifier_reference(span, ast_builder.atom(variable_name)),
+        ),
+        value,
+    ))
+}
+
 // build schema:
 // Promise.all(["first", expr, "second"].map(handlePart)).then(v => v.join(""))
 fn build_css_member_expression<'alloc>(
@@ -324,7 +340,7 @@ pub async fn evaluate_program<'alloc>(
                         if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
                             specifier
                         {
-                            if spec.local.name == "css" {
+                            if spec.local.name == "css" || spec.local.name == "style" {
                                 return false;
                             }
                         }
@@ -364,6 +380,7 @@ pub async fn evaluate_program<'alloc>(
     // transform all css`...` expresisons into classname strings
     let mut expr_counter = 0u32;
     let mut css_variable_identifiers = HashMap::new();
+    let mut style_variable_identifiers = HashMap::new();
     for stmt in program.body.iter_mut() {
         let variable_declaration = match stmt {
             Statement::VariableDeclaration(it) => it,
@@ -383,7 +400,6 @@ pub async fn evaluate_program<'alloc>(
             _ => continue,
         };
 
-        // TODO throw if more than 1
         for variable_declarator in variable_declaration.declarations.iter_mut().rev() {
             let span = variable_declarator.span;
             let Some(init) = &mut variable_declarator.init else {
@@ -398,7 +414,7 @@ pub async fn evaluate_program<'alloc>(
                 continue;
             };
 
-            if identifier.name != "css" {
+            if identifier.name != "css" && identifier.name != "style" {
                 continue;
             };
 
@@ -407,46 +423,63 @@ pub async fn evaluate_program<'alloc>(
                 panic!("css variable declaration was not a regular variable declaration")
             };
 
-            expr_counter += 1;
-            let idx = expr_counter;
+            if identifier.name == "css" {
+                expr_counter += 1;
+                let idx = expr_counter;
 
-            // get class name from the store or compute
-            let class_name = entrypoint
-                .then(|| {
-                    js_sys::eval(&format!("{store}?.__css_{idx}"))
-                        .unwrap()
-                        .as_string()
-                })
-                .flatten()
-                .unwrap_or_else(|| {
-                    let random_suffix = generate_random_id(6);
-                    let class_name = format!("{variable_name}-{random_suffix}");
+                // get class name from the store or compute
+                let class_name = entrypoint
+                    .then(|| {
+                        js_sys::eval(&format!("{store}?.__css_{idx}"))
+                            .unwrap()
+                            .as_string()
+                    })
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        let random_suffix = generate_random_id(6);
+                        let class_name = format!("{variable_name}-{random_suffix}");
 
-                    js_sys::eval(&format!(
-                        "{store} = {{...({store} ?? {{}}), __css_{idx}: \"{class_name}\"}};",
-                    ))
-                    .unwrap();
-                    class_name
-                });
+                        js_sys::eval(&format!(
+                            "{store} = {{...({store} ?? {{}}), __css_{idx}: \"{class_name}\"}};",
+                        ))
+                        .unwrap();
+                        class_name
+                    });
 
-            // completely ignore if we don't need it
-            if !entrypoint && !referenced_idents.contains(variable_name.name.as_str()) {
-                continue;
-            }
+                // completely ignore if we don't need it
+                if !entrypoint && !referenced_idents.contains(variable_name.name.as_str()) {
+                    continue;
+                }
 
-            css_variable_identifiers.insert(
-                variable_name.name.to_string(),
-                (
-                    class_name.clone(),
+                css_variable_identifiers.insert(
+                    variable_name.name.to_string(),
+                    (
+                        class_name.clone(),
+                        read_css_parts(&ast_builder, tagged_template_expression),
+                    ),
+                );
+
+                referenced_idents.insert(variable_name.name.to_string());
+                // if the right side references any idents, add them
+                referenced_idents.extend(expression_get_references(init));
+
+                *init = build_decorated_string(&ast_builder, span, &class_name);
+            } else if identifier.name == "style" {
+                // TODO dedupe
+
+                style_variable_identifiers.insert(
+                    variable_name.name.to_string(),
                     read_css_parts(&ast_builder, tagged_template_expression),
-                ),
-            );
+                );
 
-            referenced_idents.insert(variable_name.name.to_string());
-            // if the right side references any idents, add them
-            referenced_idents.extend(expression_get_references(init));
+                referenced_idents.insert(variable_name.name.to_string());
+                // if the right side references any idents, add them
+                referenced_idents.extend(expression_get_references(init));
 
-            *init = build_decorated_string(&ast_builder, span, &class_name);
+                *init = Expression::Identifier(
+                    ast_builder.alloc_identifier_reference(span, ast_builder.atom("undefined")),
+                );
+            }
         }
     }
 
@@ -633,6 +666,22 @@ pub async fn evaluate_program<'alloc>(
                                 span,
                                 variable_name,
                                 "css",
+                                build_css_member_expression(&ast_builder, span, parts.drain(..)),
+                            ),
+                        )),
+                    );
+                }
+
+                // handle `style`
+                if let Some(parts) = style_variable_identifiers.get_mut(variable_name) {
+                    tmp_program.program.body.insert(
+                        1,
+                        Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
+                            span,
+                            build_assignment(
+                                &ast_builder,
+                                span,
+                                variable_name,
                                 build_css_member_expression(&ast_builder, span, parts.drain(..)),
                             ),
                         )),
@@ -932,6 +981,7 @@ pub async fn evaluate_program<'alloc>(
         tmp_program_js.push_str(&format!(
             r#"
 function {PREFIX}_handle_expr(v) {{
+    if (v === undefined || v === null) return String(v);
     if (v.hasOwnProperty("toString")) return v.toString();
     if (typeof v == "function") return v();
     return v;
