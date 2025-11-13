@@ -1003,8 +1003,20 @@ function {PREFIX}_handle_expr(v) {{
         ));
     }
 
+    let css_file_store_ref = &transformer.css_file_store_ref;
+    let export_cache_ref = &transformer.export_cache_ref;
     // wrap into promise
-    let tmp_program_js = format!("(async() => {{\n{tmp_program_js}\n}})()");
+    let tmp_program_js = format!(
+        "let eval;
+        const global = {{
+            {css_file_store_ref},
+            {export_cache_ref},
+        }};
+        (async() => {{
+            \"use strict\";
+            {tmp_program_js}
+        }})()"
+    );
 
     let evaluated =
         js_sys::eval(&tmp_program_js).map_err(|cause| TransformError::EvaluationFailed {
