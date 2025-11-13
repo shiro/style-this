@@ -28,7 +28,7 @@ const vitePlugin = (options: Options = {}) => {
   const resolvedVirtualModulePrefix = "\0" + virtualModulePrefix;
 
   const cssFiles = new Map<string, string>();
-  const exportCache = new Map<string, Record<string, any>>();
+  const exportCache = {} as Record<string, Record<string, any>>;
   const filesContainingStyledTemplates = new Set<string>();
   let resolve: (id: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
@@ -135,7 +135,7 @@ const vitePlugin = (options: Options = {}) => {
       if (!filesContainingStyledTemplates.has(ctx.file)) return;
 
       // reset cache
-      exportCache.set(ctx.file, {});
+      exportCache[ctx.file] = {};
 
       // invalidate all modules that import this one
       const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);

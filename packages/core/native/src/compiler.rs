@@ -71,7 +71,6 @@ impl Transformer {
         .unwrap();
 
         let export_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("exportCache")).unwrap();
-
         let export_cache_ref = format!("{PREFIX}_{}", generate_random_id(8));
         js_sys::Reflect::set(
             &global,
@@ -357,7 +356,7 @@ pub async fn evaluate_program<'alloc>(
     let mut exports = HashSet::new();
 
     let cache_ref = &transformer.export_cache_ref;
-    let store = format!("{cache_ref}[\"{program_path}\"]");
+    let store = format!("global.{cache_ref}[\"{program_path}\"]");
 
     let n = ast_builder.alloc_import_declaration::<Option<Box<WithClause>>>(
         program.span,
@@ -942,7 +941,7 @@ pub async fn evaluate_program<'alloc>(
         transpile_ts_to_js(allocator, &mut ast.program);
 
         let cache_ref = &transformer.export_cache_ref;
-        let store = format!("{cache_ref}[\"{remote_filepath}\"]");
+        let store = format!("global.{cache_ref}[\"{remote_filepath}\"]");
         let all_cached = remote_referenced_idents.iter().all(|ident| {
             js_sys::eval(&format!("{store}?.hasOwnProperty('{ident}')",))
                 .unwrap()
