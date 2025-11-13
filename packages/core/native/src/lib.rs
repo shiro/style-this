@@ -14,6 +14,8 @@ use std::path::Path;
 use oxc_allocator::Allocator;
 use oxc_allocator::Box;
 use oxc_allocator::CloneIn;
+use oxc_ast::ast::Argument;
+use oxc_ast::ast::ArrayExpressionElement;
 use oxc_ast::ast::BindingPatternKind;
 use oxc_ast::ast::ExportDefaultDeclarationKind;
 use oxc_ast::ast::Expression;
