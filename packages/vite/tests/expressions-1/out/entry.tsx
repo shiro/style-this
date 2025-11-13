@@ -4,4 +4,4 @@ const doPromise = async () => {
 	await new Promise((resolve) => setTimeout(resolve, 10));
 	return "red";
 };
-const a = "a-ggghhh";
+const a = new String("a-ggghhh");

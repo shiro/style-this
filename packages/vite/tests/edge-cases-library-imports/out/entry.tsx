@@ -9,4 +9,4 @@ import { getNumber } from "some_lib";
 // const someLib = require("../../src/viteTests/edge-cases-library-imports/hi.js");
 // const { getNumber } = someLib;
 // const { getNumber } = require("some_lib/index.js");
-const a = "a-ggghhh";
+const a = new String("a-ggghhh");
