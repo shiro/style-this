@@ -443,7 +443,7 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
         }
     }
 
-    for (idx, statement) in statements_to_insert {
+    for (idx, statement) in statements_to_insert.into_iter().rev() {
         program.body.insert(idx, statement);
     }
 }
