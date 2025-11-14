@@ -68,7 +68,7 @@ impl SolidJsTransformer {
             return Err(SolidJsTransformError::BunlderParseFailed { id: filepath });
         }
 
-        solid_js_prepass(&ast_builder, &mut ast.program);
+        solid_js_prepass(&ast_builder, &mut ast.program, false);
 
         let options = CodegenOptions {
             source_map_path: Some(PathBuf::from_str(&filepath).unwrap()),
@@ -94,7 +94,11 @@ impl SolidJsTransformer {
     }
 }
 
-pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut Program<'alloc>) {
+pub fn solid_js_prepass<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    program: &mut Program<'alloc>,
+    skip_jsx: bool,
+) {
     let return_early = program.body.iter().all(|import| {
         if let Statement::ImportDeclaration(import_decl) = import {
             if let Some(specifiers) = &import_decl.specifiers {
@@ -133,8 +137,6 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                     oxc_ast::ast::Declaration::VariableDeclaration(variable_declaration) => {
                         variable_declaration
                     }
-                    // TODO functions
-                    // TODO class
                     _ => continue,
                 }
             }
@@ -207,6 +209,12 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                     var_counter += 1;
                 }
             }
+
+            // treat the styled component like a regular css`...` definition
+            if skip_jsx {
+                *init = Expression::TaggedTemplateExpression(simple_tagged_template_expression);
+                continue;
+            };
 
             statements_to_insert.push((
                 idx,

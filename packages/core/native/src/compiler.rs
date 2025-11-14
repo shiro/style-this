@@ -1,3 +1,4 @@
+use crate::solid_js::solid_js_prepass;
 use crate::utils::{binding_pattern_kind_get_idents, generate_random_id};
 use crate::*;
 
@@ -843,6 +844,7 @@ pub async fn evaluate_program<'alloc>(
             continue;
         }
 
+        solid_js_prepass(&ast_builder, &mut ast.program, true);
         transpile_ts_to_js(allocator, &mut ast.program);
 
         std::boxed::Box::pin(evaluate_program(
@@ -992,6 +994,7 @@ impl Transformer {
 
 pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a>) {
     use oxc_semantic::SemanticBuilder;
+    use oxc_transformer::JsxOptions;
     use oxc_transformer::TransformOptions;
     use oxc_transformer::Transformer;
 
