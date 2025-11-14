@@ -171,122 +171,6 @@ fn build_assignment<'alloc>(
     ))
 }
 
-// build schema:
-// Promise.all(["first", expr, "second"].map(handlePart)).then(v => v.join(""))
-fn build_css_member_expression<'alloc>(
-    ast_builder: &AstBuilder<'alloc>,
-    span: Span,
-    parts: impl Iterator<Item = Expression<'alloc>>,
-) -> Expression<'alloc> {
-    // build: ["first", expr, "second"]
-    let parts_array_expression = Expression::ArrayExpression(ast_builder.alloc_array_expression(
-        span,
-        ast_builder.vec_from_iter(parts.into_iter().map(ArrayExpressionElement::from)),
-    ));
-
-    // build: <...>.map(handlePart)
-    let parts_map_expression = Expression::CallExpression(ast_builder.alloc_call_expression(
-        span,
-        Expression::StaticMemberExpression(ast_builder.alloc_static_member_expression(
-            span,
-            parts_array_expression,
-            ast_builder.identifier_name(span, ast_builder.atom("map")),
-            false,
-        )),
-        None as Option<oxc_allocator::Box<_>>,
-        ast_builder.vec1(Argument::Identifier(
-            ast_builder.alloc_identifier_reference(
-                span,
-                ast_builder.atom(&format!("{PREFIX}_handle_expr")),
-            ),
-        )),
-        false,
-    ));
-
-    // build: Promise.all(<...>)
-    let promise_all_call = Expression::CallExpression(ast_builder.alloc_call_expression(
-        span,
-        Expression::StaticMemberExpression(ast_builder.alloc_static_member_expression(
-            span,
-            Expression::Identifier(
-                ast_builder.alloc_identifier_reference(span, ast_builder.atom("Promise")),
-            ),
-            ast_builder.identifier_name(span, ast_builder.atom("all")),
-            false,
-        )),
-        None as Option<oxc_allocator::Box<_>>,
-        ast_builder.vec1(Argument::from(parts_map_expression)),
-        false,
-    ));
-
-    // build: v.join("")
-    let join_arrow_body = ast_builder.alloc_expression_statement(
-        span,
-        Expression::CallExpression(ast_builder.alloc_call_expression(
-            span,
-            Expression::StaticMemberExpression(ast_builder.alloc_static_member_expression(
-                span,
-                Expression::Identifier(
-                    ast_builder.alloc_identifier_reference(span, ast_builder.atom("part")),
-                ),
-                ast_builder.identifier_name(span, ast_builder.atom("join")),
-                false,
-            )),
-            None as Option<oxc_allocator::Box<_>>,
-            ast_builder.vec1(Argument::StringLiteral(ast_builder.alloc_string_literal(
-                span,
-                ast_builder.atom(""),
-                None,
-            ))),
-            false,
-        )),
-    );
-
-    // build: v => <...>
-    let join_arrow_function =
-        Argument::ArrowFunctionExpression(ast_builder.alloc_arrow_function_expression(
-            span,
-            true,
-            false,
-            None as Option<oxc_allocator::Box<_>>,
-            ast_builder.alloc_formal_parameters(
-                span,
-                oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-                ast_builder.vec1(ast_builder.plain_formal_parameter(
-                    span,
-                    ast_builder.binding_pattern(
-                        BindingPatternKind::BindingIdentifier(
-                            ast_builder.alloc_binding_identifier(span, ast_builder.atom("part")),
-                        ),
-                        None as Option<oxc_allocator::Box<_>>,
-                        false,
-                    ),
-                )),
-                None as Option<oxc_allocator::Box<_>>,
-            ),
-            None as Option<oxc_allocator::Box<_>>,
-            ast_builder.alloc_function_body(
-                span,
-                ast_builder.vec(),
-                ast_builder.vec1(Statement::ExpressionStatement(join_arrow_body)),
-            ),
-        ));
-
-    // build <...>.then(<...>)
-    Expression::CallExpression(ast_builder.alloc_call_expression(
-        span,
-        Expression::StaticMemberExpression(ast_builder.alloc_static_member_expression(
-            span,
-            promise_all_call,
-            ast_builder.identifier_name(span, ast_builder.atom("then")),
-            false,
-        )),
-        None as Option<oxc_allocator::Box<_>>,
-        ast_builder.vec1(join_arrow_function),
-        false,
-    ))
-}
-
 fn build_variable_declaration_ident<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     span: Span,
@@ -454,7 +338,7 @@ pub async fn evaluate_program<'alloc>(
                     variable_name.name.to_string(),
                     (
                         class_name.clone(),
-                        read_css_parts(&ast_builder, tagged_template_expression),
+                        tagged_template_expression.clone_in(allocator),
                     ),
                 );
 
@@ -468,7 +352,7 @@ pub async fn evaluate_program<'alloc>(
 
                 style_variable_identifiers.insert(
                     variable_name.name.to_string(),
-                    read_css_parts(&ast_builder, tagged_template_expression),
+                    tagged_template_expression.clone_in(allocator),
                 );
 
                 referenced_idents.insert(variable_name.name.to_string());
@@ -654,7 +538,7 @@ pub async fn evaluate_program<'alloc>(
                 // copy the entire variable declaration verbatim
                 tmp_program.program.body.insert(0, variable_declaration);
 
-                // if it's a `css` or `style` declaration, also add the `var.css = ...` promise
+                // if it's a `css` declaration, also add the `var.css = ...` statement
                 if let Some((_, parts)) = css_variable_identifiers.get_mut(variable_name) {
                     tmp_program.program.body.insert(
                         1,
@@ -665,7 +549,11 @@ pub async fn evaluate_program<'alloc>(
                                 span,
                                 variable_name,
                                 "css",
-                                build_css_member_expression(&ast_builder, span, parts.drain(..)),
+                                ast_builder.expression_template_literal(
+                                    span,
+                                    parts.quasi.quasis.clone_in(allocator),
+                                    parts.quasi.expressions.clone_in(allocator),
+                                ),
                             ),
                         )),
                     );
@@ -681,7 +569,11 @@ pub async fn evaluate_program<'alloc>(
                                 &ast_builder,
                                 span,
                                 variable_name,
-                                build_css_member_expression(&ast_builder, span, parts.drain(..)),
+                                ast_builder.expression_template_literal(
+                                    span,
+                                    parts.quasi.quasis.clone_in(allocator),
+                                    parts.quasi.expressions.clone_in(allocator),
+                                ),
                             ),
                         )),
                     );
@@ -977,26 +869,16 @@ pub async fn evaluate_program<'alloc>(
     }
 
     if !css_variable_identifiers.is_empty() {
+        // const cssFile = [var.css, var2.css].join("\n\n");
         tmp_program_js.push_str(&format!(
-            r#"
-function {PREFIX}_handle_expr(v) {{
-    if (v === undefined || v === null) return String(v);
-    if (v.hasOwnProperty("toString")) return v.toString();
-    if (typeof v == "function") return v();
-    return v;
-}}"#
-        ));
-
-        // const cssFile = (await Promise.all([var.css, var2.css])).join("\n\n");
-        tmp_program_js.push_str(&format!(
-            "\n{}.set('{}.{}', (await Promise.all([\n{}\n])).join('\\n\\n'));",
+            "\n{}.set('{}.{}', [\n{}\n].join('\\n\\n'));",
             &transformer.css_file_store_ref,
             program_path.replace("'", "\\'"),
             transformer.css_extension,
             css_variable_identifiers
                 .into_iter()
                 .map(|(variable_name, (class_name, _))| format!(
-                    "(async() => `.{class_name} {{\n${{await {variable_name}.css}}\n}}`)()"
+                    "`.{class_name} {{\n${{{variable_name}.css}}\n}}`"
                 ))
                 .collect::<Vec<_>>()
                 .join(",\n")
@@ -1012,7 +894,7 @@ function {PREFIX}_handle_expr(v) {{
             {css_file_store_ref},
             {export_cache_ref},
         }};
-        (async() => {{
+        (async () => {{
             \"use strict\";
             {tmp_program_js}
         }})()"
@@ -1120,56 +1002,6 @@ pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a
         &TransformOptions::default(),
     );
     t.build_with_scoping(scoping, program);
-}
-
-fn read_css_parts<'alloc>(
-    ast_builder: &AstBuilder<'alloc>,
-    tagged_template_expression: &TaggedTemplateExpression<'alloc>,
-) -> Vec<Expression<'alloc>> {
-    let oxc_ast::ast::TemplateLiteral {
-        quasis,
-        expressions,
-        ..
-    } = &tagged_template_expression.quasi;
-
-    let mut quasis = quasis.clone_in(ast_builder.allocator);
-    let mut expressions = expressions.clone_in(ast_builder.allocator);
-
-    let mut parts = vec![];
-
-    loop {
-        let l = quasis.first();
-        let r = expressions.first();
-
-        // string part is next
-        if (l.is_some() && r.is_none())
-            || (l.is_some() && r.is_some() && l.unwrap().span.start < r.unwrap().span().start)
-        {
-            let current = quasis.remove(0);
-            let text_part = &current.value.cooked.unwrap_or(current.value.raw);
-            let expression = Expression::StringLiteral(ast_builder.alloc_string_literal(
-                current.span,
-                ast_builder.atom(text_part),
-                None,
-            ));
-            parts.push(expression);
-            continue;
-        }
-
-        // expression part is next
-        if (l.is_none() && r.is_some())
-            || (l.is_some() && r.is_some() && l.unwrap().span.start > r.unwrap().span().start)
-        {
-            let current = expressions.remove(0);
-            // referenced_idents.extend(expression_get_references(&current));
-            parts.push(current);
-            continue;
-        }
-
-        break;
-    }
-
-    parts
 }
 
 fn build_new_ast<'a>(allocator: &'a Allocator) -> oxc_parser::ParserReturn<'a> {
