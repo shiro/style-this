@@ -994,7 +994,6 @@ impl Transformer {
 
 pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a>) {
     use oxc_semantic::SemanticBuilder;
-    use oxc_transformer::JsxOptions;
     use oxc_transformer::TransformOptions;
     use oxc_transformer::Transformer;
 
