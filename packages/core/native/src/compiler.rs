@@ -880,9 +880,12 @@ pub async fn evaluate_program<'alloc>(
             transformer.css_extension,
             css_variable_identifiers
                 .into_iter()
-                .map(|(variable_name, (class_name, _))| format!(
-                    "`.{class_name} {{\n${{{variable_name}.css}}\n}}`"
-                ))
+                .map(|(variable_name, (class_name, _))| {
+                    if class_name.starts_with("_Global") {
+                        return format!("`${{{variable_name}.css}}\n`");
+                    }
+                    format!("`.{class_name} {{\n${{{variable_name}.css}}\n}}`")
+                })
                 .collect::<Vec<_>>()
                 .join(",\n")
         ));
