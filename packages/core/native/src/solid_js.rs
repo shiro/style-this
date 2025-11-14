@@ -406,32 +406,6 @@ pub fn solid_js_prepass<'alloc>(
                 ),
             );
 
-            let assign_class_statement =
-                Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
-                    span,
-                    Expression::AssignmentExpression(
-                        ast_builder.alloc_assignment_expression(
-                            span,
-                            oxc_ast::ast::AssignmentOperator::Assign,
-                            oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
-                                ast_builder.alloc_static_member_expression(
-                                    span,
-                                    Expression::Identifier(ast_builder.alloc_identifier_reference(
-                                        span,
-                                        ast_builder.atom("comp"),
-                                    )),
-                                    ast_builder.identifier_name(span, ast_builder.atom("class")),
-                                    false,
-                                ),
-                            ),
-                            Expression::Identifier(ast_builder.alloc_identifier_reference(
-                                span,
-                                ast_builder.atom(&class_variable_name),
-                            )),
-                        ),
-                    ),
-                ));
-
             let assign_css_statement =
                 Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
                     span,
@@ -538,7 +512,6 @@ pub fn solid_js_prepass<'alloc>(
             //       class={testStyle}
             //     />;
             //   };
-            //   comp.class = testStyle;
             //   comp.css = testStyle.css;
             //   comp.toString = () => testStyle;
             //   return comp;
@@ -564,7 +537,6 @@ pub fn solid_js_prepass<'alloc>(
                         ast_builder.vec(),
                         ast_builder.vec_from_array([
                             define_jsx_element_statement,
-                            assign_class_statement,
                             assign_css_statement,
                             assign_to_string_statement,
                             return_statement,
