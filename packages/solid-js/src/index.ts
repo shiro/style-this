@@ -1,20 +1,39 @@
 import { Component, ComponentProps, JSX } from "solid-js";
 
-type StyledComponent<T extends keyof JSX.IntrinsicElements> = (
-  ...raw: any
-) => Component<ComponentProps<T>> & StyledComponentExtensions;
-
-type StyledProxy = {
-  [K in keyof JSX.IntrinsicElements]: StyledComponent<K>;
+// Component.class
+// TODO remove this in favor of `.toString()`
+type StyledComponentExtensions = {
+  readonly class: string;
+  readonly css: string;
 };
 
-type StyledComponentExtensions = { class: string };
+type TemplateExpression<StyleProps> =
+  | string
+  | number
+  | ((styleProps: StyleProps) => string | number);
+
+type StyledProxy = {
+  [Element in keyof JSX.IntrinsicElements]: <
+    StyleProps extends Record<string, any>,
+  >(
+    s: TemplateStringsArray,
+    ...expr: Array<TemplateExpression<StyleProps>>
+  ) => Component<
+    ComponentProps<Element> & {
+      styleProps: StyleProps;
+    }
+  > &
+    StyledComponentExtensions;
+};
 
 export const styled = new Proxy({} as StyledProxy, {
-  get<T extends keyof JSX.IntrinsicElements>(target: StyledProxy, prop: T) {
-    return (..._raw: any): StyledComponent<T> => {
+  get<Element extends keyof JSX.IntrinsicElements>(
+    _target: StyledProxy,
+    elementName: Element,
+  ): StyledProxy[Element] {
+    return (..._args: any) => {
       throw new Error(
-        `@style-this: called 'styled.${String(prop)}' at runtime. This indicates an error in the transform.`,
+        `@style-this: called 'styled.${String(elementName)}' at runtime. This indicates an error in the transform.`,
       );
     };
   },

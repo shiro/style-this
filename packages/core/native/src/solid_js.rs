@@ -183,6 +183,31 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                 ast_builder.alloc_identifier_reference(span, ast_builder.atom("css")),
             );
 
+            // Substitute arrow functions with CSS variables
+            let mut captured_expressions = Vec::new();
+            let mut var_counter = 1;
+
+            // Iterate through template expressions and replace arrow functions
+            for expression in simple_tagged_template_expression
+                .quasi
+                .expressions
+                .iter_mut()
+            {
+                if let Expression::ArrowFunctionExpression(_) = expression {
+                    // Capture the original arrow function expression
+                    captured_expressions.push(expression.clone_in(ast_builder.allocator));
+
+                    // Replace with variable string (var1, var2, etc.)
+                    let var_name = format!("var(--var{var_counter})");
+                    *expression = Expression::StringLiteral(ast_builder.alloc_string_literal(
+                        expression.span(),
+                        ast_builder.atom(&var_name),
+                        None,
+                    ));
+                    var_counter += 1;
+                }
+            }
+
             statements_to_insert.push((
                 idx,
                 Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
@@ -210,43 +235,104 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
                 )),
             ));
 
-            let jsx_element_expression = Expression::JSXElement(
-                ast_builder.alloc_jsx_element(
-                    span,
-                    ast_builder.alloc_jsx_opening_element(
+            // Build style attribute with captured variables and their arrow function calls
+            let style_properties: Vec<_> = captured_expressions
+                .iter()
+                .enumerate()
+                .map(|(i, arrow_fn)| {
+                    let var_name = format!("--var{}", i + 1);
+                    ast_builder.object_property_kind_object_property(
                         span,
-                        ast_builder.jsx_element_name_identifier(span, jsx_tag),
-                        None as Option<oxc_allocator::Box<_>>,
-                        ast_builder.vec_from_array([
-                            ast_builder.jsx_attribute_item_spread_attribute(
+                        oxc_ast::ast::PropertyKind::Init,
+                        ast_builder
+                            .expression_string_literal(span, ast_builder.atom(&var_name), None)
+                            .into(),
+                        Expression::CallExpression(
+                            ast_builder.alloc_call_expression(
                                 span,
-                                Expression::Identifier(
-                                    ast_builder.alloc_identifier_reference(
-                                        span,
-                                        ast_builder.atom("props"),
-                                    ),
-                                ),
-                            ),
-                            ast_builder.jsx_attribute_item_attribute(
-                                span,
-                                ast_builder
-                                    .jsx_attribute_name_identifier(span, ast_builder.atom("class")),
-                                Some(ast_builder.jsx_attribute_value_expression_container(
-                                    span,
-                                    JSXExpression::Identifier(
-                                        ast_builder.alloc_identifier_reference(
+                                arrow_fn.clone_in(ast_builder.allocator),
+                                None as Option<oxc_allocator::Box<_>>,
+                                ast_builder.vec1(
+                                    Expression::StaticMemberExpression(
+                                        ast_builder.alloc_static_member_expression(
                                             span,
-                                            ast_builder.atom(&class_variable_name),
+                                            Expression::Identifier(
+                                                ast_builder.alloc_identifier_reference(
+                                                    span,
+                                                    ast_builder.atom("props"),
+                                                ),
+                                            ),
+                                            ast_builder.identifier_name(
+                                                span,
+                                                ast_builder.atom("styleProps"),
+                                            ),
+                                            false,
                                         ),
-                                    ),
-                                )),
+                                    )
+                                    .into(),
+                                ),
+                                false,
                             ),
-                        ]),
+                        ),
+                        false,
+                        false,
+                        false,
+                    )
+                })
+                .collect();
+
+            let style_attribute = if !captured_expressions.is_empty() {
+                Some(ast_builder.jsx_attribute_item_attribute(
+                    span,
+                    ast_builder.jsx_attribute_name_identifier(span, ast_builder.atom("style")),
+                    Some(ast_builder.jsx_attribute_value_expression_container(
+                        span,
+                        JSXExpression::ObjectExpression(ast_builder.alloc_object_expression(
+                            span,
+                            ast_builder.vec_from_iter(style_properties),
+                        )),
+                    )),
+                ))
+            } else {
+                None
+            };
+
+            // Build attributes array with conditional style attribute
+            let mut attributes = vec![
+                ast_builder.jsx_attribute_item_spread_attribute(
+                    span,
+                    Expression::Identifier(
+                        ast_builder.alloc_identifier_reference(span, ast_builder.atom("props")),
                     ),
-                    ast_builder.vec(),
-                    None as Option<oxc_allocator::Box<_>>,
                 ),
-            );
+                ast_builder.jsx_attribute_item_attribute(
+                    span,
+                    ast_builder.jsx_attribute_name_identifier(span, ast_builder.atom("class")),
+                    Some(ast_builder.jsx_attribute_value_expression_container(
+                        span,
+                        JSXExpression::Identifier(ast_builder.alloc_identifier_reference(
+                            span,
+                            ast_builder.atom(&class_variable_name),
+                        )),
+                    )),
+                ),
+            ];
+
+            if let Some(style_attr) = style_attribute {
+                attributes.push(style_attr);
+            }
+
+            let jsx_element_expression = Expression::JSXElement(ast_builder.alloc_jsx_element(
+                span,
+                ast_builder.alloc_jsx_opening_element(
+                    span,
+                    ast_builder.jsx_element_name_identifier(span, jsx_tag),
+                    None as Option<oxc_allocator::Box<_>>,
+                    ast_builder.vec_from_iter(attributes),
+                ),
+                ast_builder.vec(),
+                None as Option<oxc_allocator::Box<_>>,
+            ));
 
             let define_jsx_element_statement = Statement::VariableDeclaration(
                 ast_builder.alloc_variable_declaration(
@@ -437,13 +523,19 @@ pub fn solid_js_prepass<'alloc>(ast_builder: &AstBuilder<'alloc>, program: &mut 
             // `;
             // const Test: Component<any> & { class: string } = (() => {
             //   const comp = (props: any) => {
-            //     return <div {...props} class={testStyle} />;
+            //     const [var1, rest] = splitProps(props, ["var1"])
+            //     return <div
+            //       {...rest}
+            //       style={{"--var1": arrowFn(props)}}
+            //       class={testStyle}
+            //     />;
             //   };
             //   comp.class = testStyle;
             //   comp.css = testStyle.css;
             //   comp.toString = () => testStyle;
             //   return comp;
             // })()
+            // TODO Object.freeze
             // ```
             *init = Expression::CallExpression(ast_builder.alloc_call_expression(
                 span,
