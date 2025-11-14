@@ -1,9 +1,7 @@
 import { Component, ComponentProps, JSX } from "solid-js";
 
 // Component.class
-// TODO remove this in favor of `.toString()`
-type StyledComponentExtensions = {
-  readonly class: string;
+type CssExtension = {
   readonly css: string;
 };
 
@@ -14,7 +12,7 @@ type TemplateExpression<StyleProps> =
 
 type StyledProxy = {
   [Element in keyof JSX.IntrinsicElements]: <
-    StyleProps extends Record<string, any>,
+    StyleProps extends Record<string, any> = Record<string, never>,
   >(
     s: TemplateStringsArray,
     ...expr: Array<TemplateExpression<StyleProps>>
@@ -23,7 +21,7 @@ type StyledProxy = {
       styleProps: StyleProps;
     }
   > &
-    StyledComponentExtensions;
+    (StyleProps extends Record<string, never> ? CssExtension : {});
 };
 
 export const styled = new Proxy({} as StyledProxy, {
