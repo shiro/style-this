@@ -830,7 +830,6 @@ pub async fn evaluate_program<'alloc>(
                 filepath: remote_filepath,
             });
         }
-        transpile_ts_to_js(allocator, &mut ast.program);
 
         let cache_ref = &transformer.export_cache_ref;
         let store = format!("global.{cache_ref}[\"{remote_filepath}\"]");
@@ -843,6 +842,8 @@ pub async fn evaluate_program<'alloc>(
         if all_cached {
             continue;
         }
+
+        transpile_ts_to_js(allocator, &mut ast.program);
 
         std::boxed::Box::pin(evaluate_program(
             allocator,
