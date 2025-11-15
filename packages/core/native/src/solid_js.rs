@@ -498,6 +498,17 @@ pub fn solid_js_prepass<'alloc>(
                 )),
             ));
 
+            // build function body statements conditionally
+            let mut function_body_statements = vec![define_jsx_element_statement];
+
+            // only add assign_css_statement if there are no captured expressions
+            if captured_expressions.is_empty() {
+                function_body_statements.push(assign_css_statement);
+            }
+
+            function_body_statements.push(assign_to_string_statement);
+            function_body_statements.push(return_statement);
+
             // build this schema:
             // ```.ts
             // const testStyle = css`
@@ -535,12 +546,7 @@ pub fn solid_js_prepass<'alloc>(
                     ast_builder.alloc_function_body(
                         span,
                         ast_builder.vec(),
-                        ast_builder.vec_from_array([
-                            define_jsx_element_statement,
-                            assign_css_statement,
-                            assign_to_string_statement,
-                            return_statement,
-                        ]),
+                        ast_builder.vec_from_iter(function_body_statements),
                     ),
                 )),
                 None as Option<oxc_allocator::Box<_>>,
