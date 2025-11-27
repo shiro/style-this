@@ -2,9 +2,9 @@ export type CSSProperties = {
   [key: string]: string | number | CSSProperties;
 };
 
-interface CSS extends String {
+type CSS = string & {
   css: string;
-}
+};
 
 export const css = (..._raw: any): CSS => {
   throw new Error(
