@@ -954,16 +954,6 @@ pub async fn evaluate_program<'alloc>(
     let (css_variable_identifiers, referenced_idents, exported_idents, mut tmp_program) =
         css_transformer.finish();
 
-    js_sys::eval(&format!(
-        "console.log('got', '{}')",
-        referenced_idents
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(",")
-    ))
-    .unwrap();
-
     // handle imports - resolve other modules and rewrite return values into variable declarations
     for stmt in program.body.iter() {
         let Statement::ImportDeclaration(import_declaration) = stmt else {
