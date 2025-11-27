@@ -181,7 +181,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     }
 
     fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'alloc>) {
-        // let span = declarator.span;
         let Some(init) = &mut it.init else {
             return;
         };
@@ -207,6 +206,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
     }
 
+    // TODO handle non-variable declarations
     // fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
     //     if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
     //         && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
