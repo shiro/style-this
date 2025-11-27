@@ -170,3 +170,39 @@ pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a
     );
     t.build_with_scoping(scoping, program);
 }
+
+pub fn make_require<'a>(
+    ast_builder: &AstBuilder<'a>,
+    binding_pattern: BindingPatternKind<'a>,
+    source: &str,
+    span: Span,
+) -> Statement<'a> {
+    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+        span,
+        VariableDeclarationKind::Let,
+        ast_builder.vec1(ast_builder.variable_declarator(
+            span,
+            VariableDeclarationKind::Let,
+            ast_builder.binding_pattern(
+                binding_pattern,
+                None as Option<oxc_allocator::Box<_>>,
+                false,
+            ),
+            Some(Expression::CallExpression(
+                ast_builder.alloc_call_expression(
+                    span,
+                    Expression::Identifier(
+                        ast_builder.alloc_identifier_reference(span, ast_builder.atom("require")),
+                    ),
+                    None as Option<oxc_allocator::Box<_>>,
+                    ast_builder.vec1(oxc_ast::ast::Argument::StringLiteral(
+                        ast_builder.alloc_string_literal(span, ast_builder.atom(source), None),
+                    )),
+                    false,
+                ),
+            )),
+            false,
+        )),
+        false,
+    ))
+}

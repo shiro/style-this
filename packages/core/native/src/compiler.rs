@@ -1,5 +1,9 @@
+use oxc_ast::ast::{
+    Declaration, ExportDefaultDeclaration, ImportDeclarationSpecifier, ModuleExportName,
+};
+
 use crate::solid_js::solid_js_prepass;
-use crate::utils::transpile_ts_to_js;
+use crate::utils::{binding_pattern_kind_get_idents, transpile_ts_to_js};
 use crate::*;
 
 #[derive(Error, Debug)]
@@ -42,15 +46,11 @@ pub struct VisitorTransformer<'a, 'alloc> {
     entrypoint: bool,
     store: String,
     referenced_idents: &'a mut HashSet<String>,
-    css_variable_identifiers: HashMap<
-        String,
-        (
-            String,
-            oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
-        ),
-    >,
-    style_variable_identifiers:
-        HashMap<String, oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>>,
+    css_variable_identifiers: HashMap<String, String>,
+    style_variable_identifiers: HashSet<String>,
+    exported_idents: HashSet<String>,
+
+    tmp_program: Program<'alloc>,
 }
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
@@ -67,29 +67,28 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             entrypoint,
             store: store.to_string(),
             referenced_idents,
-            css_variable_identifiers: HashMap::new(),
-            style_variable_identifiers: HashMap::new(),
+            css_variable_identifiers: Default::default(),
+            style_variable_identifiers: Default::default(),
+            exported_idents: Default::default(),
+
+            tmp_program: utils::build_new_ast(allocator).program,
         }
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn finish(
-        self,
-    ) -> (
-        HashMap<
-            String,
-            (
-                String,
-                oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
-            ),
-        >,
-        HashMap<String, oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>>,
-    ) {
+    pub fn finish(self) -> (HashMap<String, String>, HashSet<String>, Program<'alloc>) {
         (
             self.css_variable_identifiers,
-            self.style_variable_identifiers,
+            self.exported_idents,
+            self.tmp_program,
         )
     }
+}
+
+#[derive(PartialEq)]
+enum TagType {
+    Css,
+    Style,
 }
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
@@ -97,13 +96,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     fn handle_tagged_template_expression(
         &mut self,
         variable_name: &str,
-        tagged_template_expression: &mut oxc_allocator::Box<
-            'alloc,
-            oxc_ast::ast::TaggedTemplateExpression<'alloc>,
-        >,
-    ) -> Option<Expression<'alloc>> {
-        let span = tagged_template_expression.span;
-        let tag = utils::tagged_template_get_tag(tagged_template_expression)?;
+        it: &mut oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
+    ) -> Option<(TagType, Expression<'alloc>)> {
+        let span = it.span;
+        let tag = utils::tagged_template_get_tag(it)?;
 
         if tag == "css" {
             // get class name from the store or compute
@@ -130,42 +126,23 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     class_name
                 });
 
-            self.css_variable_identifiers.insert(
-                variable_name.to_string(),
-                (
-                    class_name.clone(),
-                    tagged_template_expression.clone_in(self.allocator),
-                ),
-            );
+            self.css_variable_identifiers
+                .insert(variable_name.to_string(), class_name.to_string());
 
-            self.referenced_idents.insert(variable_name.to_string());
-            // if the right side references any idents, add them
-            self.referenced_idents
-                .extend(utils::tagged_template_expression_get_references(
-                    tagged_template_expression,
-                ));
-
-            return Some(ast::build_decorated_string(
-                self.ast_builder,
-                span,
-                &class_name,
+            return Some((
+                TagType::Css,
+                ast::build_decorated_string(self.ast_builder, span, &class_name),
             ));
         } else if tag == "style" {
-            self.style_variable_identifiers.insert(
-                variable_name.to_string(),
-                tagged_template_expression.clone_in(self.allocator),
-            );
+            self.style_variable_identifiers
+                .insert(variable_name.to_string());
 
-            self.referenced_idents.insert(variable_name.to_string());
-            // if the right side references any idents, add them
-            self.referenced_idents
-                .extend(utils::tagged_template_expression_get_references(
-                    tagged_template_expression,
-                ));
-
-            return Some(Expression::Identifier(
-                self.ast_builder
-                    .alloc_identifier_reference(span, self.ast_builder.atom("undefined")),
+            return Some((
+                TagType::Style,
+                Expression::Identifier(
+                    self.ast_builder
+                        .alloc_identifier_reference(span, self.ast_builder.atom("undefined")),
+                ),
             ));
         }
         None
@@ -185,6 +162,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         };
 
+        let mut tag_type = None;
+
         if let Expression::TaggedTemplateExpression(tagged_template_expression) = init
             && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
             && (tag == "css" || tag == "style")
@@ -198,15 +177,246 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let ret = self
                     .handle_tagged_template_expression(variable_name, tagged_template_expression);
 
-                if let Some(ret) = ret {
-                    *init = ret;
+                self.referenced_idents.insert(variable_name.to_string());
+                // if the right side references any idents, add them
+                self.referenced_idents
+                    .extend(utils::tagged_template_expression_get_references(
+                        tagged_template_expression,
+                    ));
+
+                if let Some((_type, right)) = ret {
+                    tag_type = Some((
+                        _type,
+                        // TODO swap init and avoid copy
+                        tagged_template_expression.clone_in(self.allocator),
+                    ));
+                    *init = right;
                 }
             }
         };
+
+        // transforms the declarator and builds the tmp program
+        (|| {
+            let Some(init) = &it.init else {
+                return;
+            };
+
+            // TODO handle other kinds
+            let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
+                return;
+            };
+            let variable_name = variable_name.name.as_str();
+
+            if !self.referenced_idents.contains(variable_name) {
+                return;
+            }
+
+            let span = it.span;
+
+            // if cached, grab from cache
+            let cached = js_sys::eval(&format!(
+                "{}?.hasOwnProperty('{variable_name}')",
+                self.store
+            ))
+            .unwrap()
+            .is_truthy();
+            if cached {
+                let variable_declaration = ast::build_variable_declaration_ident(
+                    self.ast_builder,
+                    span,
+                    variable_name,
+                    &format!("{}['{variable_name}']", self.store),
+                );
+
+                self.tmp_program.body.insert(0, variable_declaration);
+                return;
+            }
+
+            // TODO move out into visit fns
+            // if exported {
+            //     exports.insert(variable_name.to_string());
+            // }
+
+            // copy the entire variable declaration verbatim
+            let variable_declaration =
+                Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                    span,
+                    VariableDeclarationKind::Let,
+                    self.ast_builder.vec1(it.clone_in(self.allocator)),
+                    false,
+                ));
+            self.tmp_program.body.insert(0, variable_declaration);
+
+            // if it's a css`` or style`` declaration, also add the `var.css = ...` statement
+            match tag_type {
+                Some((TagType::Css, tagged_template_expression)) => {
+                    self.tmp_program.body.insert(
+                        1,
+                        Statement::ExpressionStatement(
+                            self.ast_builder.alloc_expression_statement(
+                                span,
+                                ast::build_object_member_string_assignment(
+                                    self.ast_builder,
+                                    span,
+                                    variable_name,
+                                    "css",
+                                    self.ast_builder.expression_template_literal(
+                                        span,
+                                        tagged_template_expression
+                                            .quasi
+                                            .quasis
+                                            .clone_in(self.allocator),
+                                        tagged_template_expression
+                                            .quasi
+                                            .expressions
+                                            .clone_in(self.allocator),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    );
+                }
+                Some((TagType::Style, tagged_template_expression)) => {
+                    self.tmp_program.body.insert(
+                        1,
+                        Statement::ExpressionStatement(
+                            self.ast_builder.alloc_expression_statement(
+                                span,
+                                ast::build_assignment(
+                                    self.ast_builder,
+                                    span,
+                                    variable_name,
+                                    self.ast_builder.expression_template_literal(
+                                        span,
+                                        tagged_template_expression
+                                            .quasi
+                                            .quasis
+                                            .clone_in(self.allocator),
+                                        tagged_template_expression
+                                            .quasi
+                                            .expressions
+                                            .clone_in(self.allocator),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    );
+                }
+                _ => {}
+            };
+
+            // if the right side references any idents, add them
+            self.referenced_idents
+                .extend(utils::expression_get_references(init));
+        })();
+
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
     }
 
-    // TODO handle non-variable declarations
+    fn visit_export_default_declaration(&mut self, it: &mut ExportDefaultDeclaration<'alloc>) {
+        match &it.declaration {
+            ExportDefaultDeclarationKind::Identifier(identifier) => {
+                let span = identifier.span;
+
+                // pretend the default export is actually a variable declaration
+                // for our meta variable
+                let mut variable_declaration = self.ast_builder.alloc_variable_declaration(
+                    span,
+                    VariableDeclarationKind::Let,
+                    self.ast_builder.vec1(self.ast_builder.variable_declarator(
+                        span,
+                        VariableDeclarationKind::Let,
+                        self.ast_builder.binding_pattern(
+                            BindingPatternKind::BindingIdentifier(
+                                self.ast_builder.alloc_binding_identifier(
+                                    span,
+                                    self.ast_builder.atom("__global__export__"),
+                                ),
+                            ),
+                            None as Option<oxc_allocator::Box<_>>,
+                            false,
+                        ),
+                        Some(Expression::Identifier(
+                            self.ast_builder.alloc_identifier_reference(
+                                span,
+                                self.ast_builder.atom(&identifier.name),
+                            ),
+                        )),
+                        false,
+                    )),
+                    false,
+                );
+
+                self.visit_variable_declaration(&mut variable_declaration);
+            }
+            ExportDefaultDeclarationKind::CallExpression(call_expression) => {
+                let span = call_expression.span;
+
+                // pretend the default export is actually a variable declaration
+                // for our meta variable
+                let mut variable_declaration = self.ast_builder.alloc_variable_declaration(
+                    span,
+                    VariableDeclarationKind::Let,
+                    self.ast_builder.vec1(self.ast_builder.variable_declarator(
+                        span,
+                        VariableDeclarationKind::Let,
+                        self.ast_builder.binding_pattern(
+                            BindingPatternKind::BindingIdentifier(
+                                self.ast_builder.alloc_binding_identifier(
+                                    span,
+                                    self.ast_builder.atom("__global__export__"),
+                                ),
+                            ),
+                            None as Option<oxc_allocator::Box<_>>,
+                            false,
+                        ),
+                        Some(Expression::CallExpression(
+                            call_expression.clone_in(self.allocator),
+                        )),
+                        false,
+                    )),
+                    false,
+                );
+
+                self.visit_variable_declaration(&mut variable_declaration);
+            }
+            ExportDefaultDeclarationKind::FunctionDeclaration(_function_declaration) => {
+                // TODO
+            }
+            _ => {}
+        }
+    }
+
+    fn visit_export_named_declaration(
+        &mut self,
+        it: &mut oxc_ast::ast::ExportNamedDeclaration<'alloc>,
+    ) {
+        let Some(declaration) = &mut it.declaration else {
+            return;
+        };
+        match declaration {
+            Declaration::VariableDeclaration(it) => {
+                for decl in &it.declarations {
+                    let idents = binding_pattern_kind_get_idents(&decl.id.kind);
+                    self.exported_idents.extend(
+                        idents
+                            .into_iter()
+                            .filter(|ident| self.referenced_idents.contains(ident)),
+                    );
+                }
+                self.visit_variable_declaration(it);
+            }
+            Declaration::FunctionDeclaration(_it) => {
+                // TODO
+            }
+            Declaration::ClassDeclaration(_it) => {
+                // TODO
+            }
+            _ => {}
+        }
+    }
+
+    // TODO accept css`` expressions that are notevariable declarations
     // fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
     //     if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
     //         && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
@@ -312,15 +522,14 @@ impl Transformer {
 }
 
 pub async fn evaluate_program<'alloc>(
-    allocator: &'alloc Allocator,
+    ast_builder: &'alloc AstBuilder<'alloc>,
     transformer: &Transformer,
     entrypoint: bool,
     program_path: &String,
     program: &mut Program<'alloc>,
     mut referenced_idents: HashSet<String>,
 ) -> Result<EvaluateProgramReturnStatus, TransformError> {
-    // TODO pass through
-    let ast_builder = AstBuilder::new(allocator);
+    let allocator = &ast_builder.allocator;
 
     // find "css" import or quit early if entrypoint
     let return_early = entrypoint
@@ -347,244 +556,30 @@ pub async fn evaluate_program<'alloc>(
         return Ok(EvaluateProgramReturnStatus::NotTransformed);
     }
 
-    let mut imports = HashMap::new();
-    let mut exports = HashSet::new();
-
     let cache_ref = &transformer.export_cache_ref;
     let store = format!("global.{cache_ref}[\"{program_path}\"]");
 
     // transform all css`...` expresisons into classname strings
     let mut css_transformer = VisitorTransformer::new(
-        &ast_builder,
+        ast_builder,
         allocator,
         entrypoint,
         &store,
         &mut referenced_idents,
     );
     css_transformer.visit_program(program);
-    let (mut css_variable_identifiers, mut style_variable_identifiers) = css_transformer.finish();
+    let (css_variable_identifiers, exported_idents, mut tmp_program) = css_transformer.finish();
 
-    // build a new minimal program
-    let mut tmp_program = utils::build_new_ast(allocator);
-    for stmt in program.body.iter().rev() {
-        if let Statement::ImportDeclaration(import_declaration) = stmt {
-            let module_id = import_declaration.source.value.to_string();
-            let Some(specifiers) = &import_declaration.specifiers else {
-                continue;
-            };
-
-            let entry = imports.entry(module_id.clone()).or_insert_with(Vec::new);
-
-            // ignore `css` import from this library
-            if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME {
-                entry.extend(specifiers.iter().filter(|specifier| match specifier {
-                    oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
-                        !matches!(
-                            &import_specifier.imported,
-                            oxc_ast::ast::ModuleExportName::IdentifierName(identifier_name)
-                            if identifier_name.name == "css"
-                        )
-                    }
-                    _ => false,
-                }));
-                continue;
-            }
-
-            entry.extend(specifiers);
+    // handle imports - resolve other modules and rewrite return values into variable declarations
+    for stmt in program.body.iter() {
+        let Statement::ImportDeclaration(import_declaration) = stmt else {
+            break;
+        };
+        let remote_module_id = import_declaration.source.value.to_string();
+        let Some(specifiers) = &import_declaration.specifiers else {
             continue;
         };
 
-        let mut exported = false;
-        let variable_declaration = match stmt {
-            Statement::ExportNamedDeclaration(export_named_declaration) => {
-                let Some(declaration) = &export_named_declaration.declaration else {
-                    continue;
-                };
-                exported = true;
-                match declaration {
-                    oxc_ast::ast::Declaration::VariableDeclaration(variable_declaration) => {
-                        Some(variable_declaration.clone_in(allocator))
-                    }
-                    // TODO functions
-                    // TODO class
-                    _ => continue,
-                }
-            }
-            Statement::ExportDefaultDeclaration(export_default_declaration) => {
-                exported = true;
-                match &export_default_declaration.declaration {
-                    ExportDefaultDeclarationKind::Identifier(identifier) => {
-                        let span = export_default_declaration.span;
-
-                        // pretend the default export is actually a variable declaration
-                        // for our meta variable
-                        let variable_declaration = ast_builder.alloc_variable_declaration(
-                            span,
-                            VariableDeclarationKind::Let,
-                            ast_builder.vec1(ast_builder.variable_declarator(
-                                span,
-                                VariableDeclarationKind::Let,
-                                ast_builder.binding_pattern(
-                                    BindingPatternKind::BindingIdentifier(
-                                        ast_builder.alloc_binding_identifier(
-                                            span,
-                                            ast_builder.atom("__global__export__"),
-                                        ),
-                                    ),
-                                    None as Option<oxc_allocator::Box<_>>,
-                                    false,
-                                ),
-                                Some(Expression::Identifier(
-                                    ast_builder.alloc_identifier_reference(
-                                        span,
-                                        ast_builder.atom(&identifier.name),
-                                    ),
-                                )),
-                                false,
-                            )),
-                            false,
-                        );
-                        Some(variable_declaration)
-                    }
-                    ExportDefaultDeclarationKind::CallExpression(call_expression) => {
-                        let span = call_expression.span;
-
-                        // pretend the default export is actually a variable declaration
-                        // for our meta variable
-                        let variable_declaration = ast_builder.alloc_variable_declaration(
-                            span,
-                            VariableDeclarationKind::Let,
-                            ast_builder.vec1(ast_builder.variable_declarator(
-                                span,
-                                VariableDeclarationKind::Let,
-                                ast_builder.binding_pattern(
-                                    BindingPatternKind::BindingIdentifier(
-                                        ast_builder.alloc_binding_identifier(
-                                            span,
-                                            ast_builder.atom("__global__export__"),
-                                        ),
-                                    ),
-                                    None as Option<oxc_allocator::Box<_>>,
-                                    false,
-                                ),
-                                Some(Expression::CallExpression(
-                                    call_expression.clone_in(allocator),
-                                )),
-                                false,
-                            )),
-                            false,
-                        );
-                        Some(variable_declaration)
-                    }
-                    ExportDefaultDeclarationKind::FunctionDeclaration(_function_declaration) => {
-                        // TODO
-                        continue;
-                    }
-                    _ => continue,
-                }
-            }
-            Statement::VariableDeclaration(variable_declaration) => {
-                Some(variable_declaration.clone_in(allocator))
-            }
-            _ => None,
-        };
-        if let Some(variable_declaration) = variable_declaration {
-            for variable_declarator in variable_declaration.declarations.iter().rev() {
-                let Some(init) = &variable_declarator.init else {
-                    continue;
-                };
-                let variable_name = match &variable_declarator.id.kind {
-                    BindingPatternKind::BindingIdentifier(binding_identifier) => {
-                        binding_identifier.name.as_str()
-                    }
-                    _ => panic!("invalid 'css`...`' usage"),
-                };
-
-                if !referenced_idents.contains(variable_name) {
-                    continue;
-                }
-
-                let span = variable_declarator.span;
-
-                // if cached, grab from cache
-                let cached = js_sys::eval(&format!("{store}?.hasOwnProperty('{variable_name}')",))
-                    .unwrap()
-                    .is_truthy();
-                if cached {
-                    let variable_declaration = ast::build_variable_declaration_ident(
-                        &ast_builder,
-                        span,
-                        variable_name,
-                        &format!("{store}['{variable_name}']"),
-                    );
-
-                    tmp_program.program.body.insert(0, variable_declaration);
-                    continue;
-                }
-
-                if exported {
-                    exports.insert(variable_name.to_string());
-                }
-
-                let variable_declaration =
-                    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
-                        span,
-                        VariableDeclarationKind::Let,
-                        ast_builder.vec1(variable_declarator.clone_in(allocator)),
-                        false,
-                    ));
-                // copy the entire variable declaration verbatim
-                tmp_program.program.body.insert(0, variable_declaration);
-
-                // if it's a `css` declaration, also add the `var.css = ...` statement
-                if let Some((_, parts)) = css_variable_identifiers.get_mut(variable_name) {
-                    tmp_program.program.body.insert(
-                        1,
-                        Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
-                            span,
-                            ast::build_object_member_string_assignment(
-                                &ast_builder,
-                                span,
-                                variable_name,
-                                "css",
-                                ast_builder.expression_template_literal(
-                                    span,
-                                    parts.quasi.quasis.clone_in(allocator),
-                                    parts.quasi.expressions.clone_in(allocator),
-                                ),
-                            ),
-                        )),
-                    );
-                }
-
-                // handle `style`
-                if let Some(parts) = style_variable_identifiers.get_mut(variable_name) {
-                    tmp_program.program.body.insert(
-                        1,
-                        Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
-                            span,
-                            ast::build_assignment(
-                                &ast_builder,
-                                span,
-                                variable_name,
-                                ast_builder.expression_template_literal(
-                                    span,
-                                    parts.quasi.quasis.clone_in(allocator),
-                                    parts.quasi.expressions.clone_in(allocator),
-                                ),
-                            ),
-                        )),
-                    );
-                }
-
-                // if the right side references any idents, add them
-                referenced_idents.extend(utils::expression_get_references(init));
-            }
-        }
-    }
-
-    // handle imports - resolve other modules and rewrite return values into variable declarations
-    for (remote_module_id, specifiers) in imports.iter() {
         let mut remote_referenced_idents = HashSet::new();
 
         let any_ident_referenced = specifiers.iter().any(|specifier| {
@@ -606,54 +601,21 @@ pub async fn evaluate_program<'alloc>(
             continue;
         }
 
-        let (remote_filepath, code) = transformer.load_file(remote_module_id).await?;
-
-        fn make_require<'a>(
-            ast_builder: &AstBuilder<'a>,
-            binding_pattern: BindingPatternKind<'a>,
-            source: &str,
-            span: Span,
-        ) -> Statement<'a> {
-            Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
-                span,
-                VariableDeclarationKind::Let,
-                ast_builder.vec1(ast_builder.variable_declarator(
-                    span,
-                    VariableDeclarationKind::Let,
-                    ast_builder.binding_pattern(
-                        binding_pattern,
-                        None as Option<oxc_allocator::Box<_>>,
-                        false,
-                    ),
-                    Some(
-                        Expression::CallExpression(
-                            ast_builder.alloc_call_expression(
-                                span,
-                                Expression::Identifier(
-                                    ast_builder.alloc_identifier_reference(
-                                        span,
-                                        ast_builder.atom("require"),
-                                    ),
-                                ),
-                                None as Option<oxc_allocator::Box<_>>,
-                                ast_builder.vec1(oxc_ast::ast::Argument::StringLiteral(
-                                    ast_builder.alloc_string_literal(
-                                        span,
-                                        ast_builder.atom(source),
-                                        None,
-                                    ),
-                                )),
-                                false,
-                            ),
-                        ),
-                    ),
-                    false,
-                )),
-                false,
-            ))
-        }
+        let (remote_filepath, code) = transformer.load_file(&remote_module_id).await?;
 
         for specifier in specifiers.iter() {
+            // ignore `css` imports from us
+            if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME
+                && let ImportDeclarationSpecifier::ImportSpecifier(import_specifier) = specifier
+                && !matches!(
+                    &import_specifier.imported,
+                    ModuleExportName::IdentifierName(identifier_name)
+                    if identifier_name.name == "css"
+                )
+            {
+                continue;
+            }
+
             let (local_name, remote_name, span) = match specifier {
                 oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
                     let local_name = import_specifier.local.name.to_string();
@@ -665,9 +627,9 @@ pub async fn evaluate_program<'alloc>(
                     let span = import_specifier.span;
 
                     if code.is_empty() {
-                        tmp_program.program.body.insert(
+                        tmp_program.body.insert(
                             0,
-                            make_require(
+                            utils::make_require(
                                 &ast_builder,
                                 BindingPatternKind::ObjectPattern(
                                     ast_builder.alloc_object_pattern(
@@ -717,9 +679,9 @@ pub async fn evaluate_program<'alloc>(
                     let span = import_default_specifier.span;
 
                     if code.is_empty() {
-                        tmp_program.program.body.insert(
+                        tmp_program.body.insert(
                             0,
-                            make_require(
+                            utils::make_require(
                                 &ast_builder,
                                 BindingPatternKind::ObjectPattern(
                                     ast_builder.alloc_object_pattern(
@@ -802,7 +764,7 @@ pub async fn evaluate_program<'alloc>(
                     ),
                     false,
                 ));
-            tmp_program.program.body.insert(0, variable_declaration);
+            tmp_program.body.insert(0, variable_declaration);
             remote_referenced_idents.insert(remote_name);
         }
 
@@ -842,10 +804,9 @@ pub async fn evaluate_program<'alloc>(
         }
 
         solid_js_prepass(&ast_builder, &mut ast.program, true);
-        utils::transpile_ts_to_js(allocator, &mut ast.program);
 
         std::boxed::Box::pin(evaluate_program(
-            allocator,
+            ast_builder,
             transformer,
             false,
             &remote_filepath,
@@ -855,18 +816,21 @@ pub async fn evaluate_program<'alloc>(
         .await?;
     }
 
-    transpile_ts_to_js(allocator, &mut tmp_program.program);
+    transpile_ts_to_js(allocator, &mut tmp_program);
 
     let mut tmp_program_js = Codegen::new()
         .with_options(CodegenOptions::default())
-        .build(&tmp_program.program)
+        .build(&tmp_program)
         .code;
 
     // we append all exported idents we evaluated to the cache
-    if !exports.is_empty() {
+    if !exported_idents.is_empty() {
         tmp_program_js.push_str(&format!(
             "\n{store} = {{...({store} ?? {{}}), {}}};",
-            exports.into_iter().collect::<Vec<String>>().join(","),
+            exported_idents
+                .into_iter()
+                .collect::<Vec<String>>()
+                .join(","),
         ));
     }
 
@@ -879,7 +843,7 @@ pub async fn evaluate_program<'alloc>(
             transformer.css_extension,
             css_variable_identifiers
                 .into_iter()
-                .map(|(variable_name, (class_name, _))| {
+                .map(|(variable_name, class_name)| {
                     if class_name.starts_with("_Global") {
                         return format!("`${{{variable_name}.css}}\n`");
                     }
@@ -967,7 +931,7 @@ impl Transformer {
         }
 
         let status = evaluate_program(
-            &allocator,
+            &ast_builder,
             self,
             true,
             &filepath,
