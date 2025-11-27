@@ -106,7 +106,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
 #[derive(PartialEq)]
 enum TagType {
-    Css,
+    // contains class name
+    Css(String),
     Style,
 }
 
@@ -116,7 +117,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         &mut self,
         variable_name: &str,
         it: &mut oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
-    ) -> Option<(TagType, Expression<'alloc>)> {
+    ) -> Option<(TagType)> {
         let span = it.span;
         let tag = utils::tagged_template_get_tag(it)?;
 
@@ -152,21 +153,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 class_name.to_string(),
             );
 
-            return Some((
-                TagType::Css,
-                ast::build_decorated_string(self.ast_builder, span, &class_name),
-            ));
+            return Some(TagType::Css(class_name));
         } else if tag == "style" {
             self.style_variable_identifiers
                 .insert(variable_name.to_string());
 
-            return Some((
-                TagType::Style,
-                Expression::Identifier(
-                    self.ast_builder
-                        .alloc_identifier_reference(span, self.ast_builder.atom("undefined")),
-                ),
-            ));
+            return Some(TagType::Style);
         }
         None
     }
@@ -194,7 +186,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         &mut self,
         it: &VariableDeclarator<'alloc>,
         tag_type: Option<(
-            TagType,
+            &TagType,
             oxc_allocator::Box<'alloc, TaggedTemplateExpression<'alloc>>,
         )>,
     ) {
@@ -252,7 +244,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         // if it's a css`` or style`` declaration, also add the `var.css = ...` statement
         match tag_type {
-            Some((TagType::Css, tagged_template_expression)) => {
+            Some((TagType::Css(_), tagged_template_expression)) => {
                 let mut stmt = Statement::ExpressionStatement(
                     self.ast_builder.alloc_expression_statement(
                         span,
@@ -398,21 +390,35 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 // if the right side references any idents, add them
                 self.referenced_idents.extend(right_references);
 
-                if let Some((_type, right)) = ret {
+                if let Some(tag_type) = ret {
+                    let right = match &tag_type {
+                        TagType::Css(class_name) => {
+                            ast::build_decorated_string(self.ast_builder, span, class_name)
+                        }
+                        TagType::Style => ast::build_undefined(self.ast_builder, span),
+                    };
                     let variable_declarator = ast::build_variable_declarator(
                         self.ast_builder,
                         span,
                         variable_name,
-                        right.clone_in(self.allocator),
+                        right,
                     );
 
                     self.handle_expression(
                         &variable_declarator,
-                        Some((_type, tagged_template_expression.clone_in(self.allocator))),
+                        Some((
+                            &tag_type,
+                            tagged_template_expression.clone_in(self.allocator),
+                        )),
                     );
 
-                    // TODO swap
-                    *it = right;
+                    *it = match &tag_type {
+                        TagType::Css(class_name) => {
+                            ast::build_string(self.ast_builder, span, class_name)
+                        }
+                        TagType::Style => ast::build_undefined(self.ast_builder, span),
+                    };
+
                     return;
                 }
             }
@@ -438,11 +444,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
+        let mut it_copy = it.clone_in(&self.allocator);
+
         let Some(init) = &mut it.init else {
             return;
         };
-
-        let mut tag_type = None;
 
         if let Expression::TaggedTemplateExpression(tagged_template_expression) = init
             && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
@@ -473,18 +479,37 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 // if the right side references any idents, add them
                 self.referenced_idents.extend(right_references);
 
-                if let Some((_type, right)) = ret {
-                    tag_type = Some((
-                        _type,
-                        // TODO swap init and avoid copy
-                        tagged_template_expression.clone_in(self.allocator),
-                    ));
-                    *init = right;
+                if let Some(tag_type) = ret {
+                    let span = tagged_template_expression.span;
+
+                    let right = match &tag_type {
+                        TagType::Css(class_name) => {
+                            ast::build_decorated_string(self.ast_builder, span, class_name)
+                        }
+                        TagType::Style => ast::build_undefined(self.ast_builder, span),
+                    };
+                    it_copy.init = Some(right);
+                    self.handle_expression(
+                        &it_copy,
+                        Some((
+                            &tag_type,
+                            tagged_template_expression.clone_in(self.allocator),
+                        )),
+                    );
+
+                    *init = match &tag_type {
+                        TagType::Css(class_name) => {
+                            ast::build_string(self.ast_builder, span, class_name)
+                        }
+                        TagType::Style => ast::build_undefined(self.ast_builder, span),
+                    };
+
+                    return;
                 }
             }
         };
 
-        self.handle_expression(it, tag_type);
+        self.handle_expression(it, None);
     }
 
     fn visit_export_default_declaration(&mut self, it: &mut ExportDefaultDeclaration<'alloc>) {

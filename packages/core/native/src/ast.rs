@@ -17,6 +17,24 @@ pub fn build_decorated_string<'alloc>(
     ))
 }
 
+pub fn build_string<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    content: &str,
+) -> Expression<'alloc> {
+    Expression::StringLiteral(ast_builder.alloc_string_literal(
+        span,
+        ast_builder.atom(content),
+        None,
+    ))
+}
+
+pub fn build_undefined<'alloc>(ast_builder: &AstBuilder<'alloc>, span: Span) -> Expression<'alloc> {
+    Expression::Identifier(
+        ast_builder.alloc_identifier_reference(span, ast_builder.atom("undefined")),
+    )
+}
+
 pub fn build_object_member_string_assignment<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     span: Span,
