@@ -15,6 +15,7 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
     | {
         code: string;
         sourcemap: string;
+        temporaryPrograms: string[];
       }
     | undefined
   >;

@@ -17,6 +17,7 @@ interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
 export interface ExtraFields {
   cssExtension: string;
   __mocks: Map<string, string>;
+  __getTemporaryPrograms: () => string[];
 }
 
 const vitePlugin = (options: Options = {}) => {
@@ -34,6 +35,7 @@ const vitePlugin = (options: Options = {}) => {
   let server: ViteDevServer | undefined;
   let styleThis: Transformer;
   const mocks = new Map<string, string>();
+  const temporaryPrograms: string[] = [];
 
   return {
     name: "vite:style-this",
@@ -41,6 +43,8 @@ const vitePlugin = (options: Options = {}) => {
 
     cssExtension,
     __mocks: mocks,
+    __getTemporaryPrograms: () =>
+      temporaryPrograms.splice(0, temporaryPrograms.length),
 
     configureServer(viteServer) {
       server = viteServer;
@@ -71,7 +75,7 @@ const vitePlugin = (options: Options = {}) => {
 
         let filepathWithQuery = await resolve(importSourceId);
 
-        if (!filepathWithQuery)
+        if (filepathWithQuery == undefined)
           throw new Error(`vite failed to resolve import '${importSourceId}'`);
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
@@ -193,6 +197,8 @@ const vitePlugin = (options: Options = {}) => {
           const module = server.moduleGraph.getModuleById(virtualModuleId);
           if (module) server.reloadModule(module);
         }
+
+        temporaryPrograms.push(...transformedResult.temporaryPrograms);
 
         return {
           code: transformedResult.code,

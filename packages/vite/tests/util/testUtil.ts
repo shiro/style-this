@@ -16,6 +16,7 @@ export const getResolver = async (testDir: string) => {
       },
       {} as Record<string, string>,
     );
+  resolver["@style-this/core"] = "";
   return resolver;
 };
 
@@ -45,6 +46,15 @@ export const evaluateProgram = async (
   await expect(cssRaw).toMatchFileSnapshot(
     `${testDir}/out/${entry}.${plugin.cssExtension}`,
   );
+
+  const temporaryPrograms = plugin
+    .__getTemporaryPrograms()
+    .join("\n\n// entry:\n")
+    .replace(testDir, "");
+
+  await expect(temporaryPrograms).toMatchFileSnapshot(
+    `${testDir}/out/compile_${entry}.js`,
+  );
 };
 
 const originalRandom = Math.random;
@@ -71,7 +81,7 @@ export const tsx = (raw: TemplateStringsArray) => raw.join("");
 export const setupPlugin = async (resolver: Record<string, string>) => {
   const ctx = {
     async resolve(id: string) {
-      if (!resolver[id]) return undefined;
+      if (resolver[id] == undefined) return undefined;
       return Promise.resolve({
         id: resolver[id],
         external: false,
@@ -92,5 +102,6 @@ export const setupPlugin = async (resolver: Record<string, string>) => {
     transform: plugin.transform.bind(ctx),
     resolveId: plugin.resolveId.bind(ctx),
     load: plugin.load.bind(ctx),
+    __getTemporaryPrograms: plugin.__getTemporaryPrograms.bind(ctx),
   };
 };

@@ -2,7 +2,11 @@ export type CSSProperties = {
   [key: string]: string | number | CSSProperties;
 };
 
-export const css = (..._raw: any): string => {
+interface CSS extends String {
+  css: string;
+}
+
+export const css = (..._raw: any): CSS => {
   throw new Error(
     "@style-this: called 'css' at runtime. This indicates an error in the transform.",
   );

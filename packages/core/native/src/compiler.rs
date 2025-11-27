@@ -778,6 +778,7 @@ pub async fn evaluate_program<'alloc>(
     program_path: &String,
     program: &mut Program<'alloc>,
     mut referenced_idents: HashSet<String>,
+    temporary_programs: &mut Vec<String>,
 ) -> Result<EvaluateProgramReturnStatus, TransformError> {
     let allocator = &ast_builder.allocator;
 
@@ -1065,6 +1066,7 @@ pub async fn evaluate_program<'alloc>(
             &remote_filepath,
             &mut ast.program,
             remote_referenced_idents,
+            temporary_programs,
         ))
         .await?;
     }
@@ -1121,11 +1123,13 @@ pub async fn evaluate_program<'alloc>(
         ));
     }
 
+    temporary_programs.push(tmp_program_js.to_string());
+
     let css_file_store_ref = &transformer.css_file_store_ref;
     let export_cache_ref = &transformer.export_cache_ref;
     // wrap into promise
     let tmp_program_js = format!(
-        "let eval;
+        "//let eval;
         const global = {{
             {css_file_store_ref},
             {export_cache_ref},
@@ -1174,6 +1178,7 @@ impl Transformer {
     ) -> Result<Option<JsValue>, TransformError> {
         let allocator = Allocator::default();
         let ast_builder = AstBuilder::new(&allocator);
+        let mut temporary_programs = vec![];
 
         let source_type =
             SourceType::from_path(&filepath).map_err(|_| TransformError::UknownExtension {
@@ -1198,6 +1203,7 @@ impl Transformer {
             &filepath,
             &mut ast.program,
             HashSet::new(),
+            &mut temporary_programs,
         )
         .await?;
 
@@ -1242,6 +1248,13 @@ impl Transformer {
             &result,
             &JsValue::from_str("sourcemap"),
             &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
+        )
+        .unwrap();
+
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("temporaryPrograms"),
+            &Array::from_iter(temporary_programs.into_iter().map(JsValue::from)),
         )
         .unwrap();
 
