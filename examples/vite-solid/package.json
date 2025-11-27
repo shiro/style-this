@@ -1,0 +1,35 @@
+{
+  "name": "example/vite-solid",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm vinxi dev",
+    "build": "vinxi build"
+  },
+  "dependencies": {
+    "@solidjs/meta": "0.29.4",
+    "@solidjs/router": "0.15.3",
+    "@solidjs/start": "1.2.0",
+    "@style-this/core": "workspace:",
+    "@style-this/solid-js": "workspace:",
+    "@style-this/vite": "workspace:",
+    "@styled/typescript-styled-plugin": "^1.0.1",
+    "classnames": "2.5.1",
+    "sass": "1.90.0",
+    "solid-js": "1.9.10",
+    "solid-labels": "0.17.0",
+    "typescript": "5.9.3",
+    "vinxi": "0.5.8",
+    "vite": "7.2.2"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "24.9.1",
+    "lightningcss": "1.30.2",
+    "prettier": "3.6.2",
+    "prettier-plugin-organize-imports": "4.3.0",
+    "solid-devtools": "0.34.4"
+  }
+}

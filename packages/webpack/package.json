@@ -24,9 +24,7 @@
   "dependencies": {
     "@style-this/core": "workspace:*",
     "@types/node": "^24.10.1",
-    "@types/webpack-virtual-modules": "^0.4.2",
-    "webpack": "^5.0.0",
-    "webpack-virtual-modules": "^0.6.2"
+    "webpack": "^5.0.0"
   },
   "peerDependencies": {
     "solid-js": "*",

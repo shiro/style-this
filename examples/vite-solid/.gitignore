@@ -1,0 +1,4 @@
+.output/
+.vinxi/
+app.config.timestamp*
+*.bundled_*.mjs

@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm --filter '!example/*' build",
     "build:core": "pnpm --filter @style-this/core build",
     "build:vite": "pnpm --filter @style-this/vite build",
     "build:webpack": "pnpm --filter @style-this/webpack build",
