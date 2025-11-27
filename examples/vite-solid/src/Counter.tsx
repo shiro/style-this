@@ -7,9 +7,7 @@ const Counter: Component = () => {
     <div class={CounterStyle}>
       {count}
 
-      <FancyButton styleProps={{}} onClick={() => ++count}>
-        count me
-      </FancyButton>
+      <FancyButton onClick={() => ++count}>count me</FancyButton>
     </div>
   );
 };

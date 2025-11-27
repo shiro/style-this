@@ -17,9 +17,10 @@ type StyledProxy = {
     s: TemplateStringsArray,
     ...expr: Array<TemplateExpression<StyleProps>>
   ) => Component<
-    ComponentProps<Element> & {
-      styleProps: StyleProps;
-    }
+    ComponentProps<Element> &
+      (StyleProps extends Record<string, never>
+        ? {}
+        : { styleProps: StyleProps })
   > &
     (StyleProps extends Record<string, never> ? CssExtension : {});
 };
