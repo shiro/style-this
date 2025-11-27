@@ -11,12 +11,6 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./dist/index.mjs",
-    "./cssLoader": {
-      "types": "./dist/cssLoader.d.mts",
-      "import": "./dist/cssLoader.mjs",
-      "require": "./dist/cssLoader.mjs",
-      "default": "./dist/cssLoader.mjs"
-    },
     "./package.json": "./package.json"
   },
   "scripts": {

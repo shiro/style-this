@@ -6,12 +6,6 @@ import type * as Webpack from "webpack";
 import { regexLinariaCSS, regexLinariaCSSQuery } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
 
-const cssLoader = path.resolve(__dirname, "./loaders/webpackCssLoader.mjs");
-const transformLoader = path.resolve(
-  __dirname,
-  "./loaders/webpackTransformLoader.mjs",
-);
-
 /**
  * Modify the css loader config to support linaria global css and prevent
  * the default css-loader from generating classnames for linaria modules.
@@ -59,14 +53,14 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
 
       config.module.rules.push({
         test: regexLinariaCSS,
-        loader: cssLoader,
+        loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"),
         options: {},
         exclude: /node_modules/,
       });
 
       config.module.rules.push({
         test: [/\.(tsx|ts|js|mjs|jsx)$/],
-        loader: transformLoader,
+        loader: path.resolve(__dirname, "./loaders/webpackTransformLoader.mjs"),
         options: {},
         exclude: /node_modules/,
       });

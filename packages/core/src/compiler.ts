@@ -38,6 +38,7 @@ export const Transformer = _Transformer as any as new (opts: {
   cssFileStore: Map<string, string>;
   exportCache: Record<string, Record<string, any>>;
   cssExtension: string;
+  wrapSelectorsWithGlobal?: boolean;
 }) => Transformer;
 export const SolidJsTransformer =
   _SolidJsTransformer as any as new () => SolidJsTransformer;

@@ -88,18 +88,15 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
     }
 
     const filepath = this.resourcePath;
-    const cssFilepath = `${filepath}.module.${cssExtension}`;
-    console.log(cssFilepath);
+    const qualifier = filepath.endsWith("pages/_app.tsx") ? "global" : "module";
+    const cssFilepath = `${filepath}.${qualifier}.${cssExtension}`;
 
-    // console.log("LOAD style-this", this.resourcePath);
-    // console.log(code);
+    console.log("JS", filepath, this.getDependencies());
 
-    // const request = `${cssFilepath}!=!${cssLoader}!${filepath}`;
-    const request = `${cssFilepath}!=!${filepath}?${cssFilepath}`;
-
+    const importSourceRequest = `${cssFilepath}!=!${filepath}?${cssFilepath}`;
     const importSource = this.utils.contextify(
       this.context || this.rootContext,
-      request,
+      importSourceRequest,
     );
 
     const transformedResult = await styleThis.transform(
@@ -115,11 +112,8 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
     }
     filesContainingStyledTemplates.add(filepath);
 
-    // console.log(transformedResult.code);
-
     this.callback(
       null,
-      // `import ${stringifiedRequest};\n${transformedResult.code}`,
       transformedResult.code,
       // TODO sourcemap
     );

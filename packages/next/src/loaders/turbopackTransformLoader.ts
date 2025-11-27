@@ -1,9 +1,13 @@
 import path from "path";
 import { initializeStyleThis } from "@style-this/core/compiler";
 import { readFile } from "fs/promises";
-import { cssFiles } from "../shared";
+import { cssFiles, dependencyStore } from "../shared";
 import { Transformer } from "@style-this/core/compiler";
 import type { RawLoaderDefinitionFunction } from "webpack";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 type LoaderType = RawLoaderDefinitionFunction<{}>;
 
@@ -17,24 +21,24 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
   // tell Webpack this loader is async
   this.async();
 
-  // TODO remove this when done
-  this.cacheable(false);
-
   const resolveSync = this.getResolve({ dependencyType: "esm" });
 
-  const resolve = (token: string, importer: string): Promise<string> => {
+  const resolve = (
+    token: string,
+    importer: string,
+  ): Promise<string | undefined> => {
     const context = path.isAbsolute(importer)
       ? path.dirname(importer)
       : path.join(process.cwd(), path.dirname(importer));
-    return new Promise((resolvePromise, rejectPromise) => {
+    return new Promise((resolvePromise) => {
       resolveSync(context, token, (err, result) => {
         if (err) {
-          rejectPromise(err);
+          resolvePromise(undefined);
         } else if (result) {
           this.addDependency(result);
           resolvePromise(result);
         } else {
-          rejectPromise(new Error(`Cannot resolve ${token}`));
+          resolvePromise(undefined);
         }
       });
     });
@@ -82,60 +86,50 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
         cssFileStore: cssFiles,
         exportCache,
         cssExtension,
+        wrapSelectorsWithGlobal: true,
       });
     }
 
     const filepath = this.resourcePath;
-    const cssFilepath = `${filepath}.module.${cssExtension}`;
-    console.log(cssFilepath);
+    const qualifier = filepath.endsWith("pages/_app.tsx") ? "global" : "module";
+    const noopFilepath = path.resolve(
+      __dirname,
+      `../../style-this.${qualifier}.css`,
+    );
+    const noopFilepathRelative = path.relative(
+      path.dirname(filepath),
+      noopFilepath,
+    );
 
-    // console.log("LOAD style-this", this.resourcePath);
-    // console.log(code);
+    // we explicitly cache-bust here
+    const importSource = `${noopFilepathRelative}?filepath=${filepath}&time=${+new Date()}`;
 
     const transformedResult = await styleThis.transform(
       code.toString(),
       filepath,
-      undefined,
+      importSource,
     );
 
     if (!transformedResult) {
       filesContainingStyledTemplates.delete(filepath);
+      dependencyStore.delete(filepath);
       this.callback(null, code, inputSourceMap);
       return;
     }
-    filesContainingStyledTemplates.add(filepath);
 
-    const css = Buffer.from(transformedResult.code).toString("base64");
-    const resultCodeWithImport = `import "data:text/css;base64,${css}";\n${transformedResult.code}`;
+    filesContainingStyledTemplates.add(filepath);
+    dependencyStore.set(filepath, this.getDependencies());
+
+    this.addDependency(noopFilepath);
 
     this.callback(
       null,
-      resultCodeWithImport,
+      transformedResult.code,
       // TODO sourcemap
     );
-  })();
 
-  // transform(transformServices, contentStr, asyncResolve).then(
-  //   async (result: Result) => {
-  //     if (result.cssText) {
-  //       await Promise.all(
-  //         result.dependencies?.map((dep: any) =>
-  //           asyncResolve(dep, this.resourcePath),
-  //         ) ?? [],
-  //       );
-  //
-  //       const css = Buffer.from(result.cssText).toString("base64");
-  //       const importStatement = `import "data:text/css;base64,${css}";`;
-  //       const finalCode = insertImportStatement(result.code, importStatement);
-  //
-  //       this.callback(null, finalCode, result.sourceMap ?? undefined);
-  //       return;
-  //     }
-  //
-  //     this.callback(null, result.code, result.sourceMap ?? undefined);
-  //   },
-  //   (err: Error) => this.callback(err),
-  // );
+    // console.log("JS", filepath, this.getDependencies());
+  })();
 };
 
 export default turbopackTransformLoader;

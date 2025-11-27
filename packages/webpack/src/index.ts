@@ -36,19 +36,22 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
   // const outputFileName = this.resourcePath.replace(/\.[^.]+$/, extension);
   const resolveSync = this.getResolve({ dependencyType: "esm" });
 
-  const resolve = (token: string, importer: string): Promise<string> => {
+  const resolve = (
+    token: string,
+    importer: string,
+  ): Promise<string | undefined> => {
     const context = path.isAbsolute(importer)
       ? path.dirname(importer)
       : path.join(process.cwd(), path.dirname(importer));
-    return new Promise((resolvePromise, rejectPromise) => {
+    return new Promise((resolvePromise) => {
       resolveSync(context, token, (err, result) => {
         if (err) {
-          rejectPromise(err);
+          resolvePromise(undefined);
         } else if (result) {
           this.addDependency(result);
           resolvePromise(result);
         } else {
-          rejectPromise(new Error(`Cannot resolve ${token}`));
+          resolvePromise(undefined);
         }
       });
     });
@@ -102,15 +105,15 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
     const filepath = this.resourcePath;
     const cssFilepath = `${filepath}.${cssExtension}`;
 
-    console.log("LOAD style-this", this.resourcePath);
-    console.log(code);
+    // console.log("LOAD style-this", this.resourcePath);
+    // console.log(code);
 
     // const request = `${cssFilepath}!=!${cssLoader}!${filepath}`;
-    const request = `${cssFilepath}!=!${filepath}?${cssFilepath}`;
+    const importSourceRequest = `${cssFilepath}!=!${cssLoader}!${filepath}`;
 
     const importSource = this.utils.contextify(
       this.context || this.rootContext,
-      request,
+      importSourceRequest,
     );
 
     const transformedResult = await styleThis.transform(

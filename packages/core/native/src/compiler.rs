@@ -42,6 +42,7 @@ pub struct Transformer {
     css_file_store_ref: String,
     export_cache_ref: String,
     css_extension: String,
+    wrap_selectors_with_global: bool,
 }
 
 #[wasm_bindgen]
@@ -60,6 +61,12 @@ impl Transformer {
             .unwrap()
             .as_string()
             .unwrap();
+
+        let wrap_selectors_with_global =
+            js_sys::Reflect::get(&opts, &JsValue::from_str("wrapSelectorsWithGlobal"))
+                .unwrap()
+                .as_bool()
+                .unwrap_or(false);
 
         let css_file_store_ref = format!("{PREFIX}_{}", generate_random_id(8));
         let css_file_store =
@@ -85,6 +92,7 @@ impl Transformer {
             css_file_store_ref,
             export_cache_ref,
             css_extension,
+            wrap_selectors_with_global,
         }
     }
 
@@ -866,6 +874,10 @@ pub async fn evaluate_program<'alloc>(
                     if class_name.starts_with("_Global") {
                         return format!("`${{{variable_name}.css}}\n`");
                     }
+                    if transformer.wrap_selectors_with_global {
+                        return format!("`:global(.{class_name}) {{\n${{{variable_name}.css}}\n}}`");
+                    }
+
                     format!("`.{class_name} {{\n${{{variable_name}.css}}\n}}`")
                 })
                 .collect::<Vec<_>>()

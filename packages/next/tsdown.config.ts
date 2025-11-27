@@ -10,7 +10,7 @@ export default defineConfig([
     format: "esm",
     entry: [
       "src/index.ts",
-      "src/loaders/webpackCssLoader.ts",
+      "src/loaders/cssLoader.ts",
       "src/loaders/webpackTransformLoader.ts",
       "src/loaders/turbopackTransformLoader.ts",
     ],

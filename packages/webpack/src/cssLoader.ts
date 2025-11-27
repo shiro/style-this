@@ -10,10 +10,10 @@ const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
 
   const filepath = this.resourcePath;
   // console.log(code);
-  console.log("HIT", filepath, cssFiles);
+  // console.log("HIT", filepath, cssFiles);
 
   const ret = cssFiles.get(`${filepath}.style.css`);
-  console.log("ret is\n", ret);
+  // console.log("ret is\n", ret);
 
   if (!ret) {
     this.callback(null, code, inputSourceMap);
