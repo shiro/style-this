@@ -12,6 +12,7 @@ export default defineConfig([
       "src/index.ts",
       "src/loaders/webpackCssLoader.ts",
       "src/loaders/webpackTransformLoader.ts",
+      "src/loaders/turbopackTransformLoader.ts",
     ],
     plugins: [wasm({ maxFileSize: 10000000 })],
   },

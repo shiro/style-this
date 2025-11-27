@@ -11,18 +11,6 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./dist/index.mjs",
-    "./cssLoader": {
-      "types": "./dist/loaders/webpackCssLoader.d.mts",
-      "import": "./dist/loaders/webpackCssLoader.mjs",
-      "require": "./dist/loaders/webpackCssLoader.mjs",
-      "default": "./dist/loaders/webpackCssLoader.mjs"
-    },
-    "./transformLoader": {
-      "types": "./dist/loaders/webpackTransformLoader.d.mts",
-      "import": "./dist/loaders/webpackTransformLoader.mjs",
-      "require": "./dist/loaders/webpackTransformLoader.mjs",
-      "default": "./dist/loaders/webpackTransformLoader.mjs"
-    },
     "./package.json": "./package.json"
   },
   "scripts": {

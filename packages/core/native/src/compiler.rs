@@ -922,7 +922,7 @@ impl Transformer {
         &self,
         code: String,
         filepath: String,
-        import_source: String,
+        import_source: Option<String>,
     ) -> Result<Option<JsValue>, TransformError> {
         let allocator = Allocator::default();
         let ast_builder = AstBuilder::new(&allocator);
@@ -958,17 +958,24 @@ impl Transformer {
         }
 
         // add import to virtual css
-        let import_declaration = ast_builder.alloc_import_declaration::<Option<Box<WithClause>>>(
-            ast.program.span,
-            None,
-            ast_builder.string_literal(ast.program.span, ast_builder.atom(&import_source), None),
-            None,
-            None,
-            ImportOrExportKind::Value,
-        );
-        ast.program
-            .body
-            .insert(0, Statement::ImportDeclaration(import_declaration));
+        if let Some(import_source) = &import_source {
+            let import_declaration = ast_builder
+                .alloc_import_declaration::<Option<Box<WithClause>>>(
+                    ast.program.span,
+                    None,
+                    ast_builder.string_literal(
+                        ast.program.span,
+                        ast_builder.atom(import_source),
+                        None,
+                    ),
+                    None,
+                    None,
+                    ImportOrExportKind::Value,
+                );
+            ast.program
+                .body
+                .insert(0, Statement::ImportDeclaration(import_declaration));
+        }
 
         let options = CodegenOptions {
             source_map_path: Some(PathBuf::from_str(&filepath).unwrap()),
