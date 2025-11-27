@@ -1,11 +1,11 @@
 "use strict";
 let { css } = require("/home/shiro/project/style-this/packages/core/dist/index.mjs");
-let foo = new String("foo-qrrsss");
+let foo = new String("foo-y7w1qz");
 foo.css = `color: white;`;
 
 global.__styleThis_dddeefff["/a.tsx"] = {...(global.__styleThis_dddeefff["/home/shiro/project/style-this/packages/vite/tests/correctness-1/a.tsx"] ?? {}), foo};
 __styleThis_aabbbccc.set('/home/shiro/project/style-this/packages/vite/tests/correctness-1/a.tsx.css', [
-`.foo-qrrsss {
+`.foo-y7w1qz {
 ${foo.css}
 }`
 ].join('\n'));
@@ -15,43 +15,43 @@ ${foo.css}
 const foo = __styleThis_dddeefff["/home/shiro/project/style-this/packages/vite/tests/correctness-1/a.tsx"]["foo"];
 let { css } = require("/home/shiro/project/style-this/packages/core/dist/index.mjs");
 let mutate = (v) => v;
-let var_172_206 = new String("var_172_206-opppqq");
-var_172_206.css = `background: blue;
+let __styleThis_expression_5 = new String("__styleThis_expression_5-z0dufg");
+__styleThis_expression_5.css = `background: blue;
     `;
-let __styleThis_var_c_7 = () => var_172_206;
-let __styleThis_var_s1_6 = new String("s1-mmnnoo");
-__styleThis_var_s1_6.css = `${__styleThis_var_c_7().css}
+let __styleThis_var_c_4 = () => __styleThis_expression_5;
+let __styleThis_var_s1_3 = new String("s1-9qjw5y");
+__styleThis_var_s1_3.css = `${__styleThis_var_c_4().css}
     `;
-let var_282_287 = new String("var_282_287-kklllm");
-var_282_287.css = ``;
+let __styleThis_expression_2 = new String("__styleThis_expression_2-9ejoh6");
+__styleThis_expression_2.css = ``;
 let a = () => {
 ("foob");
 	const b = undefined;
 	mutate(b);
-	return var_282_287;
+	return __styleThis_expression_2;
 };
 let st = `color: pink;`;
-let s2 = new String("s2-iijjjk");
+let s2 = new String("s2-w5qjc1");
 s2.css = `${st}
   ${a().css}`;
-let unrelated = new String("unrelated-ggghhh");
+let unrelated = new String("unrelated-ox2zkx");
 unrelated.css = `background: none;
   ${foo.css}`;
 
 __styleThis_aabbbccc.set('/home/shiro/project/style-this/packages/vite/tests/correctness-1/entry.tsx.css', [
-`.s2-iijjjk {
+`.s1-9qjw5y {
+${__styleThis_var_s1_3.css}
+}`,
+`.__styleThis_expression_5-z0dufg {
+${__styleThis_expression_5.css}
+}`,
+`.s2-w5qjc1 {
 ${s2.css}
 }`,
-`.var_282_287-kklllm {
-${var_282_287.css}
-}`,
-`.unrelated-ggghhh {
+`.unrelated-ox2zkx {
 ${unrelated.css}
 }`,
-`.var_172_206-opppqq {
-${var_172_206.css}
-}`,
-`.s1-mmnnoo {
-${__styleThis_var_s1_6.css}
+`.__styleThis_expression_2-9ejoh6 {
+${__styleThis_expression_2.css}
 }`
 ].join('\n'));

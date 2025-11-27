@@ -3,14 +3,14 @@ import { css, style } from "@style-this/core";
 import { foo } from "./a";
 const mutate = (v) => v;
 const a = () => {
-  ("foob");
-  const b = () => {
-    const c = () => "var_172_206-opppqq";
-    const s1 = "s1-mmnnoo";
-  };
-  mutate(b);
-  return "var_282_287-kklllm";
+("foob");
+	const b = () => {
+		const c = () => "__styleThis_expression_5-z0dufg";
+		const s1 = "s1-9qjw5y";
+	};
+	mutate(b);
+	return "__styleThis_expression_2-9ejoh6";
 };
 const st = undefined;
-const s2 = "s2-iijjjk";
-const unrelated = "unrelated-ggghhh";
+const s2 = "s2-w5qjc1";
+const unrelated = "unrelated-ox2zkx";

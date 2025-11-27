@@ -1,5 +1,3 @@
-use std::ops::DerefMut;
-
 use oxc_ast::ast::{
     Declaration, ExportDefaultDeclaration, ImportDeclarationSpecifier, ModuleExportName,
 };
@@ -51,6 +49,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     ast_builder: &'a AstBuilder<'alloc>,
     allocator: &'alloc Allocator,
     entrypoint: bool,
+    program_filepath: &'a str,
     store: String,
     referenced_idents: Vec<HashSet<String>>,
     css_variable_identifiers: HashMap<String, String>,
@@ -61,10 +60,12 @@ pub struct VisitorTransformer<'a, 'alloc> {
     scan_pass: bool,
     aliases: Vec<HashMap<String, Option<String>>>,
     dynamic_variable_names: Vec<HashSet<String>>,
-    variable_counter: u32,
+    unique_number_counter: u32,
+    css_unique_number_counter: u32,
 
     replacement_points: HashMap<Span, Expression<'alloc>>,
 
+    random: utils::SeededRandom,
     tmp_program: Program<'alloc>,
     tmp_program_statement_buffer: Vec<Vec<Statement<'alloc>>>,
 
@@ -78,11 +79,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         entrypoint: bool,
         store: &str,
         referenced_idents: HashSet<String>,
+        program_filepath: &'a str,
     ) -> Self {
         Self {
             ast_builder,
             allocator,
             entrypoint,
+            program_filepath,
             store: store.to_string(),
             referenced_idents: vec![referenced_idents],
             css_variable_identifiers: Default::default(),
@@ -95,8 +98,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             scan_pass: false,
             aliases: Default::default(),
             dynamic_variable_names: Default::default(),
-            variable_counter: 0,
+            unique_number_counter: 0,
+            css_unique_number_counter: 0,
 
+            random: Default::default(),
             tmp_program: utils::build_new_ast(allocator).program,
             tmp_program_statement_buffer: Default::default(),
 
@@ -124,28 +129,25 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     /// creates a class name or gets it from cache
-    fn create_virtual_css_template(
-        &mut self,
-        variable_name: &str,
-        it: &mut oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
-    ) -> String {
-        let span = it.span;
-
+    fn create_virtual_css_template(&mut self, variable_name: &str) -> String {
         // get class name from cache or compute
+        let unique_number = self.css_unique_number();
         self.entrypoint
             .then(|| {
-                js_sys::eval(&format!("{}?.__css_{}", self.store, span.start))
+                js_sys::eval(&format!("{}?.__css_{unique_number}", self.store))
                     .unwrap()
                     .as_string()
             })
             .flatten()
             .unwrap_or_else(|| {
-                let random_suffix = utils::generate_random_id(6);
+                let random_suffix = self
+                    .random
+                    .random_string(6, &format!("{}_{unique_number}", self.program_filepath));
                 let class_name = format!("{variable_name}-{random_suffix}");
 
                 js_sys::eval(&format!(
-                    "{} = {{...({} ?? {{}}), __css_{}_{}: \"{}\"}};",
-                    self.store, self.store, span.start, span.end, class_name
+                    "{} = {{...({} ?? {{}}), __css_{unique_number}: \"{}\"}};",
+                    self.store, self.store, class_name
                 ))
                 .unwrap();
                 class_name
@@ -319,6 +321,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             }
         };
     }
+
+    fn unique_number(&mut self) -> u32 {
+        self.unique_number_counter += 1;
+        self.unique_number_counter
+    }
+
+    fn css_unique_number(&mut self) -> u32 {
+        self.css_unique_number_counter += 1;
+        self.css_unique_number_counter
+    }
 }
 
 impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
@@ -393,7 +405,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             && (tag == "css" || tag == "style")
         {
             let span = template.span;
-            let variable_name = &format!("var_{}_{}", span.start, span.end);
+            let variable_name = &format!("{PREFIX}_expression_{}", self.unique_number());
 
             let right_references = utils::tagged_template_expression_get_references(template);
 
@@ -418,7 +430,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             match tag {
                 "css" => {
-                    let class_name = self.create_virtual_css_template(variable_name, template);
+                    let class_name = self.create_virtual_css_template(variable_name);
 
                     self.insert_into_virtual_program_css(
                         template,
@@ -493,11 +505,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let alias = if self.scope_depth == 1 {
                     None
                 } else {
-                    Some(format!("{PREFIX}_var_{ident}_{}", self.variable_counter))
+                    Some(format!("{PREFIX}_var_{ident}_{}", self.unique_number()))
                 };
 
                 self.aliases.last_mut().unwrap().insert(ident, alias);
-                self.variable_counter += 1;
             }
             oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
             return;
@@ -540,7 +551,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             match tag {
                 "css" => {
-                    let class_name = self.create_virtual_css_template(variable_name, template);
+                    let class_name = self.create_virtual_css_template(variable_name);
 
                     let variable_declarator = ast::build_variable_declarator(
                         self.ast_builder,
@@ -934,6 +945,7 @@ pub async fn evaluate_program<'alloc>(
         entrypoint,
         &store,
         referenced_idents.clone(),
+        program_path,
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {

@@ -67,6 +67,41 @@ pub fn generate_random_id(length: usize) -> String {
         .collect()
 }
 
+impl Default for SeededRandom {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct SeededRandom {
+    chars: &'static [u8],
+}
+
+impl SeededRandom {
+    pub fn new() -> Self {
+        Self {
+            chars: b"abcdefghijklmnopqrstuvwxyz0123456789",
+        }
+    }
+
+    pub fn random_string(&mut self, length: usize, seed: &str) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        seed.hash(&mut hasher);
+        let mut rng_state = hasher.finish();
+
+        (0..length)
+            .map(|_| {
+                rng_state = rng_state.wrapping_mul(1103515245).wrapping_add(12345);
+                let idx = (rng_state as usize) % self.chars.len();
+                self.chars[idx] as char
+            })
+            .collect()
+    }
+}
+
 #[derive(Default)]
 struct ExpressionCollectorVisitor {
     pub references: Vec<String>,
