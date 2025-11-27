@@ -18,6 +18,8 @@ pub enum TransformError {
     EvaluationFailed { program: String, cause: JsValue },
     #[error("failed to read file '{filepath}'")]
     ReadFileError { filepath: String, cause: JsValue },
+    #[error("tried to access dynamic variable '{variable}' during style evaluation")]
+    AccessDynamicVariableError { variable: String },
 }
 
 impl From<TransformError> for JsValue {
@@ -58,6 +60,8 @@ pub struct VisitorTransformer<'a, 'alloc> {
     replacer: utils::IdentReplacer<'a, 'alloc>,
 
     tmp_program: Program<'alloc>,
+
+    pub error: Option<TransformError>,
 }
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
@@ -86,6 +90,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             replacer: utils::IdentReplacer::new(),
 
             tmp_program: utils::build_new_ast(allocator).program,
+            error: None,
         }
     }
 
@@ -175,6 +180,15 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         None
     }
 
+    fn get_dynamic_variable(&self, name: &str) -> bool {
+        for dynamic_vars in self.dynamic_variable_names.iter().rev() {
+            if dynamic_vars.contains(name) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// transforms the declarator and builds the tmp program
     fn handle_expression(
         &mut self,
@@ -194,6 +208,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         };
         let variable_name = variable_name.name.as_str();
 
+        // TODO this should probably consider aliases everywhere...
         if !self.referenced_idents.contains(variable_name) {
             return;
         }
@@ -295,11 +310,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         let right_references = utils::expression_get_references(init);
 
-        if right_references
-            .iter()
-            .any(|ident| self.dynamic_variable_names.last().unwrap().contains(ident))
-        {
-            panic!("referenced dynamic variable");
+        for ident in &right_references {
+            if self.get_dynamic_variable(ident) {
+                self.error = Some(TransformError::AccessDynamicVariableError {
+                    variable: ident.to_string(),
+                });
+                return;
+            }
         }
 
         // if the right side references any idents, add them
@@ -310,6 +327,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     // do a forward scan for variable declarations, then move backwards through statements
     fn visit_statements(&mut self, it: &mut oxc_allocator::Vec<'alloc, Statement<'alloc>>) {
+        if self.error.is_some() {
+            return;
+        }
+
         let scan_pass = self.scan_pass;
         self.scan_pass = true;
         for el in it.iter_mut() {
@@ -339,6 +360,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
+        if self.error.is_some() {
+            return;
+        }
         if self.scan_pass {
             oxc_ast_visit::walk_mut::walk_expression(self, it);
             return;
@@ -357,11 +381,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let right_references =
                     utils::tagged_template_expression_get_references(tagged_template_expression);
 
-                if right_references
-                    .iter()
-                    .any(|ident| self.dynamic_variable_names.last().unwrap().contains(ident))
-                {
-                    panic!("referenced dynamic variable");
+                for ident in &right_references {
+                    if self.get_dynamic_variable(ident) {
+                        self.error = Some(TransformError::AccessDynamicVariableError {
+                            variable: ident.to_string(),
+                        });
+                        return;
+                    }
                 }
 
                 self.referenced_idents.insert(variable_name.to_string());
@@ -392,6 +418,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     }
 
     fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'alloc>) {
+        if self.error.is_some() {
+            return;
+        }
         if self.scan_pass {
             if self.scope_depth != 1 {
                 let idents = binding_pattern_kind_get_idents(&it.id.kind);
@@ -427,11 +456,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let right_references =
                     utils::tagged_template_expression_get_references(tagged_template_expression);
 
-                if right_references
-                    .iter()
-                    .any(|ident| self.dynamic_variable_names.last().unwrap().contains(ident))
-                {
-                    panic!("referenced dynamic variable");
+                for ident in &right_references {
+                    if self.get_dynamic_variable(ident) {
+                        self.error = Some(TransformError::AccessDynamicVariableError {
+                            variable: ident.to_string(),
+                        });
+                        return;
+                    }
                 }
 
                 self.referenced_idents.insert(variable_name.to_string());
@@ -453,6 +484,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     }
 
     fn visit_export_default_declaration(&mut self, it: &mut ExportDefaultDeclaration<'alloc>) {
+        if self.error.is_some() {
+            return;
+        }
         if self.scan_pass {
             return;
         }
@@ -542,6 +576,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         &mut self,
         it: &mut oxc_ast::ast::ExportNamedDeclaration<'alloc>,
     ) {
+        if self.error.is_some() {
+            return;
+        }
         // TODO handle correctly
         if self.scan_pass {
             return;
@@ -578,6 +615,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     }
 
     fn visit_formal_parameter(&mut self, it: &mut oxc_ast::ast::FormalParameter<'alloc>) {
+        if self.error.is_some() {
+            return;
+        }
         let idents = binding_pattern_kind_get_idents(&it.pattern.kind);
 
         self.dynamic_variable_names
@@ -721,6 +761,9 @@ pub async fn evaluate_program<'alloc>(
         &mut referenced_idents,
     );
     css_transformer.visit_program(program);
+    if let Some(error) = css_transformer.error {
+        return Err(error);
+    }
     let (css_variable_identifiers, exported_idents, mut tmp_program) = css_transformer.finish();
 
     // handle imports - resolve other modules and rewrite return values into variable declarations
