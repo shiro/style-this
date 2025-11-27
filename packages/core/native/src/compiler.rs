@@ -169,6 +169,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 return;
             }
         }
+
+        // if there's no known variable, use the global scope as fallback
+        self.referenced_idents.first_mut().unwrap().insert(name);
     }
 
     fn is_variable_referenced(&mut self, name: &str) -> bool {
@@ -959,6 +962,16 @@ pub async fn evaluate_program<'alloc>(
     }
     let (css_variable_identifiers, referenced_idents, exported_idents, mut tmp_program) =
         css_transformer.finish();
+
+    js_sys::eval(&format!(
+        "console.log('got', '{}')",
+        referenced_idents
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(",")
+    ))
+    .unwrap();
 
     // handle imports - resolve other modules and rewrite return values into variable declarations
     for stmt in program.body.iter() {

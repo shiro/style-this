@@ -1,4 +1,5 @@
 import { css, style } from "@style-this/core";
+import { foo } from "./a";
 
 const mutate = (v) => v;
 
@@ -31,4 +32,5 @@ const s2 = css`
 
 const unrelated = css`
   background: none;
+  ${foo.css}
 `;
