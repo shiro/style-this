@@ -106,10 +106,6 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let span = tagged_template_expression.span;
         let tag = utils::tagged_template_get_tag(tagged_template_expression)?;
 
-        if tag != "css" && tag != "style" {
-            return None;
-        }
-
         if tag == "css" {
             self.expr_counter += 1;
             let idx = self.expr_counter;
@@ -190,9 +186,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
     }
 
-    fn visit_variable_declarator(&mut self, declarator: &mut VariableDeclarator<'alloc>) {
+    fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'alloc>) {
         // let span = declarator.span;
-        let Some(init) = &mut declarator.init else {
+        let Some(init) = &mut it.init else {
             return;
         };
 
@@ -200,7 +196,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
             && (tag == "css" || tag == "style")
         {
-            let BindingPatternKind::BindingIdentifier(variable_name) = &declarator.id.kind else {
+            let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
                 panic!("css variable declaration was not a regular variable declaration")
             };
 
@@ -211,6 +207,23 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 *init = ret;
             }
         };
+        oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
+    }
+
+    fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
+        if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
+            && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
+            && (tag == "css" || tag == "style")
+        {
+            let ret = self
+                .handle_tagged_template_expression(&variable_name.name, tagged_template_expression);
+
+            if let Some(ret) = ret {
+                *init = ret;
+            }
+        };
+
+        oxc_ast_visit::walk_mut::walk_expression(self, it);
     }
 }
 
