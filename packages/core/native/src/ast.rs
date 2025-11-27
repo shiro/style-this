@@ -57,6 +57,27 @@ pub fn build_assignment<'alloc>(
     ))
 }
 
+pub fn build_variable_declarator<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    variable_name: &str,
+    value: Expression<'alloc>,
+) -> VariableDeclarator<'alloc> {
+    ast_builder.variable_declarator(
+        span,
+        VariableDeclarationKind::Const,
+        ast_builder.binding_pattern(
+            BindingPatternKind::BindingIdentifier(
+                ast_builder.alloc_binding_identifier(span, ast_builder.atom(variable_name)),
+            ),
+            None as Option<oxc_allocator::Box<_>>,
+            false,
+        ),
+        Some(value),
+        false,
+    )
+}
+
 pub fn build_variable_declaration_ident<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     span: Span,

@@ -2,6 +2,7 @@ use oxc_ast::ast::{
     Declaration, ExportDefaultDeclaration, ImportDeclarationSpecifier, ModuleExportName,
 };
 
+use crate::ast::build_variable_declaration_ident;
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{binding_pattern_kind_get_idents, transpile_ts_to_js};
 use crate::*;
@@ -49,6 +50,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     css_variable_identifiers: HashMap<String, String>,
     style_variable_identifiers: HashSet<String>,
     exported_idents: HashSet<String>,
+    scope_depth: u32,
 
     tmp_program: Program<'alloc>,
 }
@@ -70,6 +72,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             css_variable_identifiers: Default::default(),
             style_variable_identifiers: Default::default(),
             exported_idents: Default::default(),
+            scope_depth: 0,
 
             tmp_program: utils::build_new_ast(allocator).program,
         }
@@ -147,6 +150,128 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         }
         None
     }
+
+    /// transforms the declarator and builds the tmp program
+    fn handle_expression(
+        &mut self,
+        it: &VariableDeclarator<'alloc>,
+        tag_type: Option<(
+            TagType,
+            oxc_allocator::Box<'alloc, TaggedTemplateExpression<'alloc>>,
+        )>,
+    ) {
+        let Some(init) = &it.init else {
+            return;
+        };
+
+        // TODO handle other kinds
+        let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
+            return;
+        };
+        let variable_name = variable_name.name.as_str();
+
+        if !self.referenced_idents.contains(variable_name) {
+            return;
+        }
+
+        let span = it.span;
+
+        // if cached, grab from cache
+        let cached = js_sys::eval(&format!(
+            "{}?.hasOwnProperty('{variable_name}')",
+            self.store
+        ))
+        .unwrap()
+        .is_truthy();
+        if cached {
+            let variable_declaration = ast::build_variable_declaration_ident(
+                self.ast_builder,
+                span,
+                variable_name,
+                &format!("{}['{variable_name}']", self.store),
+            );
+
+            self.tmp_program.body.insert(0, variable_declaration);
+            return;
+        }
+
+        // TODO move out into visit fns
+        // if exported {
+        //     exports.insert(variable_name.to_string());
+        // }
+
+        // copy the entire variable declaration verbatim
+        let variable_declaration =
+            Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                span,
+                VariableDeclarationKind::Let,
+                self.ast_builder.vec1(it.clone_in(self.allocator)),
+                false,
+            ));
+        self.tmp_program.body.insert(0, variable_declaration);
+
+        // if it's a css`` or style`` declaration, also add the `var.css = ...` statement
+        match tag_type {
+            Some((TagType::Css, tagged_template_expression)) => {
+                self.tmp_program.body.insert(
+                    1,
+                    Statement::ExpressionStatement(
+                        self.ast_builder.alloc_expression_statement(
+                            span,
+                            ast::build_object_member_string_assignment(
+                                self.ast_builder,
+                                span,
+                                variable_name,
+                                "css",
+                                self.ast_builder.expression_template_literal(
+                                    span,
+                                    tagged_template_expression
+                                        .quasi
+                                        .quasis
+                                        .clone_in(self.allocator),
+                                    tagged_template_expression
+                                        .quasi
+                                        .expressions
+                                        .clone_in(self.allocator),
+                                ),
+                            ),
+                        ),
+                    ),
+                );
+            }
+            Some((TagType::Style, tagged_template_expression)) => {
+                self.tmp_program.body.insert(
+                    1,
+                    Statement::ExpressionStatement(
+                        self.ast_builder.alloc_expression_statement(
+                            span,
+                            ast::build_assignment(
+                                self.ast_builder,
+                                span,
+                                variable_name,
+                                self.ast_builder.expression_template_literal(
+                                    span,
+                                    tagged_template_expression
+                                        .quasi
+                                        .quasis
+                                        .clone_in(self.allocator),
+                                    tagged_template_expression
+                                        .quasi
+                                        .expressions
+                                        .clone_in(self.allocator),
+                                ),
+                            ),
+                        ),
+                    ),
+                );
+            }
+            _ => {}
+        };
+
+        // if the right side references any idents, add them
+        self.referenced_idents
+            .extend(utils::expression_get_references(init));
+    }
 }
 
 impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
@@ -157,7 +282,65 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
     }
 
+    fn enter_scope(
+        &mut self,
+        _flags: oxc_semantic::ScopeFlags,
+        _scope_id: &std::cell::Cell<Option<oxc_semantic::ScopeId>>,
+    ) {
+        self.scope_depth += 1;
+    }
+
+    fn leave_scope(&mut self) {
+        self.scope_depth -= 1;
+    }
+
+    fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
+        if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
+            && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
+            && (tag == "css" || tag == "style")
+        {
+            let span = tagged_template_expression.span;
+            let variable_name = &format!("css_{}_{}", span.start, span.end);
+
+            if self.entrypoint || self.referenced_idents.contains(variable_name) {
+                let ret = self
+                    .handle_tagged_template_expression(variable_name, tagged_template_expression);
+
+                self.referenced_idents.insert(variable_name.to_string());
+                // if the right side references any idents, add them
+                self.referenced_idents
+                    .extend(utils::tagged_template_expression_get_references(
+                        tagged_template_expression,
+                    ));
+
+                if let Some((_type, right)) = ret {
+                    let variable_declarator = ast::build_variable_declarator(
+                        self.ast_builder,
+                        span,
+                        variable_name,
+                        right.clone_in(self.allocator),
+                    );
+
+                    self.handle_expression(
+                        &variable_declarator,
+                        Some((_type, tagged_template_expression.clone_in(self.allocator))),
+                    );
+
+                    // TODO swap
+                    *it = right;
+                    return;
+                }
+            }
+        };
+
+        oxc_ast_visit::walk_mut::walk_expression(self, it);
+    }
+
     fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'alloc>) {
+        if self.scope_depth != 1 {
+            return;
+        }
+
         let Some(init) = &mut it.init else {
             return;
         };
@@ -195,120 +378,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             }
         };
 
-        // transforms the declarator and builds the tmp program
-        (|| {
-            let Some(init) = &it.init else {
-                return;
-            };
-
-            // TODO handle other kinds
-            let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
-                return;
-            };
-            let variable_name = variable_name.name.as_str();
-
-            if !self.referenced_idents.contains(variable_name) {
-                return;
-            }
-
-            let span = it.span;
-
-            // if cached, grab from cache
-            let cached = js_sys::eval(&format!(
-                "{}?.hasOwnProperty('{variable_name}')",
-                self.store
-            ))
-            .unwrap()
-            .is_truthy();
-            if cached {
-                let variable_declaration = ast::build_variable_declaration_ident(
-                    self.ast_builder,
-                    span,
-                    variable_name,
-                    &format!("{}['{variable_name}']", self.store),
-                );
-
-                self.tmp_program.body.insert(0, variable_declaration);
-                return;
-            }
-
-            // TODO move out into visit fns
-            // if exported {
-            //     exports.insert(variable_name.to_string());
-            // }
-
-            // copy the entire variable declaration verbatim
-            let variable_declaration =
-                Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
-                    span,
-                    VariableDeclarationKind::Let,
-                    self.ast_builder.vec1(it.clone_in(self.allocator)),
-                    false,
-                ));
-            self.tmp_program.body.insert(0, variable_declaration);
-
-            // if it's a css`` or style`` declaration, also add the `var.css = ...` statement
-            match tag_type {
-                Some((TagType::Css, tagged_template_expression)) => {
-                    self.tmp_program.body.insert(
-                        1,
-                        Statement::ExpressionStatement(
-                            self.ast_builder.alloc_expression_statement(
-                                span,
-                                ast::build_object_member_string_assignment(
-                                    self.ast_builder,
-                                    span,
-                                    variable_name,
-                                    "css",
-                                    self.ast_builder.expression_template_literal(
-                                        span,
-                                        tagged_template_expression
-                                            .quasi
-                                            .quasis
-                                            .clone_in(self.allocator),
-                                        tagged_template_expression
-                                            .quasi
-                                            .expressions
-                                            .clone_in(self.allocator),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    );
-                }
-                Some((TagType::Style, tagged_template_expression)) => {
-                    self.tmp_program.body.insert(
-                        1,
-                        Statement::ExpressionStatement(
-                            self.ast_builder.alloc_expression_statement(
-                                span,
-                                ast::build_assignment(
-                                    self.ast_builder,
-                                    span,
-                                    variable_name,
-                                    self.ast_builder.expression_template_literal(
-                                        span,
-                                        tagged_template_expression
-                                            .quasi
-                                            .quasis
-                                            .clone_in(self.allocator),
-                                        tagged_template_expression
-                                            .quasi
-                                            .expressions
-                                            .clone_in(self.allocator),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    );
-                }
-                _ => {}
-            };
-
-            // if the right side references any idents, add them
-            self.referenced_idents
-                .extend(utils::expression_get_references(init));
-        })();
+        self.handle_expression(it, tag_type);
 
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
     }
@@ -415,23 +485,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             _ => {}
         }
     }
-
-    // TODO accept css`` expressions that are notevariable declarations
-    // fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
-    //     if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
-    //         && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
-    //         && (tag == "css" || tag == "style")
-    //     {
-    //         let ret = self
-    //             .handle_tagged_template_expression(&variable_name.name, tagged_template_expression);
-    //
-    //         if let Some(ret) = ret {
-    //             *init = ret;
-    //         }
-    //     };
-    //
-    //     oxc_ast_visit::walk_mut::walk_expression(self, it);
-    // }
 }
 
 #[wasm_bindgen]
