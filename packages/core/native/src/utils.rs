@@ -231,6 +231,10 @@ impl<'a, 'alloc> IdentReplacer<'a, 'alloc> {
         statement: &mut Statement<'alloc>,
         aliases: &'b Vec<HashMap<String, String>>,
     ) {
+        if aliases.iter().all(|v| v.is_empty()) {
+            return;
+        }
+
         self.ast_builder = Some(ast_builder);
         self.aliases = Some(unsafe { std::mem::transmute(aliases) });
         self.visit_statement(statement);

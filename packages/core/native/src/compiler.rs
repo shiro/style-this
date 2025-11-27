@@ -243,8 +243,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 false,
             ));
 
-        self.replacer
-            .replace(self.ast_builder, &mut variable_declaration, &self.aliases);
+        if self.scope_depth != 1 {
+            self.replacer
+                .replace(self.ast_builder, &mut variable_declaration, &self.aliases);
+        };
 
         self.tmp_program.body.insert(0, variable_declaration);
 
@@ -274,8 +276,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     ),
                 );
 
-                self.replacer
-                    .replace(self.ast_builder, &mut stmt, &self.aliases);
+                if self.scope_depth != 1 {
+                    self.replacer
+                        .replace(self.ast_builder, &mut stmt, &self.aliases);
+                }
 
                 self.tmp_program.body.insert(1, stmt);
             }
