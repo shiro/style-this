@@ -2,7 +2,7 @@
 name = "style_this"
 version = "0.1.0"
 authors = ["shiro <shiro@usagi.io>"]
-edition = "2018"
+edition = "2024"
 
 [package.metadata.wasm-pack.profile.release]
 # wasm-opt = ["-Os", "--enable-mutable-globals"]

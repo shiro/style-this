@@ -196,24 +196,20 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         };
 
-        if let Expression::TaggedTemplateExpression(tagged_template_expression) = init {
-            if let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression) {
-                if tag == "css" || tag == "style" {
-                    let BindingPatternKind::BindingIdentifier(variable_name) = &declarator.id.kind
-                    else {
-                        panic!("css variable declaration was not a regular variable declaration")
-                    };
-
-                    let ret = self.handle_tagged_template_expression(
-                        &variable_name.name,
-                        tagged_template_expression,
-                    );
-
-                    if let Some(ret) = ret {
-                        *init = ret;
-                    }
-                }
+        if let Expression::TaggedTemplateExpression(tagged_template_expression) = init
+            && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
+            && (tag == "css" || tag == "style")
+        {
+            let BindingPatternKind::BindingIdentifier(variable_name) = &declarator.id.kind else {
+                panic!("css variable declaration was not a regular variable declaration")
             };
+
+            let ret = self
+                .handle_tagged_template_expression(&variable_name.name, tagged_template_expression);
+
+            if let Some(ret) = ret {
+                *init = ret;
+            }
         };
     }
 }
@@ -319,20 +315,19 @@ pub async fn evaluate_program<'alloc>(
     // find "css" import or quit early if entrypoint
     let return_early = entrypoint
         && program.body.iter().all(|import| {
-            if let Statement::ImportDeclaration(import_decl) = import {
-                if let Some(specifiers) = &import_decl.specifiers {
-                    for specifier in specifiers.iter() {
-                        if import_decl.source.value != LIBRARY_CORE_IMPORT_NAME {
-                            continue;
-                        }
+            if let Statement::ImportDeclaration(import_decl) = import
+                && let Some(specifiers) = &import_decl.specifiers
+            {
+                for specifier in specifiers.iter() {
+                    if import_decl.source.value != LIBRARY_CORE_IMPORT_NAME {
+                        continue;
+                    }
 
-                        if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
-                            specifier
-                        {
-                            if spec.local.name == "css" || spec.local.name == "style" {
-                                return false;
-                            }
-                        }
+                    if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
+                        specifier
+                        && (spec.local.name == "css" || spec.local.name == "style")
+                    {
+                        return false;
                     }
                 }
             }
