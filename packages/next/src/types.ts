@@ -1,0 +1,17 @@
+// import { PluginOptions } from '@wyw-in-js/transform';
+import { NextConfig } from "next";
+
+// export type LinariaTransformLoaderOptions = {
+//   /**
+//    * Eanbles a prefixer for css rules.
+//    * @default true
+//    */
+//   prefixer?: boolean;
+// } & Partial<Omit<PluginOptions, 'sourceMaps'>>;
+
+export type WithLinariaConfig = NextConfig & {
+  /**
+   * Linaria webpack loader options
+   */
+  // linaria?: LinariaTransformLoaderOptions;
+};

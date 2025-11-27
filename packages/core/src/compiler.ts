@@ -10,6 +10,7 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
   transform(
     code: string,
     filepath: string,
+    importSource: string,
   ): Promise<
     | {
         code: string;
@@ -24,6 +25,7 @@ export interface SolidJsTransformer
   transform(
     code: string,
     filepath: string,
+    importSource: string,
   ): Promise<{
     code: string;
     sourcemap: string;

@@ -33,6 +33,15 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
   // TODO remove this when done
   this.cacheable(false);
 
+  const {
+    sourceMap = undefined,
+    // preprocessor = undefined,
+    prefixer = undefined,
+    // extension = "css",
+    // cacheProvider,
+    ...rest
+  } = this.getOptions() || {};
+
   // const outputFileName = this.resourcePath.replace(/\.[^.]+$/, extension);
   const resolveSync = this.getResolve({ dependencyType: "esm" });
 
