@@ -30,15 +30,15 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
     const context = path.isAbsolute(importer)
       ? path.dirname(importer)
       : path.join(process.cwd(), path.dirname(importer));
-    return new Promise((resolvePromise) => {
+    return new Promise((ok) => {
       resolveSync(context, token, (err, result) => {
         if (err) {
-          resolvePromise(undefined);
+          ok(undefined);
         } else if (result) {
           this.addDependency(result);
-          resolvePromise(result);
+          ok(result);
         } else {
-          resolvePromise(undefined);
+          ok(undefined);
         }
       });
     });
@@ -54,12 +54,8 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
       return [filepath, mocks.get(importSourceId)!];
     }
 
-    let filepathWithQuery = await resolve(importSourceId, "./index.ts");
-
-    if (!filepathWithQuery)
-      throw new Error(`webpack failed to resolve import '${importSourceId}'`);
-
-    let [filepath, _query] = filepathWithQuery.split("?", 2);
+    let filepath =
+      (await resolve(importSourceId, "./index.ts")) ?? importSourceId;
 
     if (
       !filepath.startsWith(`${cwd}/node_modules/`) &&

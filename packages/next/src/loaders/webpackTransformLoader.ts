@@ -24,19 +24,22 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
 
   const resolveSync = this.getResolve({ dependencyType: "esm" });
 
-  const resolve = (token: string, importer: string): Promise<string> => {
+  const resolve = (
+    token: string,
+    importer: string,
+  ): Promise<string | undefined> => {
     const context = path.isAbsolute(importer)
       ? path.dirname(importer)
       : path.join(process.cwd(), path.dirname(importer));
-    return new Promise((resolvePromise, rejectPromise) => {
+    return new Promise((ok) => {
       resolveSync(context, token, (err, result) => {
         if (err) {
-          rejectPromise(err);
+          ok(undefined);
         } else if (result) {
           this.addDependency(result);
-          resolvePromise(result);
+          ok(result);
         } else {
-          rejectPromise(new Error(`Cannot resolve ${token}`));
+          ok(undefined);
         }
       });
     });
@@ -52,12 +55,8 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       return [filepath, mocks.get(importSourceId)!];
     }
 
-    let filepathWithQuery = await resolve(importSourceId, "./index.ts");
-
-    if (!filepathWithQuery)
-      throw new Error(`webpack failed to resolve import '${importSourceId}'`);
-
-    let [filepath, _query] = filepathWithQuery.split("?", 2);
+    let filepath =
+      (await resolve(importSourceId, "./index.ts")) ?? importSourceId;
 
     if (
       !filepath.startsWith(`${cwd}/node_modules/`) &&
