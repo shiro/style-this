@@ -164,7 +164,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     }
 
     fn reference_variable(&mut self, name: String) {
-        for (depth, alias_map) in self.aliases.iter().rev().enumerate() {
+        for (depth, alias_map) in self.aliases.iter().enumerate().rev() {
             if alias_map.contains_key(&name) {
                 self.referenced_idents.get_mut(depth).unwrap().insert(name);
                 return;
