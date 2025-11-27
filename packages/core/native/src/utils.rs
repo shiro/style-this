@@ -211,8 +211,6 @@ pub fn make_require<'a>(
 }
 
 pub struct IdentReplacer<'a, 'alloc> {
-    // pub references: Vec<String>,
-    // pub scopes_references: Vec<HashSet<String>>,
     aliases: Option<&'a Vec<HashMap<String, String>>>,
     ast_builder: Option<&'a AstBuilder<'alloc>>,
 }
@@ -269,3 +267,165 @@ impl<'a, 'alloc> VisitMut<'alloc> for IdentReplacer<'a, 'alloc> {
         }
     }
 }
+
+pub struct VirtualProgramTransformer<'a, 'alloc> {
+    ast_builder: Option<&'a AstBuilder<'alloc>>,
+    class_variable_names: Option<&'a HashMap<String, String>>,
+}
+
+impl<'a, 'alloc> VirtualProgramTransformer<'a, 'alloc> {
+    pub fn new() -> Self {
+        Self {
+            ast_builder: None,
+            class_variable_names: None,
+        }
+    }
+
+    pub fn transform(
+        &mut self,
+        ast_builder: &'a AstBuilder<'alloc>,
+        statement: &mut Statement<'alloc>,
+        class_name_variables: &HashMap<String, String>,
+    ) {
+        if class_name_variables.is_empty() {
+            return;
+        }
+
+        self.ast_builder = Some(ast_builder);
+        self.class_variable_names = Some(unsafe { std::mem::transmute(class_name_variables) });
+
+        self.visit_statement(statement);
+
+        self.ast_builder = None;
+        self.class_variable_names = None;
+    }
+}
+
+impl<'a, 'alloc> VisitMut<'alloc> for VirtualProgramTransformer<'a, 'alloc> {
+    fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
+        let span = it.span();
+        if let Expression::StringLiteral(string_literal) = it
+            && let Some(variable_name) = self
+                .class_variable_names
+                .unwrap()
+                .get(string_literal.value.as_str())
+        {
+            let ast_builder = self.ast_builder.unwrap();
+
+            *it = Expression::Identifier(
+                ast_builder.alloc_identifier_reference(span, ast_builder.atom(variable_name)),
+            );
+            return;
+        }
+
+        oxc_ast_visit::walk_mut::walk_expression(self, it);
+    }
+}
+
+// impl<'a, 'alloc> VisitMut<'alloc> for VirtualProgramTransformer<'a, 'alloc> {
+//     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
+//         let span = it.span();
+//         if let Expression::StringLiteral(string_literal) = it
+//             && self
+//                 .class_names
+//                 .unwrap()
+//                 .contains(string_literal.value.as_str())
+//         {
+//             // string literal expression to IIFE
+//             let ast_builder = self.ast_builder.unwrap();
+//             // let class_name = string_literal.value.as_str();
+//
+//             let declaration_statement = Statement::VariableDeclaration(
+//                 ast_builder.alloc_variable_declaration(
+//                     span,
+//                     VariableDeclarationKind::Let,
+//                     ast_builder.vec1(
+//                         ast_builder.variable_declarator(
+//                             span,
+//                             VariableDeclarationKind::Let,
+//                             ast_builder.binding_pattern(
+//                                 BindingPatternKind::BindingIdentifier(
+//                                     ast_builder
+//                                         .alloc_binding_identifier(span, ast_builder.atom("value")),
+//                                 ),
+//                                 None as Option<oxc_allocator::Box<_>>,
+//                                 false,
+//                             ),
+//                             Some(it.clone_in(ast_builder.allocator)),
+//                             false,
+//                         ),
+//                     ),
+//                     false,
+//                 ),
+//             );
+//
+//             let assign_css_statement =
+//                 Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
+//                     span,
+//                     Expression::AssignmentExpression(ast_builder.alloc_assignment_expression(
+//                         span,
+//                         oxc_ast::ast::AssignmentOperator::Assign,
+//                         oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
+//                             ast_builder.alloc_static_member_expression(
+//                                 span,
+//                                 Expression::Identifier(
+//                                     ast_builder.alloc_identifier_reference(
+//                                         span,
+//                                         ast_builder.atom("value"),
+//                                     ),
+//                                 ),
+//                                 ast_builder.identifier_name(span, ast_builder.atom("css")),
+//                                 false,
+//                             ),
+//                         ),
+//                         Expression::StringLiteral(ast_builder.alloc_string_literal(
+//                             span,
+//                             ast_builder.atom("Hello World"),
+//                             None,
+//                         )),
+//                     )),
+//                 ));
+//
+//             let return_statement = Statement::ReturnStatement(ast_builder.alloc_return_statement(
+//                 span,
+//                 Some(Expression::Identifier(
+//                     ast_builder.alloc_identifier_reference(span, ast_builder.atom("value")),
+//                 )),
+//             ));
+//
+//             let iife_expression = Expression::CallExpression(ast_builder.alloc_call_expression(
+//                 span,
+//                 Expression::ArrowFunctionExpression(ast_builder.alloc_arrow_function_expression(
+//                     span,
+//                     false,
+//                     false,
+//                     None as Option<oxc_allocator::Box<_>>,
+//                     ast_builder.alloc_formal_parameters(
+//                         span,
+//                         oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
+//                         ast_builder.vec(),
+//                         None as Option<oxc_allocator::Box<_>>,
+//                     ),
+//                     None as Option<oxc_allocator::Box<_>>,
+//                     ast_builder.alloc_function_body(
+//                         span,
+//                         ast_builder.vec(),
+//                         ast_builder.vec_from_array([
+//                             declaration_statement,
+//                             assign_css_statement,
+//                             return_statement,
+//                         ]),
+//                     ),
+//                 )),
+//                 None as Option<oxc_allocator::Box<_>>,
+//                 ast_builder.vec(),
+//                 false,
+//             ));
+//
+//             *it = iife_expression;
+//             return;
+//         }
+//
+//         oxc_ast_visit::walk_mut::walk_expression(self, it);
+//     }
+// }

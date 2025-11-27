@@ -52,12 +52,15 @@ pub struct VisitorTransformer<'a, 'alloc> {
     style_variable_identifiers: HashSet<String>,
     exported_idents: HashSet<String>,
     scope_depth: u32,
+    found_nested_template_literal: bool,
 
     scan_pass: bool,
     aliases: Vec<HashMap<String, String>>,
+    class_name_variables: HashMap<String, String>,
     dynamic_variable_names: Vec<HashSet<String>>,
     ident_alias_counter: u32,
     replacer: utils::IdentReplacer<'a, 'alloc>,
+    virtual_program_transformer: utils::VirtualProgramTransformer<'a, 'alloc>,
 
     tmp_program: Program<'alloc>,
 
@@ -82,12 +85,15 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             style_variable_identifiers: Default::default(),
             exported_idents: Default::default(),
             scope_depth: 0,
+            found_nested_template_literal: Default::default(),
 
-            scan_pass: true,
+            scan_pass: false,
             aliases: Default::default(),
+            class_name_variables: Default::default(),
             dynamic_variable_names: Default::default(),
             ident_alias_counter: 0,
             replacer: utils::IdentReplacer::new(),
+            virtual_program_transformer: utils::VirtualProgramTransformer::new(),
 
             tmp_program: utils::build_new_ast(allocator).program,
             error: None,
@@ -153,6 +159,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 class_name.to_string(),
             );
 
+            self.class_name_variables
+                .insert(class_name.to_string(), variable_name.to_string());
+
             return Some(TagType::Css(class_name));
         } else if tag == "style" {
             self.style_variable_identifiers
@@ -201,9 +210,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let variable_name = variable_name.name.as_str();
 
         // TODO this should probably consider aliases everywhere...
-        if !self.referenced_idents.contains(variable_name) {
-            return;
-        }
+        // if !self.referenced_idents.contains(variable_name) && tag_type.is_none() {
+        //     return;
+        // }
 
         let span = it.span;
 
@@ -234,6 +243,18 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 self.ast_builder.vec1(it.clone_in(self.allocator)),
                 false,
             ));
+
+        // TODO wip
+        js_sys::eval(&format!("console.log('check', '{variable_name}')",)).unwrap();
+        if self.found_nested_template_literal {
+            js_sys::eval(&format!("console.log('hit', '{variable_name}')",)).unwrap();
+            self.virtual_program_transformer.transform(
+                self.ast_builder,
+                &mut variable_declaration,
+                &self.class_name_variables,
+            );
+            self.found_nested_template_literal = false;
+        }
 
         if self.scope_depth != 1 {
             self.replacer
@@ -327,11 +348,16 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
+        if self.scan_pass {
+            return;
+        }
+
         let scan_pass = self.scan_pass;
         self.scan_pass = true;
-        for el in it.iter_mut() {
+        for el in it.iter_mut().rev() {
             self.visit_statement(el);
         }
+        js_sys::eval(&format!("console.log('scan done')",)).unwrap();
         self.scan_pass = false;
         for el in it.iter_mut().rev() {
             self.visit_statement(el);
@@ -390,38 +416,35 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 // if the right side references any idents, add them
                 self.referenced_idents.extend(right_references);
 
-                if let Some(tag_type) = ret {
-                    let right = match &tag_type {
-                        TagType::Css(class_name) => {
-                            ast::build_decorated_string(self.ast_builder, span, class_name)
-                        }
-                        TagType::Style => ast::build_undefined(self.ast_builder, span),
-                    };
-                    let variable_declarator = ast::build_variable_declarator(
-                        self.ast_builder,
-                        span,
-                        variable_name,
-                        right,
-                    );
+                let tag_type = ret.unwrap();
+                let right = match &tag_type {
+                    TagType::Css(class_name) => {
+                        ast::build_decorated_string(self.ast_builder, span, class_name)
+                    }
+                    TagType::Style => ast::build_undefined(self.ast_builder, span),
+                };
+                let variable_declarator =
+                    ast::build_variable_declarator(self.ast_builder, span, variable_name, right);
 
-                    self.handle_expression(
-                        &variable_declarator,
-                        Some((
-                            &tag_type,
-                            tagged_template_expression.clone_in(self.allocator),
-                        )),
-                    );
+                self.handle_expression(
+                    &variable_declarator,
+                    Some((
+                        &tag_type,
+                        tagged_template_expression.clone_in(self.allocator),
+                    )),
+                );
 
-                    *it = match &tag_type {
-                        TagType::Css(class_name) => {
-                            ast::build_string(self.ast_builder, span, class_name)
-                        }
-                        TagType::Style => ast::build_undefined(self.ast_builder, span),
-                    };
-
-                    return;
-                }
+                *it = match &tag_type {
+                    TagType::Css(class_name) => {
+                        ast::build_string(self.ast_builder, span, class_name)
+                    }
+                    TagType::Style => ast::build_undefined(self.ast_builder, span),
+                };
             }
+
+            self.found_nested_template_literal = true;
+
+            js_sys::eval(&format!("console.log('found', '{variable_name}')",)).unwrap();
         };
 
         oxc_ast_visit::walk_mut::walk_expression(self, it);
@@ -479,39 +502,42 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 // if the right side references any idents, add them
                 self.referenced_idents.extend(right_references);
 
-                if let Some(tag_type) = ret {
-                    let span = tagged_template_expression.span;
+                let tag_type = ret.unwrap();
+                let span = tagged_template_expression.span;
 
-                    let right = match &tag_type {
-                        TagType::Css(class_name) => {
-                            ast::build_decorated_string(self.ast_builder, span, class_name)
-                        }
-                        TagType::Style => ast::build_undefined(self.ast_builder, span),
-                    };
-                    it_copy.init = Some(right);
-                    self.handle_expression(
-                        &it_copy,
-                        Some((
-                            &tag_type,
-                            tagged_template_expression.clone_in(self.allocator),
-                        )),
-                    );
+                let right = match &tag_type {
+                    TagType::Css(class_name) => {
+                        ast::build_decorated_string(self.ast_builder, span, class_name)
+                    }
+                    TagType::Style => ast::build_undefined(self.ast_builder, span),
+                };
+                it_copy.init = Some(right);
+                self.handle_expression(
+                    &it_copy,
+                    Some((
+                        &tag_type,
+                        tagged_template_expression.clone_in(self.allocator),
+                    )),
+                );
 
-                    *init = match &tag_type {
-                        TagType::Css(class_name) => {
-                            ast::build_string(self.ast_builder, span, class_name)
-                        }
-                        TagType::Style => ast::build_undefined(self.ast_builder, span),
-                    };
-
-                    return;
-                }
+                *init = match &tag_type {
+                    TagType::Css(class_name) => {
+                        ast::build_string(self.ast_builder, span, class_name)
+                    }
+                    TagType::Style => ast::build_undefined(self.ast_builder, span),
+                };
             }
+            return;
         };
+
+        let prev = self.found_nested_template_literal;
+        self.found_nested_template_literal = false;
 
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
 
         self.handle_expression(it, None);
+
+        self.found_nested_template_literal = prev;
     }
 
     fn visit_export_default_declaration(&mut self, it: &mut ExportDefaultDeclaration<'alloc>) {
