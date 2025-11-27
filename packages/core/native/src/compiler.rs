@@ -614,13 +614,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
 
+        let Some(init) = &it.init else { return };
+
         let variable_names = binding_pattern_kind_get_idents(&it.id.kind);
         let referenced_variable_names: Vec<_> = variable_names
             .iter()
             .filter(|name| self.is_variable_referenced(name))
             .collect();
-
-        let Some(init) = &it.init else { return };
 
         if referenced_variable_names.is_empty() {
             self.replacement_points.insert(

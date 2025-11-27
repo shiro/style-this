@@ -4,7 +4,7 @@ import { css } from "@style-this/core";
 const color: string = "coral";
 
 const Main: Component = () => {
-  const color = "blue";
+  // const color = "blue";
   return (
     <div class={ContainerStyle}>
       <Counter />
