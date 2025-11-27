@@ -1,0 +1,46 @@
+{
+  "name": "@style-this/webpack",
+  "version": "0.1.0",
+  "description": "CSS-in-JS library for the modern web - webpack plugin",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./cssLoader": {
+      "types": "./dist/cssLoader.d.mts",
+      "import": "./dist/cssLoader.mjs",
+      "require": "./dist/cssLoader.mjs",
+      "default": "./dist/cssLoader.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "lint": "eslint",
+    "lint:fix": "pnpm lint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@style-this/core": "workspace:*",
+    "@types/node": "^24.10.1",
+    "@types/webpack-virtual-modules": "^0.4.2",
+    "webpack": "^5.0.0",
+    "webpack-virtual-modules": "^0.6.2"
+  },
+  "peerDependencies": {
+    "solid-js": "*",
+    "webpack": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": true
+    }
+  }
+}

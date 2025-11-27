@@ -8,6 +8,7 @@
     "build": "pnpm -r build",
     "build:core": "pnpm --filter @style-this/core build",
     "build:vite": "pnpm --filter @style-this/vite build",
+    "build:webpack": "pnpm --filter @style-this/webpack build",
     "dev": "pnpm -r dev",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",

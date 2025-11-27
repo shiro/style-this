@@ -33,9 +33,9 @@ export interface SolidJsTransformer
 // fix types on rust-generated types
 export const Transformer = _Transformer as any as new (opts: {
   loadFile: (filepath: string) => Promise<[string, string]>;
-  cssExtension: string;
   cssFileStore: Map<string, string>;
-  exportCache: Map<string, Record<string, any>>;
+  exportCache: Record<string, Record<string, any>>;
+  cssExtension: string;
 }) => Transformer;
 export const SolidJsTransformer =
   _SolidJsTransformer as any as new () => SolidJsTransformer;

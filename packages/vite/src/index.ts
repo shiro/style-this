@@ -169,11 +169,16 @@ const vitePlugin = (options: Options = {}) => {
         return;
       }
 
+      const importSource = `${virtualModulePrefix}${filepath}.${cssExtension}`;
       const cssFilepath = `${filepath}.${cssExtension}`;
       cssFiles.delete(cssFilepath);
 
       try {
-        const transformedResult = await styleThis.transform(code, filepath);
+        const transformedResult = await styleThis.transform(
+          code,
+          filepath,
+          importSource,
+        );
 
         if (!transformedResult) {
           filesContainingStyledTemplates.delete(filepath);

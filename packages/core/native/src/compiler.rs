@@ -4,8 +4,8 @@ use crate::*;
 
 #[derive(Error, Debug)]
 pub enum TransformError {
-    #[error("failed to parse program from bunlder 'bundler-id:{id}'")]
-    BunlderParseFailed { id: String },
+    #[error("failed to parse program from bundler 'bundler-id:{id}'")]
+    BundlerParseFailed { id: String },
     #[error("failed to parse program from file '{filepath}'")]
     RawParseFailed { filepath: String },
     #[error("failed to determine program type from extension '{filepath}'")]
@@ -242,24 +242,6 @@ pub async fn evaluate_program<'alloc>(
 
     let cache_ref = &transformer.export_cache_ref;
     let store = format!("global.{cache_ref}[\"{program_path}\"]");
-
-    let n = ast_builder.alloc_import_declaration::<Option<Box<WithClause>>>(
-        program.span,
-        None,
-        ast_builder.string_literal(
-            program.span,
-            ast_builder.atom(&format!(
-                "virtual:style-this:{program_path}.{}",
-                transformer.css_extension
-            )),
-            None,
-        ),
-        None,
-        None,
-        ImportOrExportKind::Value,
-    );
-
-    program.body.insert(0, Statement::ImportDeclaration(n));
 
     // transform all css`...` expresisons into classname strings
     let mut expr_counter = 0u32;
@@ -940,8 +922,11 @@ impl Transformer {
         &self,
         code: String,
         filepath: String,
+        import_source: String,
     ) -> Result<Option<JsValue>, TransformError> {
         let allocator = Allocator::default();
+        let ast_builder = AstBuilder::new(&allocator);
+
         let source_type =
             SourceType::from_path(&filepath).map_err(|_| TransformError::UknownExtension {
                 filepath: filepath.clone(),
@@ -954,7 +939,8 @@ impl Transformer {
             .parse();
 
         if ast.panicked {
-            return Err(TransformError::BunlderParseFailed { id: filepath });
+            // panic!(format!("{:?}", ast.errors));
+            return Err(TransformError::BundlerParseFailed { id: filepath });
         }
 
         let status = evaluate_program(
@@ -970,6 +956,19 @@ impl Transformer {
         if status == EvaluateProgramReturnStatus::NotTransformed {
             return Ok(None);
         }
+
+        // add import to virtual css
+        let import_declaration = ast_builder.alloc_import_declaration::<Option<Box<WithClause>>>(
+            ast.program.span,
+            None,
+            ast_builder.string_literal(ast.program.span, ast_builder.atom(&import_source), None),
+            None,
+            None,
+            ImportOrExportKind::Value,
+        );
+        ast.program
+            .body
+            .insert(0, Statement::ImportDeclaration(import_declaration));
 
         let options = CodegenOptions {
             source_map_path: Some(PathBuf::from_str(&filepath).unwrap()),
