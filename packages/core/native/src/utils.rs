@@ -163,11 +163,14 @@ pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a
 
     let ret = SemanticBuilder::new().build(program);
     let scoping = ret.semantic.into_scoping();
-    let t = Transformer::new(
-        allocator,
-        Path::new("test.tsx"),
-        &TransformOptions::default(),
-    );
+    let options = TransformOptions {
+        env: oxc_transformer::EnvOptions {
+            module: oxc_transformer::Module::CommonJS,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let t = Transformer::new(allocator, Path::new("test.tsx"), &options);
     t.build_with_scoping(scoping, program);
 }
 
@@ -205,4 +208,60 @@ pub fn make_require<'a>(
         )),
         false,
     ))
+}
+
+pub struct IdentReplacer<'a, 'alloc> {
+    // pub references: Vec<String>,
+    // pub scopes_references: Vec<HashSet<String>>,
+    aliases: Option<&'a Vec<HashMap<String, String>>>,
+    ast_builder: Option<&'a AstBuilder<'alloc>>,
+}
+
+impl<'a, 'alloc> IdentReplacer<'a, 'alloc> {
+    pub fn new() -> Self {
+        Self {
+            ast_builder: None,
+            aliases: None,
+        }
+    }
+
+    pub fn replace<'b>(
+        &mut self,
+        ast_builder: &'a AstBuilder<'alloc>,
+        statement: &mut Statement<'alloc>,
+        aliases: &'b Vec<HashMap<String, String>>,
+    ) {
+        self.ast_builder = Some(ast_builder);
+        self.aliases = Some(unsafe { std::mem::transmute(aliases) });
+        self.visit_statement(statement);
+        self.ast_builder = None;
+        self.aliases = None;
+    }
+
+    fn get_alias(&self, name: &str) -> Option<String> {
+        for alias_map in self.aliases.unwrap().iter().rev() {
+            if let Some(alias) = alias_map.get(name) {
+                return Some(alias.clone());
+            }
+        }
+        None
+    }
+}
+
+impl<'a, 'alloc> VisitMut<'alloc> for IdentReplacer<'a, 'alloc> {
+    fn visit_identifier_reference(&mut self, it: &mut oxc_ast::ast::IdentifierReference<'alloc>) {
+        if let Some(alias) = self.get_alias(&it.name) {
+            it.name = self.ast_builder.unwrap().atom(&alias);
+        }
+    }
+    fn visit_binding_identifier(&mut self, it: &mut oxc_ast::ast::BindingIdentifier<'alloc>) {
+        if let Some(alias) = self.get_alias(&it.name) {
+            it.name = self.ast_builder.unwrap().atom(&alias);
+        }
+    }
+    fn visit_identifier_name(&mut self, it: &mut oxc_ast::ast::IdentifierName<'alloc>) {
+        if let Some(alias) = self.get_alias(&it.name) {
+            it.name = self.ast_builder.unwrap().atom(&alias);
+        }
+    }
 }
