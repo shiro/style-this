@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use oxc_ast::ast::{
     Declaration, ExportDefaultDeclaration, ImportDeclarationSpecifier, ModuleExportName,
 };
@@ -59,7 +61,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     scan_pass: bool,
     aliases: Vec<HashMap<String, Option<String>>>,
     dynamic_variable_names: Vec<HashSet<String>>,
-    ident_alias_counter: u32,
+    variable_counter: u32,
 
     replacement_points: HashMap<Span, Expression<'alloc>>,
 
@@ -93,7 +95,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             scan_pass: false,
             aliases: Default::default(),
             dynamic_variable_names: Default::default(),
-            ident_alias_counter: 0,
+            variable_counter: 0,
 
             tmp_program: utils::build_new_ast(allocator).program,
             tmp_program_statement_buffer: Default::default(),
@@ -132,12 +134,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         // get class name from cache or compute
         self.entrypoint
             .then(|| {
-                js_sys::eval(&format!(
-                    "{}?.__css_{}_{}",
-                    self.store, span.start, span.end
-                ))
-                .unwrap()
-                .as_string()
+                js_sys::eval(&format!("{}?.__css_{}", self.store, span.start))
+                    .unwrap()
+                    .as_string()
             })
             .flatten()
             .unwrap_or_else(|| {
@@ -287,57 +286,38 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .push(stmt);
     }
 
-    fn alias_binding_pattern(
-        &self,
-        mut pattern: BindingPatternKind<'alloc>,
-    ) -> BindingPatternKind<'alloc> {
-        match &mut pattern {
+    fn alias_binding_pattern(&self, pattern: &mut BindingPatternKind<'alloc>) {
+        match pattern {
             BindingPatternKind::BindingIdentifier(it) => {
                 if let Some(name) = self.get_alias(&it.name) {
                     it.name = self.ast_builder.atom(name);
                 }
             }
-            BindingPatternKind::ObjectPattern(object_pattern) => {
-                // let local_idents = object_pattern
-                //     .properties
-                //     .iter()
-                //     .map(|v| binding_pattern_kind_get_idents(&v.value.kind))
-                //     .fold(HashSet::new(), |mut acc, hashset| {
-                //         acc.extend(hashset);
-                //         acc
-                //     });
-                // idents.extend(local_idents);
-                //
-                // if let Some(rest) = &object_pattern.rest {
-                //     idents.extend(binding_pattern_kind_get_idents(&rest.argument.kind));
-                // }
-                todo!()
+            BindingPatternKind::ObjectPattern(pattern) => {
+                pattern
+                    .properties
+                    .iter_mut()
+                    .for_each(|v| self.alias_binding_pattern(&mut v.value.kind));
+
+                if let Some(rest) = &mut pattern.rest {
+                    self.alias_binding_pattern(&mut rest.argument.kind);
+                }
             }
-            BindingPatternKind::ArrayPattern(array_pattern) => {
-                // let local_idents = array_pattern
-                //     .elements
-                //     .iter()
-                //     .filter_map(|element| element.as_ref())
-                //     .map(|element| binding_pattern_kind_get_idents(&element.kind))
-                //     .fold(HashSet::new(), |mut acc, hashset| {
-                //         acc.extend(hashset);
-                //         acc
-                //     });
-                // idents.extend(local_idents);
-                //
-                // if let Some(rest) = &array_pattern.rest {
-                //     idents.extend(binding_pattern_kind_get_idents(&rest.argument.kind));
-                // }
-                todo!()
+            BindingPatternKind::ArrayPattern(pattern) => {
+                pattern
+                    .elements
+                    .iter_mut()
+                    .filter_map(|element| element.as_mut())
+                    .for_each(|element| self.alias_binding_pattern(&mut element.kind));
+
+                if let Some(rest) = &mut pattern.rest {
+                    self.alias_binding_pattern(&mut rest.argument.kind);
+                }
             }
-            BindingPatternKind::AssignmentPattern(assignment_pattern) => {
-                todo!()
-                // idents.extend(binding_pattern_kind_get_idents(
-                //     &assignment_pattern.left.kind,
-                // ));
+            BindingPatternKind::AssignmentPattern(pattern) => {
+                self.alias_binding_pattern(&mut pattern.left.kind);
             }
         };
-        pattern
     }
 }
 
@@ -513,11 +493,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let alias = if self.scope_depth == 1 {
                     None
                 } else {
-                    Some(format!("{PREFIX}_var_{ident}_{}", self.ident_alias_counter))
+                    Some(format!("{PREFIX}_var_{ident}_{}", self.variable_counter))
                 };
 
                 self.aliases.last_mut().unwrap().insert(ident, alias);
-                self.ident_alias_counter += 1;
+                self.variable_counter += 1;
             }
             oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
             return;
@@ -664,12 +644,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             &mut self.replacement_points,
         );
 
-        let variable_declarator = ast::build_variable_declarator_pattern(
-            self.ast_builder,
-            span,
-            self.alias_binding_pattern(it.id.kind.clone_in(self.allocator)),
-            right,
-        );
+        let mut aliased_idents = it.id.kind.clone_in(self.allocator);
+        self.alias_binding_pattern(&mut aliased_idents);
+
+        let variable_declarator =
+            ast::build_variable_declarator_pattern(self.ast_builder, span, aliased_idents, right);
         self.insert_into_virtual_program(variable_declarator, Some(pos));
     }
 
