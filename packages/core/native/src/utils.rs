@@ -73,6 +73,7 @@ struct ExpressionCollectorVisitor {
     pub scopes_references: Vec<HashSet<String>>,
 }
 
+use oxc_ast::ast::TemplateElement;
 use oxc_ast_visit::walk::walk_formal_parameter;
 use oxc_ast_visit::walk::walk_identifier_reference;
 use oxc_ast_visit::walk::walk_variable_declarator;
@@ -210,111 +211,46 @@ pub fn make_require<'a>(
     ))
 }
 
-pub struct IdentReplacer<'a, 'alloc> {
-    aliases: Option<&'a Vec<HashMap<String, String>>>,
+struct SpanReplacer<'a, 'alloc> {
     ast_builder: Option<&'a AstBuilder<'alloc>>,
+    replacement_points: Option<&'a mut HashMap<Span, Expression<'alloc>>>,
 }
 
-impl<'a, 'alloc> IdentReplacer<'a, 'alloc> {
-    pub fn new() -> Self {
-        Self {
-            ast_builder: None,
-            aliases: None,
-        }
+pub fn replace_in_expression_using_spans<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    expression: &mut Expression<'alloc>,
+    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
+) {
+    let mut t = SpanReplacer {
+        ast_builder: None,
+        replacement_points: None,
+    };
+
+    if replacement_points.is_empty() {
+        return;
     }
 
-    pub fn replace<'b>(
-        &mut self,
-        ast_builder: &'a AstBuilder<'alloc>,
-        statement: &mut Statement<'alloc>,
-        aliases: &'b Vec<HashMap<String, String>>,
-    ) {
-        if aliases.iter().all(|v| v.is_empty()) {
-            return;
-        }
+    t.ast_builder = Some(ast_builder);
+    t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
 
-        self.ast_builder = Some(ast_builder);
-        self.aliases = Some(unsafe { std::mem::transmute(aliases) });
-        self.visit_statement(statement);
-        self.ast_builder = None;
-        self.aliases = None;
-    }
+    t.visit_expression(expression);
 
-    fn get_alias(&self, name: &str) -> Option<String> {
-        for alias_map in self.aliases.unwrap().iter().rev() {
-            if let Some(alias) = alias_map.get(name) {
-                return Some(alias.clone());
-            }
-        }
-        None
-    }
+    t.ast_builder = None;
+    t.replacement_points = None;
 }
 
-impl<'a, 'alloc> VisitMut<'alloc> for IdentReplacer<'a, 'alloc> {
-    fn visit_identifier_reference(&mut self, it: &mut oxc_ast::ast::IdentifierReference<'alloc>) {
-        if let Some(alias) = self.get_alias(&it.name) {
-            it.name = self.ast_builder.unwrap().atom(&alias);
-        }
-    }
-    fn visit_binding_identifier(&mut self, it: &mut oxc_ast::ast::BindingIdentifier<'alloc>) {
-        if let Some(alias) = self.get_alias(&it.name) {
-            it.name = self.ast_builder.unwrap().atom(&alias);
-        }
-    }
-    fn visit_identifier_name(&mut self, it: &mut oxc_ast::ast::IdentifierName<'alloc>) {
-        if let Some(alias) = self.get_alias(&it.name) {
-            it.name = self.ast_builder.unwrap().atom(&alias);
-        }
-    }
-}
-
-pub struct VirtualProgramTransformer<'a, 'alloc> {
-    ast_builder: Option<&'a AstBuilder<'alloc>>,
-    class_variable_names: Option<&'a HashMap<String, String>>,
-}
-
-impl<'a, 'alloc> VirtualProgramTransformer<'a, 'alloc> {
-    pub fn new() -> Self {
-        Self {
-            ast_builder: None,
-            class_variable_names: None,
-        }
-    }
-
-    pub fn transform(
-        &mut self,
-        ast_builder: &'a AstBuilder<'alloc>,
-        statement: &mut Statement<'alloc>,
-        class_name_variables: &HashMap<String, String>,
-    ) {
-        if class_name_variables.is_empty() {
-            return;
-        }
-
-        self.ast_builder = Some(ast_builder);
-        self.class_variable_names = Some(unsafe { std::mem::transmute(class_name_variables) });
-
-        self.visit_statement(statement);
-
-        self.ast_builder = None;
-        self.class_variable_names = None;
-    }
-}
-
-impl<'a, 'alloc> VisitMut<'alloc> for VirtualProgramTransformer<'a, 'alloc> {
+impl<'a, 'alloc> VisitMut<'alloc> for SpanReplacer<'a, 'alloc> {
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
         let span = it.span();
-        if let Expression::StringLiteral(string_literal) = it
-            && let Some(variable_name) = self
-                .class_variable_names
-                .unwrap()
-                .get(string_literal.value.as_str())
+        if let Some(replacement) = self
+            .replacement_points
+            .as_deref_mut()
+            .unwrap()
+            .remove(&span)
         {
             let ast_builder = self.ast_builder.unwrap();
 
-            *it = Expression::Identifier(
-                ast_builder.alloc_identifier_reference(span, ast_builder.atom(variable_name)),
-            );
+            *it = replacement.clone_in(ast_builder.allocator);
             return;
         }
 
@@ -322,110 +258,70 @@ impl<'a, 'alloc> VisitMut<'alloc> for VirtualProgramTransformer<'a, 'alloc> {
     }
 }
 
-// impl<'a, 'alloc> VisitMut<'alloc> for VirtualProgramTransformer<'a, 'alloc> {
-//     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
-//         let span = it.span();
-//         if let Expression::StringLiteral(string_literal) = it
-//             && self
-//                 .class_names
-//                 .unwrap()
-//                 .contains(string_literal.value.as_str())
-//         {
-//             // string literal expression to IIFE
-//             let ast_builder = self.ast_builder.unwrap();
-//             // let class_name = string_literal.value.as_str();
-//
-//             let declaration_statement = Statement::VariableDeclaration(
-//                 ast_builder.alloc_variable_declaration(
-//                     span,
-//                     VariableDeclarationKind::Let,
-//                     ast_builder.vec1(
-//                         ast_builder.variable_declarator(
-//                             span,
-//                             VariableDeclarationKind::Let,
-//                             ast_builder.binding_pattern(
-//                                 BindingPatternKind::BindingIdentifier(
-//                                     ast_builder
-//                                         .alloc_binding_identifier(span, ast_builder.atom("value")),
-//                                 ),
-//                                 None as Option<oxc_allocator::Box<_>>,
-//                                 false,
-//                             ),
-//                             Some(it.clone_in(ast_builder.allocator)),
-//                             false,
-//                         ),
-//                     ),
-//                     false,
-//                 ),
-//             );
-//
-//             let assign_css_statement =
-//                 Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
-//                     span,
-//                     Expression::AssignmentExpression(ast_builder.alloc_assignment_expression(
-//                         span,
-//                         oxc_ast::ast::AssignmentOperator::Assign,
-//                         oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
-//                             ast_builder.alloc_static_member_expression(
-//                                 span,
-//                                 Expression::Identifier(
-//                                     ast_builder.alloc_identifier_reference(
-//                                         span,
-//                                         ast_builder.atom("value"),
-//                                     ),
-//                                 ),
-//                                 ast_builder.identifier_name(span, ast_builder.atom("css")),
-//                                 false,
-//                             ),
-//                         ),
-//                         Expression::StringLiteral(ast_builder.alloc_string_literal(
-//                             span,
-//                             ast_builder.atom("Hello World"),
-//                             None,
-//                         )),
-//                     )),
-//                 ));
-//
-//             let return_statement = Statement::ReturnStatement(ast_builder.alloc_return_statement(
-//                 span,
-//                 Some(Expression::Identifier(
-//                     ast_builder.alloc_identifier_reference(span, ast_builder.atom("value")),
-//                 )),
-//             ));
-//
-//             let iife_expression = Expression::CallExpression(ast_builder.alloc_call_expression(
-//                 span,
-//                 Expression::ArrowFunctionExpression(ast_builder.alloc_arrow_function_expression(
-//                     span,
-//                     false,
-//                     false,
-//                     None as Option<oxc_allocator::Box<_>>,
-//                     ast_builder.alloc_formal_parameters(
-//                         span,
-//                         oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-//                         ast_builder.vec(),
-//                         None as Option<oxc_allocator::Box<_>>,
-//                     ),
-//                     None as Option<oxc_allocator::Box<_>>,
-//                     ast_builder.alloc_function_body(
-//                         span,
-//                         ast_builder.vec(),
-//                         ast_builder.vec_from_array([
-//                             declaration_statement,
-//                             assign_css_statement,
-//                             return_statement,
-//                         ]),
-//                     ),
-//                 )),
-//                 None as Option<oxc_allocator::Box<_>>,
-//                 ast_builder.vec(),
-//                 false,
-//             ));
-//
-//             *it = iife_expression;
-//             return;
-//         }
-//
-//         oxc_ast_visit::walk_mut::walk_expression(self, it);
-//     }
-// }
+struct IdentifierReplacer<'a, 'alloc, F>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    ast_builder: Option<&'a AstBuilder<'alloc>>,
+    get_replacement: Option<&'a F>,
+}
+
+pub fn replace_in_expression_using_identifiers<'alloc, F>(
+    ast_builder: &AstBuilder<'alloc>,
+    expression: &mut Expression<'alloc>,
+    get_replacement: &F,
+) where
+    F: Fn(&str) -> Option<String>,
+{
+    let mut t = IdentifierReplacer {
+        ast_builder: None,
+        get_replacement: None,
+    };
+
+    t.ast_builder = Some(ast_builder);
+    t.get_replacement = Some(get_replacement);
+
+    t.visit_expression(expression);
+
+    t.ast_builder = None;
+    t.get_replacement = None;
+}
+
+impl<'a, 'alloc, F> VisitMut<'alloc> for IdentifierReplacer<'a, 'alloc, F>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    fn visit_identifier_reference(&mut self, it: &mut oxc_ast::ast::IdentifierReference<'alloc>) {
+        if let Some(replacement) = self.get_replacement.as_ref().unwrap()(&it.name) {
+            it.name = self.ast_builder.unwrap().atom(&replacement);
+        }
+    }
+
+    fn visit_binding_identifier(&mut self, it: &mut oxc_ast::ast::BindingIdentifier<'alloc>) {
+        if let Some(replacement) = self.get_replacement.as_ref().unwrap()(&it.name) {
+            it.name = self.ast_builder.unwrap().atom(&replacement);
+        }
+    }
+
+    fn visit_identifier_name(&mut self, it: &mut oxc_ast::ast::IdentifierName<'alloc>) {
+        if let Some(replacement) = self.get_replacement.as_ref().unwrap()(&it.name) {
+            it.name = self.ast_builder.unwrap().atom(&replacement);
+        }
+    }
+}
+
+pub fn trim_newlines<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    quasis: &mut oxc_allocator::Vec<'alloc, TemplateElement<'alloc>>,
+) {
+    if !quasis.is_empty() {
+        let last_idx = quasis.len() - 1;
+        let trimmed_first = quasis[0]
+            .value
+            .raw
+            .trim_start_matches([' ', '\n', '\r', '\t']);
+        quasis[0].value.raw = ast_builder.atom(trimmed_first);
+        let trimmed = quasis[last_idx].value.raw.trim_end_matches(['\n']);
+        quasis[last_idx].value.raw = ast_builder.atom(trimmed);
+    }
+}

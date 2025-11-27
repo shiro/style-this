@@ -1,29 +1,41 @@
 "use strict";
-let { css } = require("/home/shiro/project/style-this/packages/core/dist/index.mjs");
-let outer = () => {
-	const inner = () => {
-		return __styleThis_css_98_132;
-	};
-	return __styleThis_css_148_191;
-};
-let __styleThis_var_inner_0 = () => {
-	return __styleThis_css_98_132;
-};
-let __styleThis_css_98_132 = new String("__styleThis_css_98_132-iijjjk");
-__styleThis_css_98_132.css = `
-      background: blue;
+let mutate = (v) => v;
+let var_145_179 = new String("var_145_179-opppqq");
+var_145_179.css = `background: blue;
     `;
-let __styleThis_css_148_191 = new String("__styleThis_css_148_191-ggghhh");
-__styleThis_css_148_191.css = `
-    ${__styleThis_var_inner_0().css}
-    color: red;
-  `;
+let __styleThis_var_c_7 = () => var_145_179;
+let __styleThis_var_s1_6 = new String("s1-mmnnoo");
+__styleThis_var_s1_6.css = `${__styleThis_var_c_7().css}
+    `;
+let var_255_260 = new String("var_255_260-kklllm");
+var_255_260.css = ``;
+let a = () => {
+("foob");
+	const b = undefined;
+	mutate(b);
+	return var_255_260;
+};
+let st = `color: pink;`;
+let s2 = new String("s2-iijjjk");
+s2.css = `${st}
+  ${a().css}`;
+let unrelated = new String("unrelated-ggghhh");
+unrelated.css = `background: none;`;
 
 __styleThis_aabbbccc.set('/entry.tsx.css', [
-`.__styleThis_css_148_191-ggghhh {
-${__styleThis_css_148_191.css}
+`.unrelated-ggghhh {
+${unrelated.css}
 }`,
-`.__styleThis_css_98_132-iijjjk {
-${__styleThis_css_98_132.css}
+`.s1-mmnnoo {
+${__styleThis_var_s1_6.css}
+}`,
+`.s2-iijjjk {
+${s2.css}
+}`,
+`.var_255_260-kklllm {
+${var_255_260.css}
+}`,
+`.var_145_179-opppqq {
+${var_145_179.css}
 }`
-].join('\n\n'));
+].join('\n'));

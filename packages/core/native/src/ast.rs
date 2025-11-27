@@ -96,6 +96,25 @@ pub fn build_variable_declarator<'alloc>(
     )
 }
 
+pub fn build_variable_declarator_pattern<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    variable_pattern: BindingPatternKind<'alloc>,
+    value: Expression<'alloc>,
+) -> VariableDeclarator<'alloc> {
+    ast_builder.variable_declarator(
+        span,
+        VariableDeclarationKind::Const,
+        ast_builder.binding_pattern(
+            variable_pattern,
+            None as Option<oxc_allocator::Box<_>>,
+            false,
+        ),
+        Some(value),
+        false,
+    )
+}
+
 pub fn build_variable_declaration_ident<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     span: Span,
