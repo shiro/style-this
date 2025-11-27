@@ -117,7 +117,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         &mut self,
         variable_name: &str,
         it: &mut oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
-    ) -> Option<(TagType)> {
+    ) -> Option<TagType> {
         let span = it.span;
         let tag = utils::tagged_template_get_tag(it)?;
 
@@ -370,7 +370,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             let span = tagged_template_expression.span;
             let variable_name = &format!("{PREFIX}_css_{}_{}", span.start, span.end);
 
-            if self.entrypoint || self.referenced_idents.contains(variable_name) {
+            if self.entrypoint {
                 let ret = self
                     .handle_tagged_template_expression(variable_name, tagged_template_expression);
 
@@ -444,7 +444,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
-        let mut it_copy = it.clone_in(&self.allocator);
+        let mut it_copy = it.clone_in(self.allocator);
 
         let Some(init) = &mut it.init else {
             return;
@@ -508,6 +508,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 }
             }
         };
+
+        oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
 
         self.handle_expression(it, None);
     }
@@ -855,7 +857,7 @@ pub async fn evaluate_program<'alloc>(
                         tmp_program.body.insert(
                             0,
                             utils::make_require(
-                                &ast_builder,
+                                ast_builder,
                                 BindingPatternKind::ObjectPattern(
                                     ast_builder.alloc_object_pattern(
                                         span,
@@ -907,7 +909,7 @@ pub async fn evaluate_program<'alloc>(
                         tmp_program.body.insert(
                             0,
                             utils::make_require(
-                                &ast_builder,
+                                ast_builder,
                                 BindingPatternKind::ObjectPattern(
                                     ast_builder.alloc_object_pattern(
                                         span,

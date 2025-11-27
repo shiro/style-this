@@ -147,13 +147,13 @@ pub fn tagged_template_expression_get_references<'a>(
 
 pub fn build_new_ast<'a>(allocator: &'a Allocator) -> oxc_parser::ParserReturn<'a> {
     let source_type = SourceType::tsx();
-    let parsed = Parser::new(allocator, "", source_type)
+
+    Parser::new(allocator, "", source_type)
         .with_options(ParseOptions {
             parse_regular_expression: true,
             ..ParseOptions::default()
         })
-        .parse();
-    parsed
+        .parse()
 }
 
 pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a>) {
