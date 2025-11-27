@@ -37,6 +37,7 @@ const vitePlugin = (options: Options = {}) => {
 
   return {
     name: "vite:style-this",
+    enforce: "pre",
 
     cssExtension,
     __mocks: mocks,

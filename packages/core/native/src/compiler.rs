@@ -1,4 +1,5 @@
 use crate::solid_js::solid_js_prepass;
+use crate::utils::transpile_ts_to_js;
 use crate::*;
 
 #[derive(Error, Debug)]
@@ -41,7 +42,6 @@ pub struct VisitorTransformer<'a, 'alloc> {
     entrypoint: bool,
     store: String,
     referenced_idents: &'a mut HashSet<String>,
-    expr_counter: u32,
     css_variable_identifiers: HashMap<
         String,
         (
@@ -67,7 +67,6 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             entrypoint,
             store: store.to_string(),
             referenced_idents,
-            expr_counter: 0,
             css_variable_identifiers: HashMap::new(),
             style_variable_identifiers: HashMap::new(),
         }
@@ -107,16 +106,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let tag = utils::tagged_template_get_tag(tagged_template_expression)?;
 
         if tag == "css" {
-            self.expr_counter += 1;
-            let idx = self.expr_counter;
-
             // get class name from the store or compute
             let class_name = self
                 .entrypoint
                 .then(|| {
-                    js_sys::eval(&format!("{}?.__css_{}", self.store, idx))
-                        .unwrap()
-                        .as_string()
+                    js_sys::eval(&format!(
+                        "{}?.__css_{}_{}",
+                        self.store, span.start, span.end
+                    ))
+                    .unwrap()
+                    .as_string()
                 })
                 .flatten()
                 .unwrap_or_else(|| {
@@ -124,17 +123,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     let class_name = format!("{variable_name}-{random_suffix}");
 
                     js_sys::eval(&format!(
-                        "{} = {{...({} ?? {{}}), __css_{}: \"{}\"}};",
-                        self.store, self.store, idx, class_name
+                        "{} = {{...({} ?? {{}}), __css_{}_{}: \"{}\"}};",
+                        self.store, self.store, span.start, span.end, class_name
                     ))
                     .unwrap();
                     class_name
                 });
-
-            // completely ignore if we don't need it
-            if !self.entrypoint && !self.referenced_idents.contains(variable_name) {
-                return None;
-            }
 
             self.css_variable_identifiers.insert(
                 variable_name.to_string(),
@@ -199,32 +193,35 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
                 panic!("css variable declaration was not a regular variable declaration")
             };
+            let variable_name = variable_name.name.as_str();
 
-            let ret = self
-                .handle_tagged_template_expression(&variable_name.name, tagged_template_expression);
+            if self.entrypoint || self.referenced_idents.contains(variable_name) {
+                let ret = self
+                    .handle_tagged_template_expression(variable_name, tagged_template_expression);
 
-            if let Some(ret) = ret {
-                *init = ret;
+                if let Some(ret) = ret {
+                    *init = ret;
+                }
             }
         };
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
     }
 
-    fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
-        if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
-            && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
-            && (tag == "css" || tag == "style")
-        {
-            let ret = self
-                .handle_tagged_template_expression(&variable_name.name, tagged_template_expression);
-
-            if let Some(ret) = ret {
-                *init = ret;
-            }
-        };
-
-        oxc_ast_visit::walk_mut::walk_expression(self, it);
-    }
+    // fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
+    //     if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
+    //         && let Some(tag) = utils::tagged_template_get_tag(tagged_template_expression)
+    //         && (tag == "css" || tag == "style")
+    //     {
+    //         let ret = self
+    //             .handle_tagged_template_expression(&variable_name.name, tagged_template_expression);
+    //
+    //         if let Some(ret) = ret {
+    //             *init = ret;
+    //         }
+    //     };
+    //
+    //     oxc_ast_visit::walk_mut::walk_expression(self, it);
+    // }
 }
 
 #[wasm_bindgen]
@@ -857,6 +854,8 @@ pub async fn evaluate_program<'alloc>(
         ))
         .await?;
     }
+
+    transpile_ts_to_js(allocator, &mut tmp_program.program);
 
     let mut tmp_program_js = Codegen::new()
         .with_options(CodegenOptions::default())
