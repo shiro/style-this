@@ -1,0 +1,1752 @@
+use oxc_ast::ast::{
+    ExportDefaultDeclaration, ExportNamedDeclaration, ImportDeclaration, VariableDeclaration,
+};
+
+use crate::solid_js::solid_js_prepass;
+use crate::utils::{binding_pattern_kind_get_idents, generate_random_id};
+use crate::*;
+
+pub struct VisitorTransformer<'a, 'alloc> {
+    ast_builder: &'a AstBuilder<'alloc>,
+    allocator: &'alloc Allocator,
+    entrypoint: bool,
+    store: String,
+    referenced_idents: &'a mut HashSet<String>,
+    expr_counter: u32,
+    css_variable_identifiers: HashMap<
+        String,
+        (
+            String,
+            oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
+        ),
+    >,
+    style_variable_identifiers:
+        HashMap<String, oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>>,
+    tmp_program: oxc_parser::ParserReturn<'alloc>,
+    exports: &'a mut HashSet<String>,
+    imports: HashMap<String, Vec<oxc_ast::ast::ImportDeclarationSpecifier<'alloc>>>,
+    transformer: &'a Transformer,
+    program_path: String,
+}
+
+impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
+    pub fn new(
+        ast_builder: &'a AstBuilder<'alloc>,
+        allocator: &'alloc Allocator,
+        entrypoint: bool,
+        store: &str,
+        referenced_idents: &'a mut HashSet<String>,
+        exports: &'a mut HashSet<String>,
+        transformer: &'a Transformer,
+        program_path: String,
+    ) -> Self {
+        let tmp_program = build_new_ast(allocator);
+        Self {
+            ast_builder,
+            allocator,
+            entrypoint,
+            store: store.to_string(),
+            referenced_idents,
+            expr_counter: 0,
+            css_variable_identifiers: HashMap::new(),
+            style_variable_identifiers: HashMap::new(),
+            tmp_program,
+            exports,
+            imports: HashMap::new(),
+            transformer,
+            program_path,
+        }
+    }
+
+    // pub fn build_tmp_program(&mut self, program: &Program<'alloc>) {
+    //     // Process statements in reverse order to maintain dependencies
+    //     for stmt in program.body.iter().rev() {
+    //         self.process_statement_for_tmp_program(stmt);
+    //     }
+    // }
+    //
+    // fn process_statement_for_tmp_program(&mut self, stmt: &Statement<'alloc>) {
+    //     match stmt {
+    //         Statement::ImportDeclaration(import_declaration) => {
+    //             self.process_import_declaration_for_tmp_program(import_declaration);
+    //         }
+    //         Statement::ExportNamedDeclaration(export_named_declaration) => {
+    //             self.process_export_named_declaration_for_tmp_program(export_named_declaration);
+    //         }
+    //         Statement::ExportDefaultDeclaration(export_default_declaration) => {
+    //             self.process_export_default_declaration_for_tmp_program(export_default_declaration);
+    //         }
+    //         Statement::VariableDeclaration(variable_declaration) => {
+    //             self.process_variable_declaration_for_tmp_program(variable_declaration, false);
+    //         }
+    //         _ => {}
+    //     }
+    // }
+    //
+    // fn process_import_declaration_for_tmp_program(
+    //     &mut self,
+    //     import_declaration: &ImportDeclaration<'alloc>,
+    // ) {
+    //     let module_id = import_declaration.source.value.to_string();
+    //     let Some(specifiers) = &import_declaration.specifiers else {
+    //         return;
+    //     };
+    //
+    //     let entry = self
+    //         .imports
+    //         .entry(module_id.clone())
+    //         .or_insert_with(Vec::new);
+    //
+    //     // ignore `css` import from this library
+    //     if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME {
+    //         for specifier in specifiers.iter() {
+    //             match specifier {
+    //                 oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
+    //                     if !matches!(
+    //                         &import_specifier.imported,
+    //                         oxc_ast::ast::ModuleExportName::IdentifierName(identifier_name)
+    //                         if identifier_name.name == "css"
+    //                     ) {
+    //                         entry.push(specifier.clone_in(self.allocator));
+    //                     }
+    //                 }
+    //                 _ => {
+    //                     entry.push(specifier.clone_in(self.allocator));
+    //                 }
+    //             }
+    //         }
+    //         return;
+    //     }
+    //
+    //     for specifier in specifiers.iter() {
+    //         entry.push(specifier.clone_in(self.allocator));
+    //     }
+    // }
+    //
+    // fn process_export_named_declaration_for_tmp_program(
+    //     &mut self,
+    //     export_named_declaration: &ExportNamedDeclaration<'alloc>,
+    // ) {
+    //     let Some(declaration) = &export_named_declaration.declaration else {
+    //         return;
+    //     };
+    //
+    //     match declaration {
+    //         oxc_ast::ast::Declaration::VariableDeclaration(variable_declaration) => {
+    //             self.process_variable_declaration_for_tmp_program(variable_declaration, true);
+    //         }
+    //         // TODO functions
+    //         // TODO class
+    //         _ => {}
+    //     }
+    // }
+    //
+    // fn process_export_default_declaration_for_tmp_program(
+    //     &mut self,
+    //     export_default_declaration: &ExportDefaultDeclaration<'alloc>,
+    // ) {
+    //     let span = export_default_declaration.span;
+    //
+    //     let variable_declaration = match &export_default_declaration.declaration {
+    //         ExportDefaultDeclarationKind::Identifier(identifier) => {
+    //             // pretend the default export is actually a variable declaration
+    //             // for our meta variable
+    //             self.ast_builder.alloc_variable_declaration(
+    //                 span,
+    //                 VariableDeclarationKind::Let,
+    //                 self.ast_builder.vec1(self.ast_builder.variable_declarator(
+    //                     span,
+    //                     VariableDeclarationKind::Let,
+    //                     self.ast_builder.binding_pattern(
+    //                         BindingPatternKind::BindingIdentifier(
+    //                             self.ast_builder.alloc_binding_identifier(
+    //                                 span,
+    //                                 self.ast_builder.atom("__global__export__"),
+    //                             ),
+    //                         ),
+    //                         None as Option<oxc_allocator::Box<_>>,
+    //                         false,
+    //                     ),
+    //                     Some(Expression::Identifier(
+    //                         self.ast_builder.alloc_identifier_reference(
+    //                             span,
+    //                             self.ast_builder.atom(&identifier.name),
+    //                         ),
+    //                     )),
+    //                     false,
+    //                 )),
+    //                 false,
+    //             )
+    //         }
+    //         ExportDefaultDeclarationKind::CallExpression(call_expression) => {
+    //             // pretend the default export is actually a variable declaration
+    //             // for our meta variable
+    //             self.ast_builder.alloc_variable_declaration(
+    //                 span,
+    //                 VariableDeclarationKind::Let,
+    //                 self.ast_builder.vec1(self.ast_builder.variable_declarator(
+    //                     span,
+    //                     VariableDeclarationKind::Let,
+    //                     self.ast_builder.binding_pattern(
+    //                         BindingPatternKind::BindingIdentifier(
+    //                             self.ast_builder.alloc_binding_identifier(
+    //                                 span,
+    //                                 self.ast_builder.atom("__global__export__"),
+    //                             ),
+    //                         ),
+    //                         None as Option<oxc_allocator::Box<_>>,
+    //                         false,
+    //                     ),
+    //                     Some(Expression::CallExpression(
+    //                         call_expression.clone_in(self.allocator),
+    //                     )),
+    //                     false,
+    //                 )),
+    //                 false,
+    //             )
+    //         }
+    //         ExportDefaultDeclarationKind::FunctionDeclaration(_function_declaration) => {
+    //             // TODO
+    //             return;
+    //         }
+    //         _ => return,
+    //     };
+    //
+    //     self.process_variable_declaration_for_tmp_program(variable_declaration, true);
+    // }
+    //
+    // fn process_variable_declaration_for_tmp_program(
+    //     &mut self,
+    //     variable_declaration: &VariableDeclaration<'alloc>,
+    //     exported: bool,
+    // ) {
+    //     for variable_declarator in variable_declaration.declarations.iter().rev() {
+    //         let Some(init) = &variable_declarator.init else {
+    //             continue;
+    //         };
+    //         let variable_name = match &variable_declarator.id.kind {
+    //             BindingPatternKind::BindingIdentifier(binding_identifier) => {
+    //                 binding_identifier.name.as_str()
+    //             }
+    //             _ => panic!("invalid 'css`...`' usage"),
+    //         };
+    //
+    //         if !self.referenced_idents.contains(variable_name) {
+    //             continue;
+    //         }
+    //
+    //         let span = variable_declarator.span;
+    //
+    //         // if cached, grab from cache
+    //         let cached = js_sys::eval(&format!(
+    //             "{}?.hasOwnProperty('{}')",
+    //             self.store, variable_name
+    //         ))
+    //         .unwrap()
+    //         .is_truthy();
+    //         if cached {
+    //             let variable_declaration = build_variable_declaration_ident(
+    //                 self.ast_builder,
+    //                 span,
+    //                 variable_name,
+    //                 &format!("{}['{variable_name}']", self.store),
+    //             );
+    //
+    //             self.tmp_program
+    //                 .program
+    //                 .body
+    //                 .insert(0, variable_declaration);
+    //             continue;
+    //         }
+    //
+    //         if exported {
+    //             self.exports.insert(variable_name.to_string());
+    //         }
+    //
+    //         let variable_declaration = Statement::VariableDeclaration(
+    //             self.ast_builder.alloc_variable_declaration(
+    //                 span,
+    //                 VariableDeclarationKind::Let,
+    //                 self.ast_builder
+    //                     .vec1(variable_declarator.clone_in(self.allocator)),
+    //                 false,
+    //             ),
+    //         );
+    //         // copy the entire variable declaration verbatim
+    //         self.tmp_program
+    //             .program
+    //             .body
+    //             .insert(0, variable_declaration);
+    //
+    //         // if it's a `css` declaration, also add the `var.css = ...` statement
+    //         if let Some((_, parts)) = self.css_variable_identifiers.get_mut(variable_name) {
+    //             self.tmp_program.program.body.insert(
+    //                 1,
+    //                 Statement::ExpressionStatement(self.ast_builder.alloc_expression_statement(
+    //                     span,
+    //                     build_object_member_string_assignment(
+    //                         self.ast_builder,
+    //                         span,
+    //                         variable_name,
+    //                         "css",
+    //                         self.ast_builder.expression_template_literal(
+    //                             span,
+    //                             parts.quasi.quasis.clone_in(self.allocator),
+    //                             parts.quasi.expressions.clone_in(self.allocator),
+    //                         ),
+    //                     ),
+    //                 )),
+    //             );
+    //         }
+    //
+    //         // handle `style`
+    //         if let Some(parts) = self.style_variable_identifiers.get_mut(variable_name) {
+    //             self.tmp_program.program.body.insert(
+    //                 1,
+    //                 Statement::ExpressionStatement(self.ast_builder.alloc_expression_statement(
+    //                     span,
+    //                     build_assignment(
+    //                         self.ast_builder,
+    //                         span,
+    //                         variable_name,
+    //                         self.ast_builder.expression_template_literal(
+    //                             span,
+    //                             parts.quasi.quasis.clone_in(self.allocator),
+    //                             parts.quasi.expressions.clone_in(self.allocator),
+    //                         ),
+    //                     ),
+    //                 )),
+    //             );
+    //         }
+    //
+    //         // if the right side references any idents, add them
+    //         self.referenced_idents
+    //             .extend(expression_get_references(init));
+    //     }
+    // }
+
+    fn handle_variable_declaration(&mut self, variable_name: &str, span: Span, exported: bool) {
+        if !self.referenced_idents.contains(variable_name) {
+            return;
+        }
+
+        // if cached, grab from cache
+        let cached = js_sys::eval(&format!(
+            "{}?.hasOwnProperty('{}')",
+            self.store, variable_name
+        ))
+        .unwrap()
+        .is_truthy();
+        if cached {
+            let variable_declaration = build_variable_declaration_ident(
+                self.ast_builder,
+                span,
+                variable_name,
+                &format!("{}['{variable_name}']", self.store),
+            );
+
+            self.tmp_program
+                .program
+                .body
+                .insert(0, variable_declaration);
+            return;
+        }
+
+        if exported {
+            self.exports.insert(variable_name.to_string());
+        }
+
+        // Create variable declaration for the temporary program
+        let variable_declarator = self.ast_builder.variable_declarator(
+            span,
+            VariableDeclarationKind::Let,
+            self.ast_builder.binding_pattern(
+                BindingPatternKind::BindingIdentifier(
+                    self.ast_builder
+                        .alloc_binding_identifier(span, self.ast_builder.atom(variable_name)),
+                ),
+                None as Option<oxc_allocator::Box<_>>,
+                false,
+            ),
+            Some(Expression::Identifier(
+                self.ast_builder
+                    .alloc_identifier_reference(span, self.ast_builder.atom("undefined")),
+            )),
+            false,
+        );
+
+        let variable_declaration =
+            Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                span,
+                VariableDeclarationKind::Let,
+                self.ast_builder.vec1(variable_declarator),
+                false,
+            ));
+
+        self.tmp_program
+            .program
+            .body
+            .insert(0, variable_declaration);
+
+        // Handle CSS and style assignments
+        if let Some((_, parts)) = self.css_variable_identifiers.get(variable_name) {
+            self.tmp_program.program.body.insert(
+                1,
+                Statement::ExpressionStatement(self.ast_builder.alloc_expression_statement(
+                    span,
+                    build_object_member_string_assignment(
+                        self.ast_builder,
+                        span,
+                        variable_name,
+                        "css",
+                        self.ast_builder.expression_template_literal(
+                            span,
+                            parts.quasi.quasis.clone_in(self.allocator),
+                            parts.quasi.expressions.clone_in(self.allocator),
+                        ),
+                    ),
+                )),
+            );
+        }
+
+        if let Some(parts) = self.style_variable_identifiers.get(variable_name) {
+            self.tmp_program.program.body.insert(
+                1,
+                Statement::ExpressionStatement(self.ast_builder.alloc_expression_statement(
+                    span,
+                    build_assignment(
+                        self.ast_builder,
+                        span,
+                        variable_name,
+                        self.ast_builder.expression_template_literal(
+                            span,
+                            parts.quasi.quasis.clone_in(self.allocator),
+                            parts.quasi.expressions.clone_in(self.allocator),
+                        ),
+                    ),
+                )),
+            );
+        }
+    }
+
+    pub fn finish(
+        self,
+    ) -> (
+        HashMap<
+            String,
+            (
+                String,
+                oxc_allocator::Box<'alloc, oxc_ast::ast::TaggedTemplateExpression<'alloc>>,
+            ),
+        >,
+        oxc_parser::ParserReturn<'alloc>,
+        HashMap<String, Vec<oxc_ast::ast::ImportDeclarationSpecifier<'alloc>>>,
+    ) {
+        (
+            self.css_variable_identifiers,
+            self.tmp_program,
+            self.imports,
+        )
+    }
+}
+
+impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
+    fn visit_import_declaration(&mut self, import_declaration: &mut ImportDeclaration<'alloc>) {
+        let module_id = import_declaration.source.value.to_string();
+        let Some(specifiers) = &import_declaration.specifiers else {
+            return;
+        };
+
+        let imports_entry = self
+            .imports
+            .entry(module_id.clone())
+            .or_insert_with(Vec::new);
+
+        // ignore `css` import from this library
+        if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME {
+            for specifier in specifiers.iter() {
+                match specifier {
+                    oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
+                        if !matches!(
+                            &import_specifier.imported,
+                            oxc_ast::ast::ModuleExportName::IdentifierName(identifier_name)
+                            if identifier_name.name == "css"
+                        ) {
+                            imports_entry.push(specifier.clone_in(self.allocator));
+                        }
+                    }
+                    _ => {
+                        imports_entry.push(specifier.clone_in(self.allocator));
+                    }
+                }
+            }
+            return;
+        }
+
+        for specifier in specifiers.iter() {
+            imports_entry.push(specifier.clone_in(self.allocator));
+        }
+    }
+
+    fn visit_export_named_declaration(
+        &mut self,
+        export_declaration: &mut ExportNamedDeclaration<'alloc>,
+    ) {
+        let Some(declaration) = &export_declaration.declaration else {
+            return;
+        };
+
+        if let oxc_ast::ast::Declaration::VariableDeclaration(variable_declaration) = declaration {
+            for variable_declarator in variable_declaration.declarations.iter() {
+                let variable_name = match &variable_declarator.id.kind {
+                    BindingPatternKind::BindingIdentifier(binding_identifier) => {
+                        binding_identifier.name.as_str()
+                    }
+                    _ => continue,
+                };
+
+                if !self.referenced_idents.contains(variable_name) {
+                    continue;
+                }
+
+                let Some(init) = &variable_declarator.init else {
+                    continue;
+                };
+
+                self.handle_variable_declaration(variable_name, variable_declarator.span, true);
+
+                // if the right side references any idents, add them
+                self.referenced_idents
+                    .extend(expression_get_references(init));
+            }
+        }
+    }
+
+    fn visit_export_default_declaration(
+        &mut self,
+        export_declaration: &mut ExportDefaultDeclaration<'alloc>,
+    ) {
+        let span = export_declaration.span;
+        let variable_name = "__global__export__";
+
+        if !self.referenced_idents.contains(variable_name) {
+            return;
+        }
+
+        match &export_declaration.declaration {
+            ExportDefaultDeclarationKind::Identifier(identifier) => {
+                // Create variable declaration for the temporary program
+                let variable_declarator = self.ast_builder.variable_declarator(
+                    span,
+                    VariableDeclarationKind::Let,
+                    self.ast_builder.binding_pattern(
+                        BindingPatternKind::BindingIdentifier(
+                            self.ast_builder.alloc_binding_identifier(
+                                span,
+                                self.ast_builder.atom(variable_name),
+                            ),
+                        ),
+                        None as Option<oxc_allocator::Box<_>>,
+                        false,
+                    ),
+                    Some(Expression::Identifier(
+                        self.ast_builder.alloc_identifier_reference(
+                            span,
+                            self.ast_builder.atom(&identifier.name),
+                        ),
+                    )),
+                    false,
+                );
+
+                let variable_declaration =
+                    Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                        span,
+                        VariableDeclarationKind::Let,
+                        self.ast_builder.vec1(variable_declarator),
+                        false,
+                    ));
+
+                self.tmp_program
+                    .program
+                    .body
+                    .insert(0, variable_declaration);
+                self.exports.insert(variable_name.to_string());
+            }
+            ExportDefaultDeclarationKind::CallExpression(call_expression) => {
+                // Create variable declaration for the temporary program
+                let variable_declarator = self.ast_builder.variable_declarator(
+                    span,
+                    VariableDeclarationKind::Let,
+                    self.ast_builder.binding_pattern(
+                        BindingPatternKind::BindingIdentifier(
+                            self.ast_builder.alloc_binding_identifier(
+                                span,
+                                self.ast_builder.atom(variable_name),
+                            ),
+                        ),
+                        None as Option<oxc_allocator::Box<_>>,
+                        false,
+                    ),
+                    Some(Expression::CallExpression(
+                        call_expression.clone_in(self.allocator),
+                    )),
+                    false,
+                );
+
+                let variable_declaration =
+                    Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                        span,
+                        VariableDeclarationKind::Let,
+                        self.ast_builder.vec1(variable_declarator),
+                        false,
+                    ));
+
+                self.tmp_program
+                    .program
+                    .body
+                    .insert(0, variable_declaration);
+                self.exports.insert(variable_name.to_string());
+            }
+            ExportDefaultDeclarationKind::FunctionDeclaration(_function_declaration) => {
+                // TODO: Handle function declarations
+            }
+            _ => {}
+        }
+    }
+
+    fn visit_variable_declaration(
+        &mut self,
+        variable_declaration: &mut VariableDeclaration<'alloc>,
+    ) {
+        for variable_declarator in variable_declaration.declarations.iter() {
+            let variable_name = match &variable_declarator.id.kind {
+                BindingPatternKind::BindingIdentifier(binding_identifier) => {
+                    binding_identifier.name.as_str()
+                }
+                _ => continue,
+            };
+
+            if !self.referenced_idents.contains(variable_name) {
+                continue;
+            }
+
+            let Some(init) = &variable_declarator.init else {
+                continue;
+            };
+
+            // Skip if this is a css/style tagged template (handled by visit_variable_declarator)
+            if let Expression::TaggedTemplateExpression(tagged_template_expression) = init {
+                if let Expression::Identifier(identifier) = &tagged_template_expression.tag {
+                    if identifier.name == "css" || identifier.name == "style" {
+                        continue;
+                    }
+                }
+            }
+
+            self.handle_variable_declaration(variable_name, variable_declarator.span, false);
+
+            // if the right side references any idents, add them
+            self.referenced_idents
+                .extend(expression_get_references(init));
+        }
+    }
+
+    fn visit_variable_declarator(&mut self, declarator: &mut VariableDeclarator<'alloc>) {
+        let span = declarator.span;
+        let Some(init) = &mut declarator.init else {
+            return;
+        };
+
+        let Expression::TaggedTemplateExpression(tagged_template_expression) = init else {
+            return;
+        };
+
+        let Expression::Identifier(identifier) = &mut tagged_template_expression.tag else {
+            return;
+        };
+
+        if identifier.name != "css" && identifier.name != "style" {
+            return;
+        }
+
+        let BindingPatternKind::BindingIdentifier(variable_name) = &declarator.id.kind else {
+            panic!("css variable declaration was not a regular variable declaration")
+        };
+
+        if identifier.name == "css" {
+            self.expr_counter += 1;
+            let idx = self.expr_counter;
+
+            // get class name from the store or compute
+            let class_name = self
+                .entrypoint
+                .then(|| {
+                    js_sys::eval(&format!("{}?.__css_{}", self.store, idx))
+                        .unwrap()
+                        .as_string()
+                })
+                .flatten()
+                .unwrap_or_else(|| {
+                    let random_suffix = generate_random_id(6);
+                    let class_name = format!("{}-{}", variable_name.name, random_suffix);
+
+                    js_sys::eval(&format!(
+                        "{} = {{...({} ?? {{}}), __css_{}: \"{}\"}};",
+                        self.store, self.store, idx, class_name
+                    ))
+                    .unwrap();
+                    class_name
+                });
+
+            // completely ignore if we don't need it
+            if !self.entrypoint && !self.referenced_idents.contains(variable_name.name.as_str()) {
+                return;
+            }
+
+            self.css_variable_identifiers.insert(
+                variable_name.name.to_string(),
+                (
+                    class_name.clone(),
+                    tagged_template_expression.clone_in(self.allocator),
+                ),
+            );
+
+            self.referenced_idents
+                .insert(variable_name.name.to_string());
+            // if the right side references any idents, add them
+            self.referenced_idents
+                .extend(expression_get_references(&*init));
+
+            *init = build_decorated_string(self.ast_builder, span, &class_name);
+        } else if identifier.name == "style" {
+            self.style_variable_identifiers.insert(
+                variable_name.name.to_string(),
+                tagged_template_expression.clone_in(self.allocator),
+            );
+
+            self.referenced_idents
+                .insert(variable_name.name.to_string());
+            // if the right side references any idents, add them
+            self.referenced_idents
+                .extend(expression_get_references(init));
+
+            *init = Expression::Identifier(
+                self.ast_builder
+                    .alloc_identifier_reference(span, self.ast_builder.atom("undefined")),
+            );
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum TransformError {
+    #[error("failed to parse program from bundler 'bundler-id:{id}'")]
+    BundlerParseFailed { id: String },
+    #[error("failed to parse program from file '{filepath}'")]
+    RawParseFailed { filepath: String },
+    #[error("failed to determine program type from extension '{filepath}'")]
+    UknownExtension { filepath: String },
+    #[error("failed to run program:\n{program}")]
+    EvaluationFailed { program: String, cause: JsValue },
+    #[error("failed to read file '{filepath}'")]
+    ReadFileError { filepath: String, cause: JsValue },
+}
+
+impl From<TransformError> for JsValue {
+    fn from(from: TransformError) -> Self {
+        let err = js_sys::Error::new(&from.to_string());
+
+        // stack trace points to wasm wrapper, delete it
+        js_sys::Reflect::set(&err, &JsValue::from_str("stack"), &JsValue::from_str("")).unwrap();
+
+        // set cause property for variants that have one
+        match &from {
+            TransformError::EvaluationFailed { cause, .. }
+            | TransformError::ReadFileError { cause, .. } => {
+                js_sys::Reflect::set(&err, &JsValue::from_str("cause"), cause).unwrap();
+            }
+            _ => (),
+        };
+
+        err.into()
+    }
+}
+
+#[wasm_bindgen]
+pub struct Transformer {
+    load_file: js_sys::Function,
+    css_file_store_ref: String,
+    export_cache_ref: String,
+    css_extension: String,
+    wrap_selectors_with_global: bool,
+}
+
+#[wasm_bindgen]
+impl Transformer {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new(opts: JsValue) -> Self {
+        let global = js_sys::global();
+
+        let load_file = js_sys::Reflect::get(&opts, &JsValue::from_str("loadFile"))
+            .unwrap()
+            .dyn_into::<js_sys::Function>()
+            .unwrap();
+
+        let css_extension = js_sys::Reflect::get(&opts, &JsValue::from_str("cssExtension"))
+            .unwrap()
+            .as_string()
+            .unwrap();
+
+        let wrap_selectors_with_global =
+            js_sys::Reflect::get(&opts, &JsValue::from_str("wrapSelectorsWithGlobal"))
+                .unwrap()
+                .as_bool()
+                .unwrap_or(false);
+
+        let css_file_store_ref = format!("{PREFIX}_{}", generate_random_id(8));
+        let css_file_store =
+            js_sys::Reflect::get(&opts, &JsValue::from_str("cssFileStore")).unwrap();
+        js_sys::Reflect::set(
+            &global,
+            &JsValue::from_str(&css_file_store_ref),
+            &css_file_store,
+        )
+        .unwrap();
+
+        let export_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("exportCache")).unwrap();
+        let export_cache_ref = format!("{PREFIX}_{}", generate_random_id(8));
+        js_sys::Reflect::set(
+            &global,
+            &JsValue::from_str(&export_cache_ref),
+            &export_cache,
+        )
+        .unwrap();
+
+        Self {
+            load_file,
+            css_file_store_ref,
+            export_cache_ref,
+            css_extension,
+            wrap_selectors_with_global,
+        }
+    }
+
+    /// loads file contents and id
+    async fn load_file(&self, id: &str) -> Result<(String, String), TransformError> {
+        let promise = self
+            .load_file
+            .call1(&JsValue::UNDEFINED, &JsValue::from_str(id))
+            .unwrap();
+        let future = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::from(promise));
+        let ret = future
+            .await
+            .map_err(|cause| TransformError::ReadFileError {
+                filepath: id.to_string(),
+                cause,
+            })?;
+
+        let arr = Array::from(&ret);
+        let mut arr = arr
+            .into_iter()
+            .map(|v| v.as_string().unwrap())
+            .collect::<Vec<String>>();
+
+        let filepath = arr.remove(0);
+        let code = arr.remove(0);
+
+        Ok((filepath, code))
+    }
+}
+
+fn build_decorated_string<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    content: &str,
+) -> Expression<'alloc> {
+    Expression::NewExpression(ast_builder.alloc_new_expression(
+        span,
+        Expression::Identifier(
+            ast_builder.alloc_identifier_reference(span, ast_builder.atom("String")),
+        ),
+        None as Option<oxc_allocator::Box<_>>,
+        ast_builder.vec1(oxc_ast::ast::Argument::StringLiteral(
+            ast_builder.alloc_string_literal(span, ast_builder.atom(content), None),
+        )),
+    ))
+}
+
+fn build_object_member_string_assignment<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    object_name: &str,
+    member_name: &str,
+    value: Expression<'alloc>,
+) -> Expression<'alloc> {
+    Expression::AssignmentExpression(ast_builder.alloc_assignment_expression(
+        span,
+        oxc_ast::ast::AssignmentOperator::Assign,
+        oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
+            ast_builder.alloc_static_member_expression(
+                span,
+                Expression::Identifier(
+                    ast_builder.alloc_identifier_reference(span, ast_builder.atom(object_name)),
+                ),
+                ast_builder.identifier_name(span, ast_builder.atom(member_name)),
+                false,
+            ),
+        ),
+        value,
+    ))
+}
+
+fn build_assignment<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    variable_name: &str,
+    value: Expression<'alloc>,
+) -> Expression<'alloc> {
+    Expression::AssignmentExpression(ast_builder.alloc_assignment_expression(
+        span,
+        oxc_ast::ast::AssignmentOperator::Assign,
+        oxc_ast::ast::AssignmentTarget::AssignmentTargetIdentifier(
+            ast_builder.alloc_identifier_reference(span, ast_builder.atom(variable_name)),
+        ),
+        value,
+    ))
+}
+
+fn build_variable_declaration_ident<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    span: Span,
+    variable_name: &str,
+    identifier: &str,
+) -> Statement<'alloc> {
+    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+        span,
+        VariableDeclarationKind::Let,
+        ast_builder.vec1(ast_builder.variable_declarator(
+            span,
+            VariableDeclarationKind::Const,
+            ast_builder.binding_pattern(
+                BindingPatternKind::BindingIdentifier(
+                    ast_builder.alloc_binding_identifier(span, ast_builder.atom(variable_name)),
+                ),
+                None as Option<oxc_allocator::Box<_>>,
+                false,
+            ),
+            Some(Expression::Identifier(
+                ast_builder.alloc_identifier_reference(span, ast_builder.atom(identifier)),
+            )),
+            false,
+        )),
+        false,
+    ))
+}
+
+pub async fn evaluate_program<'alloc>(
+    allocator: &'alloc Allocator,
+    transformer: &Transformer,
+    entrypoint: bool,
+    program_path: &String,
+    program: &mut Program<'alloc>,
+    mut referenced_idents: HashSet<String>,
+) -> Result<EvaluateProgramReturnStatus, TransformError> {
+    // TODO pass through
+    let ast_builder = AstBuilder::new(allocator);
+
+    // find "css" import or quit early if entrypoint
+    let return_early = entrypoint
+        && program.body.iter().all(|import| {
+            if let Statement::ImportDeclaration(import_decl) = import {
+                if let Some(specifiers) = &import_decl.specifiers {
+                    for specifier in specifiers.iter() {
+                        if import_decl.source.value != LIBRARY_CORE_IMPORT_NAME {
+                            continue;
+                        }
+
+                        if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
+                            specifier
+                        {
+                            if spec.local.name == "css" || spec.local.name == "style" {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+    if return_early {
+        return Ok(EvaluateProgramReturnStatus::NotTransformed);
+    }
+
+    // let mut imports = HashMap::new();
+    let mut exports = HashSet::new();
+
+    let cache_ref = &transformer.export_cache_ref;
+    let store = format!("global.{cache_ref}[\"{program_path}\"]");
+
+    // transform all css`...` expresisons into classname strings
+    let mut css_transformer = VisitorTransformer::new(
+        &ast_builder,
+        allocator,
+        entrypoint,
+        &store,
+        &mut referenced_idents,
+        &mut exports,
+        transformer,
+        program_path.clone(),
+    );
+    css_transformer.visit_program(program);
+    // css_transformer.build_tmp_program(program);
+    let (css_variable_identifiers, mut tmp_program, imports) = css_transformer.finish();
+
+    // TODO 1
+
+    // build a new minimal program
+    // let mut tmp_program = build_new_ast(allocator);
+    // for stmt in program.body.iter().rev() {
+    //     if let Statement::ImportDeclaration(import_declaration) = stmt {
+    //         let module_id = import_declaration.source.value.to_string();
+    //         let Some(specifiers) = &import_declaration.specifiers else {
+    //             continue;
+    //         };
+    //
+    //         let entry = imports.entry(module_id.clone()).or_insert_with(Vec::new);
+    //
+    //         // ignore `css` import from this library
+    //         if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME {
+    //             entry.extend(specifiers.iter().filter(|specifier| match specifier {
+    //                 oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
+    //                     !matches!(
+    //                         &import_specifier.imported,
+    //                         oxc_ast::ast::ModuleExportName::IdentifierName(identifier_name)
+    //                         if identifier_name.name == "css"
+    //                     )
+    //                 }
+    //                 _ => false,
+    //             }));
+    //             continue;
+    //         }
+    //
+    //         entry.extend(specifiers);
+    //         continue;
+    //     };
+    //
+    //     let mut exported = false;
+    //     let variable_declaration = match stmt {
+    //         Statement::ExportNamedDeclaration(export_named_declaration) => {
+    //             let Some(declaration) = &export_named_declaration.declaration else {
+    //                 continue;
+    //             };
+    //             exported = true;
+    //             match declaration {
+    //                 oxc_ast::ast::Declaration::VariableDeclaration(variable_declaration) => {
+    //                     Some(variable_declaration.clone_in(allocator))
+    //                 }
+    //                 // TODO functions
+    //                 // TODO class
+    //                 _ => continue,
+    //             }
+    //         }
+    //         Statement::ExportDefaultDeclaration(export_default_declaration) => {
+    //             exported = true;
+    //             match &export_default_declaration.declaration {
+    //                 ExportDefaultDeclarationKind::Identifier(identifier) => {
+    //                     let span = export_default_declaration.span;
+    //
+    //                     // pretend the default export is actually a variable declaration
+    //                     // for our meta variable
+    //                     let variable_declaration = ast_builder.alloc_variable_declaration(
+    //                         span,
+    //                         VariableDeclarationKind::Let,
+    //                         ast_builder.vec1(ast_builder.variable_declarator(
+    //                             span,
+    //                             VariableDeclarationKind::Let,
+    //                             ast_builder.binding_pattern(
+    //                                 BindingPatternKind::BindingIdentifier(
+    //                                     ast_builder.alloc_binding_identifier(
+    //                                         span,
+    //                                         ast_builder.atom("__global__export__"),
+    //                                     ),
+    //                                 ),
+    //                                 None as Option<oxc_allocator::Box<_>>,
+    //                                 false,
+    //                             ),
+    //                             Some(Expression::Identifier(
+    //                                 ast_builder.alloc_identifier_reference(
+    //                                     span,
+    //                                     ast_builder.atom(&identifier.name),
+    //                                 ),
+    //                             )),
+    //                             false,
+    //                         )),
+    //                         false,
+    //                     );
+    //                     Some(variable_declaration)
+    //                 }
+    //                 ExportDefaultDeclarationKind::CallExpression(call_expression) => {
+    //                     let span = call_expression.span;
+    //
+    //                     // pretend the default export is actually a variable declaration
+    //                     // for our meta variable
+    //                     let variable_declaration = ast_builder.alloc_variable_declaration(
+    //                         span,
+    //                         VariableDeclarationKind::Let,
+    //                         ast_builder.vec1(ast_builder.variable_declarator(
+    //                             span,
+    //                             VariableDeclarationKind::Let,
+    //                             ast_builder.binding_pattern(
+    //                                 BindingPatternKind::BindingIdentifier(
+    //                                     ast_builder.alloc_binding_identifier(
+    //                                         span,
+    //                                         ast_builder.atom("__global__export__"),
+    //                                     ),
+    //                                 ),
+    //                                 None as Option<oxc_allocator::Box<_>>,
+    //                                 false,
+    //                             ),
+    //                             Some(Expression::CallExpression(
+    //                                 call_expression.clone_in(allocator),
+    //                             )),
+    //                             false,
+    //                         )),
+    //                         false,
+    //                     );
+    //                     Some(variable_declaration)
+    //                 }
+    //                 ExportDefaultDeclarationKind::FunctionDeclaration(_function_declaration) => {
+    //                     // TODO
+    //                     continue;
+    //                 }
+    //                 _ => continue,
+    //             }
+    //         }
+    //         Statement::VariableDeclaration(variable_declaration) => {
+    //             Some(variable_declaration.clone_in(allocator))
+    //         }
+    //         _ => None,
+    //     };
+    //     if let Some(variable_declaration) = variable_declaration {
+    //         for variable_declarator in variable_declaration.declarations.iter().rev() {
+    //             let Some(init) = &variable_declarator.init else {
+    //                 continue;
+    //             };
+    //             let variable_name = match &variable_declarator.id.kind {
+    //                 BindingPatternKind::BindingIdentifier(binding_identifier) => {
+    //                     binding_identifier.name.as_str()
+    //                 }
+    //                 _ => panic!("invalid 'css`...`' usage"),
+    //             };
+    //
+    //             if !referenced_idents.contains(variable_name) {
+    //                 continue;
+    //             }
+    //
+    //             let span = variable_declarator.span;
+    //
+    //             // if cached, grab from cache
+    //             let cached = js_sys::eval(&format!("{store}?.hasOwnProperty('{variable_name}')",))
+    //                 .unwrap()
+    //                 .is_truthy();
+    //             if cached {
+    //                 let variable_declaration = build_variable_declaration_ident(
+    //                     &ast_builder,
+    //                     span,
+    //                     variable_name,
+    //                     &format!("{store}['{variable_name}']"),
+    //                 );
+    //
+    //                 tmp_program.program.body.insert(0, variable_declaration);
+    //                 continue;
+    //             }
+    //
+    //             if exported {
+    //                 exports.insert(variable_name.to_string());
+    //             }
+    //
+    //             let variable_declaration =
+    //                 Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+    //                     span,
+    //                     VariableDeclarationKind::Let,
+    //                     ast_builder.vec1(variable_declarator.clone_in(allocator)),
+    //                     false,
+    //                 ));
+    //             // copy the entire variable declaration verbatim
+    //             tmp_program.program.body.insert(0, variable_declaration);
+    //
+    //             // if it's a `css` declaration, also add the `var.css = ...` statement
+    //             if let Some((_, parts)) = css_variable_identifiers.get_mut(variable_name) {
+    //                 tmp_program.program.body.insert(
+    //                     1,
+    //                     Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
+    //                         span,
+    //                         build_object_member_string_assignment(
+    //                             &ast_builder,
+    //                             span,
+    //                             variable_name,
+    //                             "css",
+    //                             ast_builder.expression_template_literal(
+    //                                 span,
+    //                                 parts.quasi.quasis.clone_in(allocator),
+    //                                 parts.quasi.expressions.clone_in(allocator),
+    //                             ),
+    //                         ),
+    //                     )),
+    //                 );
+    //             }
+    //
+    //             // handle `style`
+    //             if let Some(parts) = style_variable_identifiers.get_mut(variable_name) {
+    //                 tmp_program.program.body.insert(
+    //                     1,
+    //                     Statement::ExpressionStatement(ast_builder.alloc_expression_statement(
+    //                         span,
+    //                         build_assignment(
+    //                             &ast_builder,
+    //                             span,
+    //                             variable_name,
+    //                             ast_builder.expression_template_literal(
+    //                                 span,
+    //                                 parts.quasi.quasis.clone_in(allocator),
+    //                                 parts.quasi.expressions.clone_in(allocator),
+    //                             ),
+    //                         ),
+    //                     )),
+    //                 );
+    //             }
+    //
+    //             // if the right side references any idents, add them
+    //             referenced_idents.extend(expression_get_references(init));
+    //         }
+    //     }
+    // }
+
+    // TODO 2
+
+    // // handle imports - resolve other modules and rewrite return values into variable declarations
+    // for (remote_module_id, specifiers) in imports.iter() {
+    //     let mut remote_referenced_idents = HashSet::new();
+    //
+    //     let any_ident_referenced = specifiers.iter().any(|specifier| {
+    //         let local_name = match specifier {
+    //             oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
+    //                 import_specifier.local.name.as_str()
+    //             }
+    //             oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(
+    //                 import_default_specifier,
+    //             ) => import_default_specifier.local.name.as_str(),
+    //             oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(
+    //                 _import_namespace_specifier,
+    //             ) => "", // TODO import_namespace_specifier.local.name.to_string(),
+    //         };
+    //         referenced_idents.contains(local_name)
+    //     });
+    //
+    //     if !any_ident_referenced {
+    //         continue;
+    //     }
+    //
+    //     let (remote_filepath, code) = transformer.load_file(remote_module_id).await?;
+    //
+    //     fn make_require<'a>(
+    //         ast_builder: &AstBuilder<'a>,
+    //         binding_pattern: BindingPatternKind<'a>,
+    //         source: &str,
+    //         span: Span,
+    //     ) -> Statement<'a> {
+    //         Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+    //             span,
+    //             VariableDeclarationKind::Let,
+    //             ast_builder.vec1(ast_builder.variable_declarator(
+    //                 span,
+    //                 VariableDeclarationKind::Let,
+    //                 ast_builder.binding_pattern(
+    //                     binding_pattern,
+    //                     None as Option<oxc_allocator::Box<_>>,
+    //                     false,
+    //                 ),
+    //                 Some(
+    //                     Expression::CallExpression(
+    //                         ast_builder.alloc_call_expression(
+    //                             span,
+    //                             Expression::Identifier(
+    //                                 ast_builder.alloc_identifier_reference(
+    //                                     span,
+    //                                     ast_builder.atom("require"),
+    //                                 ),
+    //                             ),
+    //                             None as Option<oxc_allocator::Box<_>>,
+    //                             ast_builder.vec1(oxc_ast::ast::Argument::StringLiteral(
+    //                                 ast_builder.alloc_string_literal(
+    //                                     span,
+    //                                     ast_builder.atom(source),
+    //                                     None,
+    //                                 ),
+    //                             )),
+    //                             false,
+    //                         ),
+    //                     ),
+    //                 ),
+    //                 false,
+    //             )),
+    //             false,
+    //         ))
+    //     }
+    //
+    //     for specifier in specifiers.iter() {
+    //         let (local_name, remote_name, span) = match specifier {
+    //             oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
+    //                 let local_name = import_specifier.local.name.to_string();
+    //                 if !referenced_idents.contains(&local_name) {
+    //                     continue;
+    //                 }
+    //
+    //                 let remote_name = import_specifier.imported.to_string();
+    //                 let span = import_specifier.span;
+    //
+    //                 if code.is_empty() {
+    //                     tmp_program.program.body.insert(
+    //                         0,
+    //                         make_require(
+    //                             &ast_builder,
+    //                             BindingPatternKind::ObjectPattern(
+    //                                 ast_builder.alloc_object_pattern(
+    //                                     span,
+    //                                     ast_builder.vec1(
+    //                                         ast_builder.binding_property(
+    //                                             span,
+    //                                             PropertyKey::StaticIdentifier(
+    //                                                 ast_builder.alloc_identifier_name(
+    //                                                     span,
+    //                                                     ast_builder.atom(&remote_name),
+    //                                                 ),
+    //                                             ),
+    //                                             ast_builder.binding_pattern(
+    //                                                 ast_builder
+    //                                                     .binding_pattern_kind_binding_identifier(
+    //                                                         span,
+    //                                                         ast_builder.atom(&local_name),
+    //                                                     ),
+    //                                                 None as Option<oxc_allocator::Box<_>>,
+    //                                                 false,
+    //                                             ),
+    //                                             true,
+    //                                             false,
+    //                                         ),
+    //                                     ),
+    //                                     None as Option<oxc_allocator::Box<_>>,
+    //                                 ),
+    //                             ),
+    //                             &remote_filepath,
+    //                             span,
+    //                         ),
+    //                     );
+    //                     continue;
+    //                 }
+    //
+    //                 (local_name, remote_name, import_specifier.span)
+    //             }
+    //             oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(
+    //                 import_default_specifier,
+    //             ) => {
+    //                 let local_name = import_default_specifier.local.name.to_string();
+    //                 if !referenced_idents.contains(&local_name) {
+    //                     continue;
+    //                 }
+    //
+    //                 let span = import_default_specifier.span;
+    //
+    //                 if code.is_empty() {
+    //                     tmp_program.program.body.insert(
+    //                         0,
+    //                         make_require(
+    //                             &ast_builder,
+    //                             BindingPatternKind::ObjectPattern(
+    //                                 ast_builder.alloc_object_pattern(
+    //                                     span,
+    //                                     ast_builder.vec1(
+    //                                         ast_builder.binding_property(
+    //                                             span,
+    //                                             PropertyKey::StaticIdentifier(
+    //                                                 ast_builder.alloc_identifier_name(
+    //                                                     span,
+    //                                                     ast_builder.atom("default"),
+    //                                                 ),
+    //                                             ),
+    //                                             ast_builder.binding_pattern(
+    //                                                 ast_builder
+    //                                                     .binding_pattern_kind_binding_identifier(
+    //                                                         span,
+    //                                                         ast_builder.atom(&local_name),
+    //                                                     ),
+    //                                                 None as Option<oxc_allocator::Box<_>>,
+    //                                                 false,
+    //                                             ),
+    //                                             true,
+    //                                             false,
+    //                                         ),
+    //                                     ),
+    //                                     None as Option<oxc_allocator::Box<_>>,
+    //                                 ),
+    //                             ),
+    //                             &remote_filepath,
+    //                             span,
+    //                         ),
+    //                     );
+    //                     continue;
+    //                 }
+    //
+    //                 (
+    //                     local_name,
+    //                     "__global__export__".to_string(),
+    //                     import_default_specifier.span,
+    //                 )
+    //             }
+    //             oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(
+    //                 _import_namespace_specifier,
+    //             ) => {
+    //                 // TODO
+    //                 continue;
+    //             }
+    //         };
+    //
+    //         // add new variable declaration to our tmp program
+    //         let variable_declaration =
+    //             Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+    //                 span,
+    //                 VariableDeclarationKind::Const,
+    //                 ast_builder.vec1(
+    //                     ast_builder.variable_declarator(
+    //                         span,
+    //                         VariableDeclarationKind::Const,
+    //                         ast_builder.binding_pattern(
+    //                             BindingPatternKind::BindingIdentifier(
+    //                                 ast_builder.alloc_binding_identifier(
+    //                                     span,
+    //                                     ast_builder.atom(&local_name),
+    //                                 ),
+    //                             ),
+    //                             None as Option<oxc_allocator::Box<_>>,
+    //                             false,
+    //                         ),
+    //                         Some(Expression::Identifier(
+    //                             ast_builder.alloc_identifier_reference(
+    //                                 span,
+    //                                 ast_builder.atom(&format!(
+    //                                     "{cache_ref}[\"{remote_filepath}\"][\"{remote_name}\"]"
+    //                                 )),
+    //                             ),
+    //                         )),
+    //                         false,
+    //                     ),
+    //                 ),
+    //                 false,
+    //             ));
+    //         tmp_program.program.body.insert(0, variable_declaration);
+    //         remote_referenced_idents.insert(remote_name);
+    //     }
+    //
+    //     // if nothing referenced, nothing to do
+    //     if remote_referenced_idents.is_empty() {
+    //         continue;
+    //     }
+    //
+    //     let source_type = SourceType::from_path(&remote_filepath).map_err(|_| {
+    //         TransformError::UknownExtension {
+    //             filepath: remote_filepath.clone(),
+    //         }
+    //     })?;
+    //
+    //     let mut ast = Parser::new(allocator, &code, source_type)
+    //         .with_options(ParseOptions {
+    //             parse_regular_expression: true,
+    //             ..ParseOptions::default()
+    //         })
+    //         .parse();
+    //     if ast.panicked {
+    //         return Err(TransformError::RawParseFailed {
+    //             filepath: remote_filepath,
+    //         });
+    //     }
+    //
+    //     let cache_ref = &transformer.export_cache_ref;
+    //     let store = format!("global.{cache_ref}[\"{remote_filepath}\"]");
+    //     let all_cached = remote_referenced_idents.iter().all(|ident| {
+    //         js_sys::eval(&format!("{store}?.hasOwnProperty('{ident}')",))
+    //             .unwrap()
+    //             .is_truthy()
+    //     });
+    //
+    //     if all_cached {
+    //         continue;
+    //     }
+    //
+    //     solid_js_prepass(&ast_builder, &mut ast.program, true);
+    //     transpile_ts_to_js(allocator, &mut ast.program);
+    //
+    //     std::boxed::Box::pin(evaluate_program(
+    //         allocator,
+    //         transformer,
+    //         false,
+    //         &remote_filepath,
+    //         &mut ast.program,
+    //         remote_referenced_idents,
+    //     ))
+    //     .await?;
+    // }
+
+    let mut tmp_program_js = Codegen::new()
+        .with_options(CodegenOptions::default())
+        .build(&tmp_program.program)
+        .code;
+
+    // we append all exported idents we evaluated to the cache
+    if !exports.is_empty() {
+        tmp_program_js.push_str(&format!(
+            "\n{store} = {{...({store} ?? {{}}), {}}};",
+            exports.into_iter().collect::<Vec<String>>().join(","),
+        ));
+    }
+
+    if !css_variable_identifiers.is_empty() {
+        // const cssFile = [var.css, var2.css].join("\n\n");
+        tmp_program_js.push_str(&format!(
+            "\n{}.set('{}.{}', [\n{}\n].join('\\n\\n'));",
+            &transformer.css_file_store_ref,
+            program_path.replace("'", "\\'"),
+            transformer.css_extension,
+            css_variable_identifiers
+                .into_iter()
+                .map(|(variable_name, (class_name, _))| {
+                    if class_name.starts_with("_Global") {
+                        return format!("`${{{variable_name}.css}}\n`");
+                    }
+                    if transformer.wrap_selectors_with_global {
+                        return format!(
+                            "`:global(.{class_name}) {{\n${{{variable_name}.css}}\n}}`"
+                        );
+                    }
+
+                    format!("`.{class_name} {{\n${{{variable_name}.css}}\n}}`")
+                })
+                .collect::<Vec<_>>()
+                .join(",\n")
+        ));
+    }
+
+    let css_file_store_ref = &transformer.css_file_store_ref;
+    let export_cache_ref = &transformer.export_cache_ref;
+    // wrap into promise
+    let tmp_program_js = format!(
+        "let eval;
+        const global = {{
+        {css_file_store_ref},
+        {export_cache_ref},
+        }};
+        (async () => {{
+        \"use strict\";
+        {tmp_program_js}
+        }})()"
+    );
+
+    let evaluated =
+        js_sys::eval(&tmp_program_js).map_err(|cause| TransformError::EvaluationFailed {
+            program: tmp_program_js.clone(),
+            cause,
+        })?;
+
+    let promise = js_sys::Promise::from(evaluated);
+    let future = wasm_bindgen_futures::JsFuture::from(promise);
+    future
+        .await
+        .map_err(|cause| TransformError::EvaluationFailed {
+            program: tmp_program_js,
+            cause,
+        })?;
+
+    if !entrypoint {
+        return Ok(EvaluateProgramReturnStatus::NotTransformed);
+    }
+
+    Ok(EvaluateProgramReturnStatus::Transfomred)
+}
+
+#[derive(PartialEq)]
+pub enum EvaluateProgramReturnStatus {
+    Transfomred,
+    NotTransformed,
+}
+
+#[wasm_bindgen]
+impl Transformer {
+    pub async fn transform(
+        &self,
+        code: String,
+        filepath: String,
+        import_source: Option<String>,
+    ) -> Result<Option<JsValue>, TransformError> {
+        let allocator = Allocator::default();
+        let ast_builder = AstBuilder::new(&allocator);
+
+        let source_type =
+            SourceType::from_path(&filepath).map_err(|_| TransformError::UknownExtension {
+                filepath: filepath.clone(),
+            })?;
+        let mut ast = Parser::new(&allocator, &code, source_type)
+            .with_options(ParseOptions {
+                parse_regular_expression: true,
+                ..ParseOptions::default()
+            })
+            .parse();
+
+        if ast.panicked {
+            // panic!(format!("{:?}", ast.errors));
+            return Err(TransformError::BundlerParseFailed { id: filepath });
+        }
+
+        let status = evaluate_program(
+            &allocator,
+            self,
+            true,
+            &filepath,
+            &mut ast.program,
+            HashSet::new(),
+        )
+        .await?;
+
+        if status == EvaluateProgramReturnStatus::NotTransformed {
+            return Ok(None);
+        }
+
+        // add import to virtual css
+        if let Some(import_source) = &import_source {
+            let import_declaration = ast_builder
+                .alloc_import_declaration::<Option<Box<WithClause>>>(
+                    ast.program.span,
+                    None,
+                    ast_builder.string_literal(
+                        ast.program.span,
+                        ast_builder.atom(import_source),
+                        None,
+                    ),
+                    None,
+                    None,
+                    ImportOrExportKind::Value,
+                );
+            ast.program
+                .body
+                .insert(0, Statement::ImportDeclaration(import_declaration));
+        }
+
+        let options = CodegenOptions {
+            source_map_path: Some(PathBuf::from_str(&filepath).unwrap()),
+            ..Default::default()
+        };
+        let output_js = Codegen::new().with_options(options).build(&ast.program);
+
+        let result = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("code"),
+            &JsValue::from_str(&output_js.code),
+        )
+        .unwrap();
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("sourcemap"),
+            &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
+        )
+        .unwrap();
+
+        Ok(Some(result.into()))
+    }
+}
+
+pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a>) {
+    use oxc_semantic::SemanticBuilder;
+    use oxc_transformer::TransformOptions;
+    use oxc_transformer::Transformer;
+
+    let ret = SemanticBuilder::new().build(program);
+    let scoping = ret.semantic.into_scoping();
+    let t = Transformer::new(
+        allocator,
+        Path::new("test.tsx"),
+        &TransformOptions::default(),
+    );
+    t.build_with_scoping(scoping, program);
+}
+
+fn build_new_ast<'a>(allocator: &'a Allocator) -> oxc_parser::ParserReturn<'a> {
+    let source_type = SourceType::tsx();
+    let parsed = Parser::new(allocator, "", source_type)
+        .with_options(ParseOptions {
+            parse_regular_expression: true,
+            ..ParseOptions::default()
+        })
+        .parse();
+    parsed
+}
+
+fn expression_get_references<'a>(expression: &Expression<'a>) -> Vec<String> {
+    #[derive(Default)]
+    struct Visitor {
+        pub references: Vec<String>,
+        pub scopes_references: Vec<HashSet<String>>,
+    }
+
+    use oxc_ast_visit::walk::walk_formal_parameter;
+    use oxc_ast_visit::walk::walk_identifier_reference;
+    use oxc_ast_visit::walk::walk_variable_declarator;
+    use oxc_syntax::scope::{ScopeFlags, ScopeId};
+
+    impl<'a> Visit<'a> for Visitor {
+        fn enter_scope(
+            &mut self,
+            _flags: ScopeFlags,
+            _scope_id: &std::cell::Cell<Option<ScopeId>>,
+        ) {
+            self.scopes_references.push(HashSet::new());
+        }
+        fn leave_scope(&mut self) {
+            self.scopes_references.pop();
+        }
+
+        fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
+            let Some(scope) = self.scopes_references.last_mut() else {
+                return;
+            };
+            scope.extend(binding_pattern_kind_get_idents(&it.id.kind));
+
+            walk_variable_declarator(self, it);
+        }
+        fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
+            let Some(scope) = self.scopes_references.last_mut() else {
+                return;
+            };
+            scope.extend(binding_pattern_kind_get_idents(&it.pattern.kind));
+
+            walk_formal_parameter(self, it);
+        }
+        fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
+            let variable_name = &it.name;
+            for scope in self.scopes_references.iter() {
+                if scope.contains(variable_name.as_str()) {
+                    return;
+                }
+            }
+            self.references.push(variable_name.to_string());
+
+            walk_identifier_reference(self, it);
+        }
+    }
+
+    let mut visitor = Visitor {
+        ..Default::default()
+    };
+    visitor.visit_expression(expression);
+
+    visitor.references
+}

@@ -14,8 +14,6 @@ use std::path::Path;
 use oxc_allocator::Allocator;
 use oxc_allocator::Box;
 use oxc_allocator::CloneIn;
-use oxc_ast::ast::Argument;
-use oxc_ast::ast::ArrayExpressionElement;
 use oxc_ast::ast::BindingPatternKind;
 use oxc_ast::ast::ExportDefaultDeclarationKind;
 use oxc_ast::ast::Expression;
@@ -23,18 +21,20 @@ use oxc_ast::ast::Program;
 use oxc_ast::ast::PropertyKey;
 use oxc_ast::ast::TaggedTemplateExpression;
 use oxc_ast::ast::VariableDeclarationKind;
+use oxc_ast::ast::VariableDeclarator;
 use oxc_ast::ast::WithClause;
 use oxc_ast::{
     ast::{ImportOrExportKind, Statement},
     AstBuilder,
 };
-use oxc_ast_visit::Visit;
+use oxc_ast_visit::{Visit, VisitMut};
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::{ParseOptions, Parser};
 use oxc_span::GetSpan;
 use oxc_span::SourceType;
 use oxc_span::Span;
 
+mod ast;
 mod compiler;
 mod solid_js;
 

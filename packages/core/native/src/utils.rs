@@ -66,3 +66,107 @@ pub fn generate_random_id(length: usize) -> String {
         })
         .collect()
 }
+
+#[derive(Default)]
+struct ExpressionCollectorVisitor {
+    pub references: Vec<String>,
+    pub scopes_references: Vec<HashSet<String>>,
+}
+
+use oxc_ast_visit::walk::walk_formal_parameter;
+use oxc_ast_visit::walk::walk_identifier_reference;
+use oxc_ast_visit::walk::walk_variable_declarator;
+use oxc_syntax::scope::{ScopeFlags, ScopeId};
+
+impl<'a> Visit<'a> for ExpressionCollectorVisitor {
+    fn enter_scope(&mut self, _flags: ScopeFlags, _scope_id: &std::cell::Cell<Option<ScopeId>>) {
+        self.scopes_references.push(HashSet::new());
+    }
+    fn leave_scope(&mut self) {
+        self.scopes_references.pop();
+    }
+
+    fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
+        let Some(scope) = self.scopes_references.last_mut() else {
+            return;
+        };
+        scope.extend(binding_pattern_kind_get_idents(&it.id.kind));
+
+        walk_variable_declarator(self, it);
+    }
+    fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
+        let Some(scope) = self.scopes_references.last_mut() else {
+            return;
+        };
+        scope.extend(binding_pattern_kind_get_idents(&it.pattern.kind));
+
+        walk_formal_parameter(self, it);
+    }
+    fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
+        let variable_name = &it.name;
+        for scope in self.scopes_references.iter() {
+            if scope.contains(variable_name.as_str()) {
+                return;
+            }
+        }
+        self.references.push(variable_name.to_string());
+
+        walk_identifier_reference(self, it);
+    }
+}
+
+pub fn tagged_template_get_tag<'alloc>(
+    tagged_template_expression: &mut oxc_allocator::Box<
+        'alloc,
+        oxc_ast::ast::TaggedTemplateExpression<'alloc>,
+    >,
+) -> Option<&'alloc str> {
+    let Expression::Identifier(identifier) = &mut tagged_template_expression.tag else {
+        return None;
+    };
+    Some(identifier.name.as_str())
+}
+
+pub fn expression_get_references<'a>(expression: &Expression<'a>) -> Vec<String> {
+    let mut visitor = ExpressionCollectorVisitor {
+        ..Default::default()
+    };
+    visitor.visit_expression(expression);
+    visitor.references
+}
+
+pub fn tagged_template_expression_get_references<'a>(
+    it: &TaggedTemplateExpression<'a>,
+) -> Vec<String> {
+    let mut visitor = ExpressionCollectorVisitor {
+        ..Default::default()
+    };
+    visitor.visit_tagged_template_expression(it);
+    visitor.references
+}
+
+pub fn build_new_ast<'a>(allocator: &'a Allocator) -> oxc_parser::ParserReturn<'a> {
+    let source_type = SourceType::tsx();
+    let parsed = Parser::new(allocator, "", source_type)
+        .with_options(ParseOptions {
+            parse_regular_expression: true,
+            ..ParseOptions::default()
+        })
+        .parse();
+    parsed
+}
+
+pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a>) {
+    use oxc_semantic::SemanticBuilder;
+    use oxc_transformer::TransformOptions;
+    use oxc_transformer::Transformer;
+
+    let ret = SemanticBuilder::new().build(program);
+    let scoping = ret.semantic.into_scoping();
+    let t = Transformer::new(
+        allocator,
+        Path::new("test.tsx"),
+        &TransformOptions::default(),
+    );
+    t.build_with_scoping(scoping, program);
+}
