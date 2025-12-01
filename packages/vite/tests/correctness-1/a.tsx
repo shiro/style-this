@@ -4,14 +4,16 @@ export const foo = css`
   color: white;
 `;
 
-export default function () {
+export function f2() {
   return css`
     color: hotpink;
   `;
 }
 
-export function f2() {
-  return css`
-    color: hotpink;
-  `;
+export default class M {
+  static foo() {
+    return css`
+      color: green;
+    `;
+  }
 }

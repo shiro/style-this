@@ -108,7 +108,6 @@ struct ExpressionCollectorVisitor {
     pub scopes_references: Vec<HashSet<String>>,
 }
 
-use oxc_ast::ast::TemplateElement;
 use oxc_ast_visit::walk::walk_formal_parameter;
 use oxc_ast_visit::walk::walk_identifier_reference;
 use oxc_ast_visit::walk::walk_variable_declarator;
@@ -300,6 +299,29 @@ pub fn replace_in_statement_using_spans<'alloc>(
     t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
 
     t.visit_statement(statement);
+
+    t.ast_builder = None;
+    t.replacement_points = None;
+}
+
+pub fn replace_in_class_body_using_spans<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    class_body: &mut ClassBody<'alloc>,
+    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
+) {
+    let mut t = SpanReplacer {
+        ast_builder: None,
+        replacement_points: None,
+    };
+
+    if replacement_points.is_empty() {
+        return;
+    }
+
+    t.ast_builder = Some(ast_builder);
+    t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
+
+    t.visit_class_body(class_body);
 
     t.ast_builder = None;
     t.replacement_points = None;

@@ -5,23 +5,25 @@ foo.css = `color: white;`;
 let __styleThis_expression_2 = new String("__styleThis_expression_2-xqzcdq");
 __styleThis_expression_2.css = `color: hotpink;
   `;
-function __global__export__() {
-	return __styleThis_expression_2;
-}
 let __styleThis_expression_1 = new String("__styleThis_expression_1-y7w1qz");
-__styleThis_expression_1.css = `color: hotpink;
-  `;
+__styleThis_expression_1.css = `color: green;
+    `;
+class __global__export__ {
+	static foo() {
+		return __styleThis_expression_1;
+	}
+}
 
 global.__styleThis_dddeefff["/a.tsx"] = {...(global.__styleThis_dddeefff["/home/shiro/project/style-this/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 __styleThis_aabbbccc.set('/home/shiro/project/style-this/packages/vite/tests/correctness-1/a.tsx.css', [
-`.foo-uvg9av {
-${foo.css}
+`.__styleThis_expression_1-y7w1qz {
+${__styleThis_expression_1.css}
 }`,
 `.__styleThis_expression_2-xqzcdq {
 ${__styleThis_expression_2.css}
 }`,
-`.__styleThis_expression_1-y7w1qz {
-${__styleThis_expression_1.css}
+`.foo-uvg9av {
+${foo.css}
 }`
 ].join('\n'));
 
@@ -50,7 +52,7 @@ let comp = () => {
 	return __styleThis_expression_2;
 };
 let st = `color: pink;
-  ${mib()}`;
+  ${mib.foo()}`;
 let s2 = new String("s2-w5qjc1");
 s2.css = `${st}
   ${comp().css}`;
@@ -59,19 +61,19 @@ unrelated.css = `background: none;
   ${a.foo.css}`;
 
 __styleThis_aabbbccc.set('/home/shiro/project/style-this/packages/vite/tests/correctness-1/entry.tsx.css', [
-`.s2-w5qjc1 {
-${s2.css}
-}`,
 `.__styleThis_expression_5-z0dufg {
 ${__styleThis_expression_5.css}
 }`,
 `.unrelated-ox2zkx {
 ${unrelated.css}
 }`,
-`.__styleThis_expression_2-9ejoh6 {
-${__styleThis_expression_2.css}
+`.s2-w5qjc1 {
+${s2.css}
 }`,
 `.s1-9qjw5y {
 ${__styleThis_var_s1_3.css}
+}`,
+`.__styleThis_expression_2-9ejoh6 {
+${__styleThis_expression_2.css}
 }`
 ].join('\n'));

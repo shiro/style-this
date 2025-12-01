@@ -1,12 +1,14 @@
 use oxc_ast::ast::{
-    Declaration, ExportDefaultDeclaration, Function, ImportDeclarationSpecifier, ModuleExportName,
+    Class, Declaration, ExportDefaultDeclaration, Function, ImportDeclarationSpecifier,
+    ModuleExportName,
 };
 use oxc_semantic::ScopeFlags;
 
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{
-    binding_pattern_kind_get_idents, replace_in_expression_using_identifiers,
-    replace_in_expression_using_spans, replace_in_statement_using_spans, transpile_ts_to_js,
+    binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
+    replace_in_expression_using_identifiers, replace_in_expression_using_spans,
+    replace_in_statement_using_spans, transpile_ts_to_js,
 };
 use crate::*;
 
@@ -51,6 +53,7 @@ impl From<TransformError> for JsValue {
 enum VirtualProgramInsert<'alloc> {
     VariableDeclarator(VariableDeclarator<'alloc>),
     FunctionDeclaration(Function<'alloc>),
+    ClassDeclaration(Class<'alloc>),
 }
 
 impl<'alloc> VirtualProgramInsert<'alloc> {
@@ -66,6 +69,9 @@ impl<'alloc> VirtualProgramInsert<'alloc> {
             VirtualProgramInsert::FunctionDeclaration(function) => {
                 function.id.as_ref().map(|id| id.name.as_str())
             }
+            VirtualProgramInsert::ClassDeclaration(class) => {
+                class.id.as_ref().map(|id| id.name.as_str())
+            }
         }
     }
 
@@ -73,6 +79,7 @@ impl<'alloc> VirtualProgramInsert<'alloc> {
         match self {
             VirtualProgramInsert::VariableDeclarator(declarator) => declarator.span,
             VirtualProgramInsert::FunctionDeclaration(function) => function.span,
+            VirtualProgramInsert::ClassDeclaration(class) => class.span,
         }
     }
 }
@@ -221,6 +228,30 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         );
     }
 
+    fn visit_class_declaration(&mut self, it: &mut oxc_ast::ast::Class<'alloc>) {
+        let pos = self.tmp_program_statement_buffer.last().unwrap().len();
+
+        oxc_ast_visit::walk_mut::walk_class(self, it);
+
+        let Some(id) = &it.id else { return };
+        let name = id.name.as_str();
+
+        if !self.is_variable_referenced(name) {
+            return;
+        }
+
+        replace_in_class_body_using_spans(
+            self.ast_builder,
+            &mut it.body,
+            &mut self.replacement_points,
+        );
+
+        self.insert_into_virtual_program(
+            VirtualProgramInsert::ClassDeclaration(it.clone_in(self.allocator)),
+            Some(pos),
+        );
+    }
+
     /// creates a class name or gets it from cache
     fn create_virtual_css_template(&mut self, variable_name: &str) -> String {
         // get class name from cache or compute
@@ -342,6 +373,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             }
             VirtualProgramInsert::FunctionDeclaration(function) => {
                 Statement::FunctionDeclaration(self.ast_builder.alloc(function))
+            }
+            VirtualProgramInsert::ClassDeclaration(class) => {
+                Statement::ClassDeclaration(self.ast_builder.alloc(class))
             }
         };
 
@@ -838,6 +872,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             self.visit_function_declaration(function, ScopeFlags::Function);
         }
 
+        if let Statement::ClassDeclaration(class) = it {
+            self.visit_class_declaration(class);
+        }
+
         oxc_ast_visit::walk_mut::walk_statement(self, it);
     }
 
@@ -941,6 +979,18 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let mut statement = Statement::FunctionDeclaration(function);
                 self.visit_statement(&mut statement);
             }
+            ExportDefaultDeclarationKind::ClassDeclaration(class) => {
+                let span = class.span;
+
+                let mut class = class.clone_in(self.allocator);
+                class.id = Some(
+                    self.ast_builder
+                        .binding_identifier(span, self.ast_builder.atom(global_sentinel)),
+                );
+
+                let mut statement = Statement::ClassDeclaration(class);
+                self.visit_statement(&mut statement);
+            }
             _ => {}
         }
     }
@@ -995,8 +1045,20 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     Statement::FunctionDeclaration(function.clone_in(self.allocator));
                 self.visit_statement(&mut statement);
             }
-            Declaration::ClassDeclaration(_it) => {
-                // TODO
+            Declaration::ClassDeclaration(class) => {
+                let name = class
+                    .id
+                    .as_ref()
+                    .expect("named exported classes always have a name")
+                    .name
+                    .as_str();
+
+                if self.referenced_idents.first().unwrap().contains(name) {
+                    self.exported_idents.insert(name.to_string());
+                }
+
+                let mut statement = Statement::ClassDeclaration(class.clone_in(self.allocator));
+                self.visit_statement(&mut statement);
             }
             _ => {}
         }

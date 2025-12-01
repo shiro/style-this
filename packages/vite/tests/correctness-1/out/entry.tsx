@@ -1,7 +1,6 @@
 import "virtual:style-this:/entry.tsx.css";
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
-// import { f2 } from "./a";
 const mutate = (v) => v;
 const comp = () => {
 ("foob");

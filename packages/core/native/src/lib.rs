@@ -15,17 +15,19 @@ use oxc_allocator::Allocator;
 use oxc_allocator::Box;
 use oxc_allocator::CloneIn;
 use oxc_ast::ast::BindingPatternKind;
+use oxc_ast::ast::ClassBody;
 use oxc_ast::ast::ExportDefaultDeclarationKind;
 use oxc_ast::ast::Expression;
 use oxc_ast::ast::Program;
 use oxc_ast::ast::PropertyKey;
 use oxc_ast::ast::TaggedTemplateExpression;
+use oxc_ast::ast::TemplateElement;
 use oxc_ast::ast::VariableDeclarationKind;
 use oxc_ast::ast::VariableDeclarator;
 use oxc_ast::ast::WithClause;
 use oxc_ast::{
-    ast::{ImportOrExportKind, Statement},
     AstBuilder,
+    ast::{ImportOrExportKind, Statement},
 };
 use oxc_ast_visit::{Visit, VisitMut};
 use oxc_codegen::{Codegen, CodegenOptions};

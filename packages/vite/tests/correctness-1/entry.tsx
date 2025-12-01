@@ -1,6 +1,5 @@
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
-// import { f2 } from "./a";
 
 const mutate = (v) => v;
 
@@ -24,7 +23,7 @@ const comp = () => {
 
 const st = style`
   color: pink;
-  ${mib()}
+  ${mib.foo().css}
 `;
 
 const s2 = css`
