@@ -21,8 +21,10 @@ pub enum TransformError {
     EvaluationFailed { program: String, cause: JsValue },
     #[error("failed to read file '{filepath}'")]
     ReadFileError { filepath: String, cause: JsValue },
-    #[error("tried to access dynamic variable '{variable}' during style evaluation")]
-    AccessDynamicVariableError { variable: String },
+    #[error(
+        "tried to access dynamic variable '{variable}' during style evaluation in '{filepath}'"
+    )]
+    AccessDynamicVariableError { variable: String, filepath: String },
 }
 
 impl From<TransformError> for JsValue {
@@ -468,6 +470,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 if self.get_dynamic_variable(ident) {
                     self.error = Some(TransformError::AccessDynamicVariableError {
                         variable: ident.to_string(),
+                        filepath: self.program_filepath.to_string(),
                     });
                     return;
                 }
@@ -592,6 +595,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 if self.get_dynamic_variable(ident) {
                     self.error = Some(TransformError::AccessDynamicVariableError {
                         variable: ident.to_string(),
+                        filepath: self.program_filepath.to_string(),
                     });
                     return;
                 }
@@ -692,6 +696,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             if self.get_dynamic_variable(ident) {
                 self.error = Some(TransformError::AccessDynamicVariableError {
                     variable: ident.to_string(),
+                    filepath: self.program_filepath.to_string(),
                 });
                 return;
             }
