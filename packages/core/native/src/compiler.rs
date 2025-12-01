@@ -682,10 +682,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             .collect();
 
         if referenced_variable_names.is_empty() {
-            self.replacement_points.insert(
-                init.span(),
-                ast::build_undefined(self.ast_builder, init.span()),
-            );
+            // self.replacement_points.insert(
+            //     init.span(),
+            //     ast::build_undefined(self.ast_builder, init.span()),
+            // );
             return;
         }
 
@@ -933,10 +933,18 @@ impl Transformer {
     }
 
     /// loads file contents and id
-    async fn load_file(&self, id: &str) -> Result<(String, String), TransformError> {
+    async fn load_file(
+        &self,
+        id: &str,
+        importer: &str,
+    ) -> Result<(String, String), TransformError> {
         let promise = self
             .load_file
-            .call1(&JsValue::UNDEFINED, &JsValue::from_str(id))
+            .call2(
+                &JsValue::UNDEFINED,
+                &JsValue::from_str(id),
+                &JsValue::from_str(importer),
+            )
             .unwrap();
         let future = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::from(promise));
         let ret = future
@@ -1052,7 +1060,9 @@ pub async fn evaluate_program<'alloc>(
             continue;
         }
 
-        let (remote_filepath, code) = transformer.load_file(&remote_module_id).await?;
+        let (remote_filepath, code) = transformer
+            .load_file(&remote_module_id, program_path)
+            .await?;
 
         for specifier in specifiers.iter() {
             // ignore `css` imports from us
