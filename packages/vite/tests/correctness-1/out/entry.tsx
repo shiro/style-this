@@ -11,6 +11,7 @@ const comp = () => {
 	mutate(b);
 	return "__styleThis_expression_2-9ejoh6";
 };
+const { color } = { color: "blue" };
 const st = undefined;
 const s2 = "s2-w5qjc1";
 const unrelated = "unrelated-ox2zkx";

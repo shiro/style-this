@@ -57,21 +57,26 @@ enum VirtualProgramInsert<'alloc> {
 }
 
 impl<'alloc> VirtualProgramInsert<'alloc> {
-    fn name(&self) -> Option<&str> {
+    fn name(&self) -> Option<HashSet<String>> {
         match self {
             VirtualProgramInsert::VariableDeclarator(declarator) => {
-                if let BindingPatternKind::BindingIdentifier(ident) = &declarator.id.kind {
-                    Some(ident.name.as_str())
-                } else {
+                let idents = binding_pattern_kind_get_idents(&declarator.id.kind);
+                if idents.is_empty() {
                     None
+                } else {
+                    Some(idents.into_iter().collect())
                 }
             }
-            VirtualProgramInsert::FunctionDeclaration(function) => {
-                function.id.as_ref().map(|id| id.name.as_str())
-            }
-            VirtualProgramInsert::ClassDeclaration(class) => {
-                class.id.as_ref().map(|id| id.name.as_str())
-            }
+            VirtualProgramInsert::FunctionDeclaration(function) => function.id.as_ref().map(|id| {
+                let mut ret = HashSet::new();
+                ret.insert(id.name.as_str().to_string());
+                ret
+            }),
+            VirtualProgramInsert::ClassDeclaration(class) => class.id.as_ref().map(|id| {
+                let mut ret = HashSet::new();
+                ret.insert(id.name.as_str().to_string());
+                ret
+            }),
         }
     }
 
@@ -332,36 +337,42 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         it: VirtualProgramInsert<'alloc>,
         pos: Option<usize>,
     ) {
-        // TODO handle other kinds
-        let Some(variable_name) = it.name() else {
+        let Some(mut variable_names) = it.name() else {
             return;
         };
 
         let span = it.span();
 
         // if cached, grab from cache
-        let cached = js_sys::eval(&format!(
-            "{}?.hasOwnProperty('{variable_name}')",
-            self.store
-        ))
-        .unwrap()
-        .is_truthy();
-        if cached {
-            let variable_declaration = ast::build_variable_declaration_ident(
-                self.ast_builder,
-                span,
-                self.get_alias(variable_name).unwrap_or(variable_name),
-                &format!("{}['{variable_name}']", self.store),
-            );
+        variable_names.retain(|variable_name| {
+            let cached = js_sys::eval(&format!(
+                "{}?.hasOwnProperty('{variable_name}')",
+                self.store
+            ))
+            .unwrap()
+            .is_truthy();
+            if cached {
+                let variable_declaration = ast::build_variable_declaration_ident(
+                    self.ast_builder,
+                    span,
+                    self.get_alias(variable_name).unwrap_or(variable_name),
+                    &format!("{}['{variable_name}']", self.store),
+                );
 
-            self.tmp_program_statement_buffer
-                .last_mut()
-                .unwrap()
-                .push(variable_declaration);
+                self.tmp_program_statement_buffer
+                    .last_mut()
+                    .unwrap()
+                    .push(variable_declaration);
+                return false;
+            }
+            true
+        });
+
+        if variable_names.is_empty() {
             return;
         }
 
-        // copy the entire variable/function declaration verbatim
+        // copy the entire variable/function/class declaration verbatim
         let statement = match it {
             VirtualProgramInsert::VariableDeclarator(decl) => {
                 Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(

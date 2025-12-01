@@ -21,8 +21,10 @@ const comp = () => {
   return css``;
 };
 
+const { color } = { color: "blue" };
+
 const st = style`
-  color: pink;
+  color: ${color};
   ${mib.foo().css}
 `;
 
