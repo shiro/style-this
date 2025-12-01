@@ -1,11 +1,12 @@
 use oxc_ast::ast::{
-    Declaration, ExportDefaultDeclaration, ImportDeclarationSpecifier, ModuleExportName,
+    Declaration, ExportDefaultDeclaration, Function, ImportDeclarationSpecifier, ModuleExportName,
 };
+use oxc_semantic::ScopeFlags;
 
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{
     binding_pattern_kind_get_idents, replace_in_expression_using_identifiers,
-    replace_in_expression_using_spans, transpile_ts_to_js,
+    replace_in_expression_using_spans, replace_in_statement_using_spans, transpile_ts_to_js,
 };
 use crate::*;
 
@@ -44,6 +45,35 @@ impl From<TransformError> for JsValue {
         };
 
         err.into()
+    }
+}
+
+enum VirtualProgramInsert<'alloc> {
+    VariableDeclarator(VariableDeclarator<'alloc>),
+    FunctionDeclaration(Function<'alloc>),
+}
+
+impl<'alloc> VirtualProgramInsert<'alloc> {
+    fn name(&self) -> Option<&str> {
+        match self {
+            VirtualProgramInsert::VariableDeclarator(declarator) => {
+                if let BindingPatternKind::BindingIdentifier(ident) = &declarator.id.kind {
+                    Some(ident.name.as_str())
+                } else {
+                    None
+                }
+            }
+            VirtualProgramInsert::FunctionDeclaration(function) => {
+                function.id.as_ref().map(|id| id.name.as_str())
+            }
+        }
+    }
+
+    fn span(&self) -> Span {
+        match self {
+            VirtualProgramInsert::VariableDeclarator(declarator) => declarator.span,
+            VirtualProgramInsert::FunctionDeclaration(function) => function.span,
+        }
     }
 }
 
@@ -140,6 +170,57 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 }
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
+    fn visit_function_declaration(
+        &mut self,
+        it: &mut oxc_ast::ast::Function<'alloc>,
+        flags: oxc_semantic::ScopeFlags,
+    ) {
+        let pos = self.tmp_program_statement_buffer.last().unwrap().len();
+
+        oxc_ast_visit::walk_mut::walk_function(self, it, flags);
+
+        let Some(id) = &it.id else { return };
+        let name = id.name.as_str();
+
+        if !self.is_variable_referenced(name) {
+            return;
+        }
+
+        let mut function_declaration = it.clone_in(self.allocator);
+
+        if let Some(body) = &mut function_declaration.body {
+            let right_references = body
+                .statements
+                .iter()
+                .flat_map(|stmt| utils::statement_get_references(stmt))
+                .collect::<Vec<_>>();
+
+            for ident in &right_references {
+                if self.get_dynamic_variable(ident) {
+                    self.error = Some(TransformError::AccessDynamicVariableError {
+                        variable: ident.to_string(),
+                        filepath: self.program_filepath.to_string(),
+                    });
+                    return;
+                }
+            }
+
+            // transform
+            for statement in &mut body.statements {
+                replace_in_statement_using_spans(
+                    self.ast_builder,
+                    statement,
+                    &mut self.replacement_points,
+                );
+            }
+        }
+
+        self.insert_into_virtual_program(
+            VirtualProgramInsert::FunctionDeclaration(function_declaration),
+            Some(pos),
+        );
+    }
+
     /// creates a class name or gets it from cache
     fn create_virtual_css_template(&mut self, variable_name: &str) -> String {
         // get class name from cache or compute
@@ -215,14 +296,17 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         false
     }
 
-    fn insert_into_virtual_program(&mut self, it: VariableDeclarator<'alloc>, pos: Option<usize>) {
+    fn insert_into_virtual_program(
+        &mut self,
+        it: VirtualProgramInsert<'alloc>,
+        pos: Option<usize>,
+    ) {
         // TODO handle other kinds
-        let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
+        let Some(variable_name) = it.name() else {
             return;
         };
 
-        let span = it.span;
-        let variable_name = variable_name.name.as_str();
+        let span = it.span();
 
         // if cached, grab from cache
         let cached = js_sys::eval(&format!(
@@ -246,25 +330,31 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             return;
         }
 
-        // copy the entire variable declaration verbatim
-        let variable_declaration =
-            Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
-                span,
-                VariableDeclarationKind::Let,
-                self.ast_builder.vec1(it),
-                false,
-            ));
+        // copy the entire variable/function declaration verbatim
+        let statement = match it {
+            VirtualProgramInsert::VariableDeclarator(decl) => {
+                Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                    span,
+                    VariableDeclarationKind::Let,
+                    self.ast_builder.vec1(decl),
+                    false,
+                ))
+            }
+            VirtualProgramInsert::FunctionDeclaration(function) => {
+                Statement::FunctionDeclaration(self.ast_builder.alloc(function))
+            }
+        };
 
         if let Some(pos) = pos {
             self.tmp_program_statement_buffer
                 .last_mut()
                 .unwrap()
-                .insert(pos, variable_declaration);
+                .insert(pos, statement);
         } else {
             self.tmp_program_statement_buffer
                 .last_mut()
                 .unwrap()
-                .push(variable_declaration);
+                .push(statement);
         }
     }
 
@@ -503,7 +593,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         ast::build_decorated_string(self.ast_builder, span, &class_name),
                     );
 
-                    self.insert_into_virtual_program(variable_declarator, None);
+                    self.insert_into_virtual_program(
+                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                        None,
+                    );
 
                     self.replacement_points.insert(
                         span,
@@ -532,7 +625,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     self.style_variable_identifiers
                         .insert(variable_name.to_string());
 
-                    self.insert_into_virtual_program(variable_declarator, None);
+                    self.insert_into_virtual_program(
+                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                        None,
+                    );
 
                     self.replacement_points.insert(
                         span,
@@ -628,7 +724,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         &class_name,
                     );
 
-                    self.insert_into_virtual_program(variable_declarator, None);
+                    self.insert_into_virtual_program(
+                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                        None,
+                    );
 
                     *init = ast::build_string(self.ast_builder, span, &class_name);
                 }
@@ -649,7 +748,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     self.style_variable_identifiers
                         .insert(variable_name.to_string());
 
-                    self.insert_into_virtual_program(variable_declarator, None);
+                    self.insert_into_virtual_program(
+                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                        None,
+                    );
 
                     self.replacement_points.insert(
                         span,
@@ -676,6 +778,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         let Some(init) = &it.init else { return };
 
         let variable_names = binding_pattern_kind_get_idents(&it.id.kind);
+
         let referenced_variable_names: Vec<_> = variable_names
             .iter()
             .filter(|name| self.is_variable_referenced(name))
@@ -720,7 +823,22 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         let variable_declarator =
             ast::build_variable_declarator_pattern(self.ast_builder, span, aliased_idents, right);
-        self.insert_into_virtual_program(variable_declarator, Some(pos));
+        self.insert_into_virtual_program(
+            VirtualProgramInsert::VariableDeclarator(variable_declarator),
+            Some(pos),
+        );
+    }
+
+    fn visit_statement(&mut self, it: &mut Statement<'alloc>) {
+        if self.error.is_some() {
+            return;
+        }
+
+        if let Statement::FunctionDeclaration(function) = it {
+            self.visit_function_declaration(function, ScopeFlags::Function);
+        }
+
+        oxc_ast_visit::walk_mut::walk_statement(self, it);
     }
 
     fn visit_export_default_declaration(&mut self, it: &mut ExportDefaultDeclaration<'alloc>) {
@@ -739,6 +857,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             .unwrap()
             .contains(global_sentinel)
         {
+            oxc_ast_visit::walk_mut::walk_export_default_declaration(self, it);
             return;
         }
 
@@ -810,8 +929,17 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
                 self.visit_variable_declaration(&mut variable_declaration);
             }
-            ExportDefaultDeclarationKind::FunctionDeclaration(_function_declaration) => {
-                // TODO
+            ExportDefaultDeclarationKind::FunctionDeclaration(function) => {
+                let span = function.span;
+
+                let mut function = function.clone_in(self.allocator);
+                function.id = Some(
+                    self.ast_builder
+                        .binding_identifier(span, self.ast_builder.atom(global_sentinel)),
+                );
+
+                let mut statement = Statement::FunctionDeclaration(function);
+                self.visit_statement(&mut statement);
             }
             _ => {}
         }
@@ -824,6 +952,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if self.error.is_some() {
             return;
         }
+
         // TODO handle correctly
         if self.scan_pass {
             return;
@@ -832,6 +961,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         let Some(declaration) = &mut it.declaration else {
             return;
         };
+
         match declaration {
             Declaration::VariableDeclaration(it) => {
                 // TODO
@@ -849,8 +979,21 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 }
                 self.visit_variable_declaration(it);
             }
-            Declaration::FunctionDeclaration(_it) => {
-                // TODO
+            Declaration::FunctionDeclaration(function) => {
+                let name = function
+                    .id
+                    .as_ref()
+                    .expect("named exported functions always have a name")
+                    .name
+                    .as_str();
+
+                if self.referenced_idents.first().unwrap().contains(name) {
+                    self.exported_idents.insert(name.to_string());
+                }
+
+                let mut statement =
+                    Statement::FunctionDeclaration(function.clone_in(self.allocator));
+                self.visit_statement(&mut statement);
             }
             Declaration::ClassDeclaration(_it) => {
                 // TODO
@@ -999,6 +1142,7 @@ pub async fn evaluate_program<'alloc>(
             }
             true
         });
+
     if return_early {
         return Ok(EvaluateProgramReturnStatus::NotTransformed);
     }

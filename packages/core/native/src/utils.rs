@@ -163,6 +163,14 @@ pub fn tagged_template_get_tag<'alloc>(
     Some(identifier.name.as_str())
 }
 
+pub fn statement_get_references<'a>(statement: &Statement<'a>) -> Vec<String> {
+    let mut visitor = ExpressionCollectorVisitor {
+        ..Default::default()
+    };
+    visitor.visit_statement(statement);
+    visitor.references
+}
+
 pub fn expression_get_references<'a>(expression: &Expression<'a>) -> Vec<String> {
     let mut visitor = ExpressionCollectorVisitor {
         ..Default::default()
@@ -269,6 +277,29 @@ pub fn replace_in_expression_using_spans<'alloc>(
     t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
 
     t.visit_expression(expression);
+
+    t.ast_builder = None;
+    t.replacement_points = None;
+}
+
+pub fn replace_in_statement_using_spans<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    statement: &mut Statement<'alloc>,
+    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
+) {
+    let mut t = SpanReplacer {
+        ast_builder: None,
+        replacement_points: None,
+    };
+
+    if replacement_points.is_empty() {
+        return;
+    }
+
+    t.ast_builder = Some(ast_builder);
+    t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
+
+    t.visit_statement(statement);
 
     t.ast_builder = None;
     t.replacement_points = None;
