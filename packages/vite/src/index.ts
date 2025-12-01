@@ -31,7 +31,7 @@ const vitePlugin = (options: Options = {}) => {
   const cssFiles = new Map<string, string>();
   const exportCache = {} as Record<string, Record<string, any>>;
   const filesContainingStyledTemplates = new Set<string>();
-  let resolve: (id: string) => Promise<string | undefined>;
+  let resolve: (id: string, importer: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
   let styleThis: Transformer;
   const mocks = new Map<string, string>();
@@ -66,23 +66,24 @@ const vitePlugin = (options: Options = {}) => {
       const require = createRequire(cwd + "/package.json");
 
       const loadFile = async (
-        importSourceId: string,
+        importId: string,
+        importerId: string,
       ): Promise<[string, string]> => {
-        if (mocks.has(importSourceId)) {
-          const filepath = require.resolve(importSourceId);
-          return [filepath, mocks.get(importSourceId)!];
+        if (mocks.has(importId)) {
+          const filepath = require.resolve(importId);
+          return [filepath, mocks.get(importId)!];
         }
 
-        let filepathWithQuery = await resolve(importSourceId);
+        let filepathWithQuery = await resolve(importId, importerId);
 
         if (filepathWithQuery == undefined)
-          throw new Error(`vite failed to resolve import '${importSourceId}'`);
+          throw new Error(`vite failed to resolve import '${importId}'`);
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
 
         if (
           !filepath.startsWith(`${cwd}/node_modules/`) &&
-          !importSourceId.startsWith("@style-this/")
+          !importId.startsWith("@style-this/")
         ) {
           try {
             const raw = await readFile(filepath, "utf-8");
@@ -93,7 +94,7 @@ const vitePlugin = (options: Options = {}) => {
         // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
         // bundled one (that might not yet exist on disk)
         // also do not load the contents, the transformer should require(...) it as-is
-        filepath = require.resolve(importSourceId);
+        filepath = require.resolve(importId);
         return [filepath, ""];
       };
 
@@ -154,9 +155,9 @@ const vitePlugin = (options: Options = {}) => {
 
     async transform(code, filepath) {
       if (!resolve) {
-        resolve = async (id?: string) => {
+        resolve = async (id: string, importer: string) => {
           if (!id) return;
-          return (await this.resolve(id))?.id;
+          return (await this.resolve(id, importer))?.id;
         };
       }
 
