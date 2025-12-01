@@ -60,6 +60,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     scan_pass: bool,
     aliases: Vec<HashMap<String, Option<String>>>,
     dynamic_variable_names: Vec<HashSet<String>>,
+    namespace_imports: HashMap<String, (String, HashSet<String>)>,
     unique_number_counter: u32,
     css_unique_number_counter: u32,
 
@@ -98,6 +99,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             scan_pass: false,
             aliases: Default::default(),
             dynamic_variable_names: Default::default(),
+            namespace_imports: Default::default(),
             unique_number_counter: 0,
             css_unique_number_counter: 0,
 
@@ -115,12 +117,20 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     ) -> (
         HashMap<String, String>,
         HashSet<String>,
+        HashMap<String, HashSet<String>>,
         HashSet<String>,
         Program<'alloc>,
     ) {
+        let namespace_imports_by_module: HashMap<String, HashSet<String>> = self
+            .namespace_imports
+            .into_iter()
+            .map(|(_, (module_id, referenced_idents))| (module_id, referenced_idents))
+            .collect();
+
         (
             self.css_variable_identifiers,
             self.referenced_idents.into_iter().next().unwrap(),
+            namespace_imports_by_module,
             self.exported_idents,
             self.tmp_program,
         )
@@ -178,6 +188,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     fn is_variable_referenced(&mut self, name: &str) -> bool {
         for referenced_set in self.referenced_idents.iter() {
             if referenced_set.contains(name) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// checks if the variable exits in the current scope or any scope above it
+    fn variable_exists(&mut self, name: &str) -> bool {
+        for aliases in self.aliases.iter() {
+            if aliases.contains_key(name) {
                 return true;
             }
         }
@@ -392,6 +412,39 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         self.scope_depth -= 1;
     }
 
+    fn visit_import_declaration(&mut self, it: &mut oxc_ast::ast::ImportDeclaration<'alloc>) {
+        if self.scan_pass
+            && let Some(specifiers) = &it.specifiers
+        {
+            for specifier in specifiers {
+                if let ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace_spec) =
+                    specifier
+                {
+                    let remote_module_id = it.source.value.to_string();
+                    let namespace_name = namespace_spec.local.name.to_string();
+                    self.namespace_imports
+                        .insert(namespace_name, (remote_module_id, Default::default()));
+                }
+            }
+        }
+    }
+
+    fn visit_member_expression(&mut self, it: &mut oxc_ast::ast::MemberExpression<'alloc>) {
+        if !self.scan_pass
+            && let Some(property) = it.static_property_name()
+            && let Some(object) = it
+                .object()
+                .get_identifier_reference()
+                .map(|id| id.name.as_str())
+            && !self.variable_exists(object)
+            && let Some((_, remote_referenced_idents)) = self.namespace_imports.get_mut(object)
+        {
+            remote_referenced_idents.insert(property.to_string());
+        }
+
+        oxc_ast_visit::walk_mut::walk_member_expression(self, it);
+    }
+
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
         if self.error.is_some() {
             return;
@@ -404,6 +457,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             && let Some(tag) = utils::tagged_template_get_tag(template)
             && (tag == "css" || tag == "style")
         {
+            oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
+
             let span = template.span;
             let variable_name = &format!("{PREFIX}_expression_{}", self.unique_number());
 
@@ -525,6 +580,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
                 panic!("css variable declaration was not a regular variable declaration")
             };
+
+            oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
+
             let span = template.span;
             let variable_name = variable_name.name.as_str();
 
@@ -569,9 +627,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     self.insert_into_virtual_program(variable_declarator, None);
 
                     *init = ast::build_string(self.ast_builder, span, &class_name);
-
-                    // if self.entrypoint || self.referenced_idents.contains(variable_name) {
-                    // ...
                 }
                 "style" => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
@@ -951,8 +1006,13 @@ pub async fn evaluate_program<'alloc>(
     if let Some(error) = css_transformer.error {
         return Err(error);
     }
-    let (css_variable_identifiers, referenced_idents, exported_idents, mut tmp_program) =
-        css_transformer.finish();
+    let (
+        css_variable_identifiers,
+        referenced_idents,
+        mut namespace_imports,
+        exported_idents,
+        mut tmp_program,
+    ) = css_transformer.finish();
 
     // handle imports - resolve other modules and rewrite return values into variable declarations
     for stmt in program.body.iter() {
@@ -964,19 +1024,21 @@ pub async fn evaluate_program<'alloc>(
             continue;
         };
 
-        let mut remote_referenced_idents = HashSet::new();
+        let mut remote_referenced_idents = namespace_imports
+            .remove(&remote_module_id)
+            .unwrap_or_default();
 
         let any_ident_referenced = specifiers.iter().any(|specifier| {
             let local_name = match specifier {
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
-                    import_specifier.local.name.as_str()
+                oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import) => {
+                    import.local.name.as_str()
                 }
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(
-                    import_default_specifier,
-                ) => import_default_specifier.local.name.as_str(),
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(
-                    _import_namespace_specifier,
-                ) => "", // TODO import_namespace_specifier.local.name.to_string(),
+                oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(import) => {
+                    import.local.name.as_str()
+                }
+                oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(import) => {
+                    import.local.name.as_str()
+                }
             };
             referenced_idents.contains(local_name)
         });
@@ -1050,7 +1112,7 @@ pub async fn evaluate_program<'alloc>(
                         continue;
                     }
 
-                    (local_name, remote_name, import_specifier.span)
+                    (local_name, Some(remote_name), import_specifier.span)
                 }
                 oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(
                     import_default_specifier,
@@ -1104,16 +1166,45 @@ pub async fn evaluate_program<'alloc>(
 
                     (
                         local_name,
-                        "__global__export__".to_string(),
+                        Some("__global__export__".to_string()),
                         import_default_specifier.span,
                     )
                 }
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(
-                    _import_namespace_specifier,
-                ) => {
-                    // TODO
-                    continue;
+                oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(import) => {
+                    let namespace_name = import.local.name.to_string();
+
+                    if !referenced_idents.contains(&namespace_name) {
+                        continue;
+                    }
+
+                    let span = import.span;
+
+                    if code.is_empty() {
+                        tmp_program.body.insert(
+                            0,
+                            utils::make_require(
+                                ast_builder,
+                                BindingPatternKind::BindingIdentifier(
+                                    ast_builder.alloc_binding_identifier(
+                                        span,
+                                        ast_builder.atom(&namespace_name),
+                                    ),
+                                ),
+                                &remote_filepath,
+                                span,
+                            ),
+                        );
+                        continue;
+                    }
+
+                    (namespace_name, None, import.span)
                 }
+            };
+
+            let cache_source = if let Some(remote_name) = &remote_name {
+                format!("{cache_ref}[\"{remote_filepath}\"][\"{remote_name}\"]")
+            } else {
+                format!("{cache_ref}[\"{remote_filepath}\"]")
             };
 
             // add new variable declaration to our tmp program
@@ -1138,9 +1229,7 @@ pub async fn evaluate_program<'alloc>(
                             Some(Expression::Identifier(
                                 ast_builder.alloc_identifier_reference(
                                     span,
-                                    ast_builder.atom(&format!(
-                                        "{cache_ref}[\"{remote_filepath}\"][\"{remote_name}\"]"
-                                    )),
+                                    ast_builder.atom(&cache_source),
                                 ),
                             )),
                             false,
@@ -1149,7 +1238,9 @@ pub async fn evaluate_program<'alloc>(
                     false,
                 ));
             tmp_program.body.insert(0, variable_declaration);
-            remote_referenced_idents.insert(remote_name);
+            if let Some(remote_name) = remote_name {
+                remote_referenced_idents.insert(remote_name);
+            }
         }
 
         // if nothing referenced, nothing to do

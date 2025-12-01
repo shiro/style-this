@@ -1,9 +1,9 @@
 import { css, style } from "@style-this/core";
-import { foo } from "./a";
+import * as a from "./a";
 
 const mutate = (v) => v;
 
-const a = () => {
+const comp = () => {
   ("foob");
 
   const b = () => {
@@ -27,10 +27,10 @@ const st = style`
 
 const s2 = css`
   ${st}
-  ${a().css}
+  ${comp().css}
 `;
 
 const unrelated = css`
   background: none;
-  ${foo.css}
+  ${a.foo.css}
 `;

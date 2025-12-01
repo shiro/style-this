@@ -1,8 +1,8 @@
 import "virtual:style-this:/entry.tsx.css";
 import { css, style } from "@style-this/core";
-import { foo } from "./a";
+import * as a from "./a";
 const mutate = (v) => v;
-const a = () => {
+const comp = () => {
 ("foob");
 	const b = () => {
 		const c = () => "__styleThis_expression_5-z0dufg";
