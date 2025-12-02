@@ -255,13 +255,13 @@ pub fn make_require<'a>(
 
 struct SpanReplacer<'a, 'alloc> {
     ast_builder: Option<&'a AstBuilder<'alloc>>,
-    replacement_points: Option<&'a mut HashMap<Span, Expression<'alloc>>>,
+    replacement_points: Option<&'a HashMap<Span, Expression<'alloc>>>,
 }
 
 pub fn replace_in_expression_using_spans<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     expression: &mut Expression<'alloc>,
-    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
+    replacement_points: &HashMap<Span, Expression<'alloc>>,
 ) {
     let mut t = SpanReplacer {
         ast_builder: None,
@@ -330,12 +330,7 @@ pub fn replace_in_class_body_using_spans<'alloc>(
 impl<'a, 'alloc> VisitMut<'alloc> for SpanReplacer<'a, 'alloc> {
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
         let span = it.span();
-        if let Some(replacement) = self
-            .replacement_points
-            .as_deref_mut()
-            .unwrap()
-            .remove(&span)
-        {
+        if let Some(replacement) = self.replacement_points.unwrap().get(&span) {
             let ast_builder = self.ast_builder.unwrap();
 
             *it = replacement.clone_in(ast_builder.allocator);

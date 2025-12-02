@@ -3,6 +3,21 @@ import mib, * as a from "./a";
 
 const mutate = (v) => v;
 
+const a1 = () => {
+  const a2 = () => {
+    const a3 = () => {
+      return css`a`;
+    };
+  };
+  const m = css`
+    ${a2}
+  `;
+};
+
+const b = css`
+  ${a1}
+`;
+
 const comp = () => {
   ("foob");
 

@@ -774,6 +774,14 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         None,
                     );
 
+                    self.replacement_points.insert(
+                        span,
+                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                            span,
+                            self.ast_builder.atom(&resolved_variable_name),
+                        )),
+                    );
+
                     *init = ast::build_string(self.ast_builder, span, &class_name);
                 }
                 "style" => {
@@ -830,10 +838,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             .collect();
 
         if referenced_variable_names.is_empty() {
-            // self.replacement_points.insert(
-            //     init.span(),
-            //     ast::build_undefined(self.ast_builder, init.span()),
-            // );
             return;
         }
 
@@ -856,7 +860,12 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         let mut right = init.clone_in(self.allocator);
 
-        // transform
+        js_sys::eval(&format!(
+            "console.log('rep {variable_names:?} {:?}')",
+            self.replacement_points
+        ))
+        .unwrap();
+
         replace_in_expression_using_spans(
             self.ast_builder,
             &mut right,

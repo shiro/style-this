@@ -2,6 +2,15 @@ import "virtual:style-this:/entry.tsx.css";
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
 const mutate = (v) => v;
+const a1 = () => {
+	const a2 = () => {
+		const a3 = () => {
+			return "__styleThis_expression_9-cdunkh";
+		};
+	};
+	const m = "m-xqb8pe";
+};
+const b = "b-huzk9u";
 const comp = () => {
 ("foob");
 	const b = () => {
