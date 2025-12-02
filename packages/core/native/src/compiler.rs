@@ -336,11 +336,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         &mut self,
         it: VirtualProgramInsert<'alloc>,
         pos: Option<usize>,
-    ) {
-        let Some(mut variable_names) = it.name() else {
-            return;
-        };
-
+    ) -> Option<String> {
+        let mut variable_names = it.name()?;
         let span = it.span();
 
         // if cached, grab from cache
@@ -369,38 +366,93 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         });
 
         if variable_names.is_empty() {
-            return;
+            return None;
         }
+
+        let pos = pos.unwrap_or(self.tmp_program_statement_buffer.last().unwrap().len());
 
         // copy the entire variable/function/class declaration verbatim
-        let statement = match it {
-            VirtualProgramInsert::VariableDeclarator(decl) => {
-                Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
-                    span,
-                    VariableDeclarationKind::Let,
-                    self.ast_builder.vec1(decl),
-                    false,
-                ))
+        let (temporary_variable_name, statement) = match it {
+            VirtualProgramInsert::VariableDeclarator(mut variable_declarator) => {
+                if let BindingPatternKind::BindingIdentifier(left) = &variable_declarator.id.kind {
+                    (
+                        left.name.to_string(),
+                        Statement::VariableDeclaration(
+                            self.ast_builder.alloc_variable_declaration(
+                                span,
+                                VariableDeclarationKind::Let,
+                                self.ast_builder.vec1(variable_declarator),
+                                false,
+                            ),
+                        ),
+                    )
+                } else {
+                    let variable_name = format!("{PREFIX}_expression_{}", self.unique_number());
+
+                    // we swap the left side with the new variable identifier, then add another
+                    // declaration destructuring the values out of it
+                    let pattern = std::mem::replace(
+                        &mut variable_declarator.id,
+                        self.ast_builder.binding_pattern(
+                            BindingPatternKind::BindingIdentifier(
+                                self.ast_builder.alloc_binding_identifier(
+                                    span,
+                                    self.ast_builder.atom(&variable_name),
+                                ),
+                            ),
+                            None as Option<oxc_allocator::Box<_>>,
+                            false,
+                        ),
+                    );
+                    let destructure_declarator = ast::build_variable_declarator_pattern(
+                        self.ast_builder,
+                        span,
+                        pattern,
+                        ast::build_identifier(self.ast_builder, span, &variable_name),
+                    );
+
+                    let variable_declaration = Statement::VariableDeclaration(
+                        self.ast_builder.alloc_variable_declaration(
+                            span,
+                            VariableDeclarationKind::Let,
+                            self.ast_builder
+                                .vec1(variable_declarator.clone_in(self.allocator)),
+                            false,
+                        ),
+                    );
+
+                    self.tmp_program_statement_buffer
+                        .last_mut()
+                        .unwrap()
+                        .insert(pos, variable_declaration);
+
+                    let s = Statement::VariableDeclaration(
+                        self.ast_builder.alloc_variable_declaration(
+                            span,
+                            VariableDeclarationKind::Let,
+                            self.ast_builder.vec1(destructure_declarator),
+                            false,
+                        ),
+                    );
+                    (variable_name, s)
+                }
             }
-            VirtualProgramInsert::FunctionDeclaration(function) => {
-                Statement::FunctionDeclaration(self.ast_builder.alloc(function))
-            }
-            VirtualProgramInsert::ClassDeclaration(class) => {
-                Statement::ClassDeclaration(self.ast_builder.alloc(class))
-            }
+            VirtualProgramInsert::FunctionDeclaration(function) => (
+                function.name().unwrap().to_string(),
+                Statement::FunctionDeclaration(self.ast_builder.alloc(function)),
+            ),
+            VirtualProgramInsert::ClassDeclaration(class) => (
+                class.name().unwrap().to_string(),
+                Statement::ClassDeclaration(self.ast_builder.alloc(class)),
+            ),
         };
 
-        if let Some(pos) = pos {
-            self.tmp_program_statement_buffer
-                .last_mut()
-                .unwrap()
-                .insert(pos, statement);
-        } else {
-            self.tmp_program_statement_buffer
-                .last_mut()
-                .unwrap()
-                .push(statement);
-        }
+        self.tmp_program_statement_buffer
+            .last_mut()
+            .unwrap()
+            .insert(pos, statement);
+
+        Some(temporary_variable_name)
     }
 
     /// inserts the `var.css = \`...\`` part
@@ -860,27 +912,45 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         let mut right = init.clone_in(self.allocator);
 
-        js_sys::eval(&format!(
-            "console.log('rep {variable_names:?} {:?}')",
-            self.replacement_points
-        ))
-        .unwrap();
-
         replace_in_expression_using_spans(
             self.ast_builder,
             &mut right,
             &mut self.replacement_points,
         );
 
+        replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
+            self.get_alias(name).map(|v| v.to_string())
+        });
+
         let mut aliased_idents = it.id.kind.clone_in(self.allocator);
         self.alias_binding_pattern(&mut aliased_idents);
 
-        let variable_declarator =
-            ast::build_variable_declarator_pattern(self.ast_builder, span, aliased_idents, right);
-        self.insert_into_virtual_program(
+        let variable_declarator = ast::build_variable_declarator_pattern(
+            self.ast_builder,
+            span,
+            self.ast_builder.binding_pattern(
+                aliased_idents,
+                None as Option<oxc_allocator::Box<_>>,
+                false,
+            ),
+            right,
+        );
+
+        let ret = self.insert_into_virtual_program(
             VirtualProgramInsert::VariableDeclarator(variable_declarator),
             Some(pos),
         );
+
+        // point to the newly hoisted variable on global level
+        if let Some(variable_name) = ret {
+            self.replacement_points.insert(
+                init.span(),
+                Expression::Identifier(
+                    self.ast_builder
+                        .alloc_identifier_reference(span, self.ast_builder.atom(&variable_name)),
+                ),
+            );
+        };
     }
 
     fn visit_statement(&mut self, it: &mut Statement<'alloc>) {

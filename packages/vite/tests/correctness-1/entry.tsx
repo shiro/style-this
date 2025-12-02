@@ -8,9 +8,11 @@ const a1 = () => {
     const a3 = () => {
       return css`a`;
     };
+    return [0];
   };
+  const wi = a2();
   const m = css`
-    ${a2}
+    ${wi}
   `;
 };
 

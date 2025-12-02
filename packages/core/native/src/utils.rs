@@ -57,6 +57,32 @@ pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> Has
     idents
 }
 
+// pub fn binding_pattern_kind_build_TODO<'alloc>(
+//     ast_builder: &mut AstBuilder<'alloc>,
+//     span: Span,
+//     kind: &BindingPatternKind<'alloc>,
+// ) {
+//     let mut idents = HashSet::new();
+//
+//     let f = ast_builder.alloc_object_expression(span, ast_builder.vec_from_iter(iter));
+//
+//     match kind {
+//         BindingPatternKind::BindingIdentifier(binding_identifier) => {
+//             // idents.insert(binding_identifier.name.to_string());
+//             todo!()
+//         }
+//         BindingPatternKind::ObjectPattern(object_pattern) => {
+//             todo!()
+//         }
+//         BindingPatternKind::ArrayPattern(array_pattern) => {
+//             todo!()
+//         }
+//         BindingPatternKind::AssignmentPattern(assignment_pattern) => {
+//             todo!()
+//         }
+//     };
+// }
+
 pub fn generate_random_id(length: usize) -> String {
     (0..length)
         .map(|_| {
@@ -253,15 +279,31 @@ pub fn make_require<'a>(
     ))
 }
 
+pub fn trim_newlines<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    quasis: &mut oxc_allocator::Vec<'alloc, TemplateElement<'alloc>>,
+) {
+    if !quasis.is_empty() {
+        let last_idx = quasis.len() - 1;
+        let trimmed_first = quasis[0]
+            .value
+            .raw
+            .trim_start_matches([' ', '\n', '\r', '\t']);
+        quasis[0].value.raw = ast_builder.atom(trimmed_first);
+        let trimmed = quasis[last_idx].value.raw.trim_end_matches(['\n']);
+        quasis[last_idx].value.raw = ast_builder.atom(trimmed);
+    }
+}
+
 struct SpanReplacer<'a, 'alloc> {
     ast_builder: Option<&'a AstBuilder<'alloc>>,
-    replacement_points: Option<&'a HashMap<Span, Expression<'alloc>>>,
+    replacement_points: Option<&'a mut HashMap<Span, Expression<'alloc>>>,
 }
 
 pub fn replace_in_expression_using_spans<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     expression: &mut Expression<'alloc>,
-    replacement_points: &HashMap<Span, Expression<'alloc>>,
+    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
 ) {
     let mut t = SpanReplacer {
         ast_builder: None,
@@ -330,7 +372,12 @@ pub fn replace_in_class_body_using_spans<'alloc>(
 impl<'a, 'alloc> VisitMut<'alloc> for SpanReplacer<'a, 'alloc> {
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
         let span = it.span();
-        if let Some(replacement) = self.replacement_points.unwrap().get(&span) {
+        if let Some(replacement) = self
+            .replacement_points
+            .as_deref_mut()
+            .unwrap()
+            .remove(&span)
+        {
             let ast_builder = self.ast_builder.unwrap();
 
             *it = replacement.clone_in(ast_builder.allocator);
@@ -390,21 +437,5 @@ where
         if let Some(replacement) = self.get_replacement.as_ref().unwrap()(&it.name) {
             it.name = self.ast_builder.unwrap().atom(&replacement);
         }
-    }
-}
-
-pub fn trim_newlines<'alloc>(
-    ast_builder: &AstBuilder<'alloc>,
-    quasis: &mut oxc_allocator::Vec<'alloc, TemplateElement<'alloc>>,
-) {
-    if !quasis.is_empty() {
-        let last_idx = quasis.len() - 1;
-        let trimmed_first = quasis[0]
-            .value
-            .raw
-            .trim_start_matches([' ', '\n', '\r', '\t']);
-        quasis[0].value.raw = ast_builder.atom(trimmed_first);
-        let trimmed = quasis[last_idx].value.raw.trim_end_matches(['\n']);
-        quasis[last_idx].value.raw = ast_builder.atom(trimmed);
     }
 }
