@@ -66,24 +66,24 @@ const vitePlugin = (options: Options = {}) => {
       const require = createRequire(cwd + "/package.json");
 
       const loadFile = async (
-        importId: string,
-        importerId: string,
+        id: string,
+        importer: string,
       ): Promise<[string, string]> => {
-        if (mocks.has(importId)) {
-          const filepath = require.resolve(importId);
-          return [filepath, mocks.get(importId)!];
+        if (mocks.has(id)) {
+          const filepath = require.resolve(id);
+          return [filepath, mocks.get(id)!];
         }
 
-        let filepathWithQuery = await resolve(importId, importerId);
+        let filepathWithQuery = await resolve(id, importer);
 
         if (filepathWithQuery == undefined)
-          throw new Error(`vite failed to resolve import '${importId}'`);
+          throw new Error(`vite failed to resolve import '${id}'`);
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
 
         if (
           !filepath.startsWith(`${cwd}/node_modules/`) &&
-          !importId.startsWith("@style-this/")
+          !id.startsWith("@style-this/")
         ) {
           try {
             const raw = await readFile(filepath, "utf-8");
@@ -94,7 +94,7 @@ const vitePlugin = (options: Options = {}) => {
         // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
         // bundled one (that might not yet exist on disk)
         // also do not load the contents, the transformer should require(...) it as-is
-        filepath = require.resolve(importId);
+        filepath = require.resolve(id);
         return [filepath, ""];
       };
 

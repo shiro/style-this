@@ -21,8 +21,10 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
   >;
 }
 
-export interface SolidJsTransformer
-  extends Omit<_SolidJsTransformer, "transform"> {
+export interface SolidJsTransformer extends Omit<
+  _SolidJsTransformer,
+  "transform"
+> {
   transform(
     code: string,
     filepath: string,
@@ -35,7 +37,7 @@ export interface SolidJsTransformer
 
 // fix types on rust-generated types
 export const Transformer = _Transformer as any as new (opts: {
-  loadFile: (filepath: string) => Promise<[string, string]>;
+  loadFile: (filepath: string, importer: string) => Promise<[string, string]>;
   cssFileStore: Map<string, string>;
   exportCache: Record<string, Record<string, any>>;
   cssExtension: string;
