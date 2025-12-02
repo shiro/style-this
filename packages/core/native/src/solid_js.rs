@@ -100,20 +100,18 @@ pub fn solid_js_prepass<'alloc>(
     skip_jsx: bool,
 ) {
     let return_early = program.body.iter().all(|import| {
-        if let Statement::ImportDeclaration(import_decl) = import {
-            if let Some(specifiers) = &import_decl.specifiers {
-                for specifier in specifiers.iter() {
-                    if import_decl.source.value != LIBRARY_SOLID_JS_IMPORT_NAME {
-                        continue;
-                    }
+        if let Statement::ImportDeclaration(import_decl) = import
+            && let Some(specifiers) = &import_decl.specifiers
+        {
+            for specifier in specifiers.iter() {
+                if import_decl.source.value != LIBRARY_SOLID_JS_IMPORT_NAME {
+                    continue;
+                }
 
-                    if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
-                        specifier
-                    {
-                        if spec.local.name == "styled" {
-                            return false;
-                        }
-                    }
+                if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) = specifier
+                    && spec.local.name == "styled"
+                {
+                    return false;
                 }
             }
         }

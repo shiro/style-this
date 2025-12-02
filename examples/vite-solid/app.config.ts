@@ -43,12 +43,9 @@ export default defineConfig({
       },
       css: { transformer: "lightningcss" },
       plugins: [
-        options.router == "client" && styleThisSolidVitePlugin(),
+        // options.router == "client" && styleThisSolidVitePlugin(),
         options.router == "client" &&
-          styleThisVitePlugin({
-            cssExtension: "scss",
-            filter: /.*\.tsx/,
-          }),
+          styleThisVitePlugin({ filter: /.*\.tsx/ }),
       ].filter(Boolean),
     };
   },

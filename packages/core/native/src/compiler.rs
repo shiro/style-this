@@ -1266,7 +1266,7 @@ pub async fn evaluate_program<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
     transformer: &Transformer,
     entrypoint: bool,
-    program_path: &String,
+    program_filepath: &String,
     program: &mut Program<'alloc>,
     referenced_idents: HashSet<String>,
     temporary_programs: &mut Vec<String>,
@@ -1274,33 +1274,56 @@ pub async fn evaluate_program<'alloc>(
     let allocator = &ast_builder.allocator;
 
     // find "css" import or quit early if entrypoint
-    let return_early = entrypoint
-        && program.body.iter().all(|import| {
-            if let Statement::ImportDeclaration(import_decl) = import
-                && let Some(specifiers) = &import_decl.specifiers
-            {
-                for specifier in specifiers.iter() {
-                    if import_decl.source.value != LIBRARY_CORE_IMPORT_NAME {
-                        continue;
-                    }
+    let mut return_early = entrypoint;
+    let mut solid_prepass = false;
 
-                    if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
-                        specifier
-                        && (spec.local.name == "css" || spec.local.name == "style")
-                    {
-                        return false;
+    if return_early {
+        for stmt in &program.body {
+            let Statement::ImportDeclaration(import_decl) = stmt else {
+                break;
+            };
+
+            let Some(specifiers) = &import_decl.specifiers else {
+                continue;
+            };
+
+            for specifier in specifiers.iter() {
+                match import_decl.source.value.as_str() {
+                    LIBRARY_CORE_IMPORT_NAME => {
+                        if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
+                            specifier
+                            && (spec.local.name == "css" || spec.local.name == "style")
+                        {
+                            return_early = false;
+                            break;
+                        }
                     }
+                    LIBRARY_SOLID_JS_IMPORT_NAME => {
+                        solid_prepass = true;
+                        if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
+                            specifier
+                            && spec.local.name == "styled"
+                        {
+                            return_early = false;
+                            break;
+                        }
+                    }
+                    _ => continue,
                 }
             }
-            true
-        });
+        }
+    }
 
     if return_early {
         return Ok(EvaluateProgramReturnStatus::NotTransformed);
     }
 
+    if solid_prepass {
+        solid_js_prepass(ast_builder, program, false);
+    }
+
     let cache_ref = &transformer.export_cache_ref;
-    let store = format!("global.{cache_ref}[\"{program_path}\"]");
+    let store = format!("global.{cache_ref}[\"{program_filepath}\"]");
 
     // transform all css`...` expresisons into classname strings
     let mut css_transformer = VisitorTransformer::new(
@@ -1309,7 +1332,7 @@ pub async fn evaluate_program<'alloc>(
         entrypoint,
         &store,
         referenced_idents.clone(),
-        program_path,
+        program_filepath,
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
@@ -1357,7 +1380,7 @@ pub async fn evaluate_program<'alloc>(
         }
 
         let (remote_filepath, code) = transformer
-            .load_file(&remote_module_id, program_path)
+            .load_file(&remote_module_id, program_filepath)
             .await?;
 
         for specifier in specifiers.iter() {
@@ -1589,8 +1612,6 @@ pub async fn evaluate_program<'alloc>(
             continue;
         }
 
-        solid_js_prepass(ast_builder, &mut ast.program, true);
-
         std::boxed::Box::pin(evaluate_program(
             ast_builder,
             transformer,
@@ -1634,7 +1655,7 @@ pub async fn evaluate_program<'alloc>(
         tmp_program_js.push_str(&format!(
             "\n{}.set('{}.{}', [\n{}\n].join('\\n'));",
             &transformer.css_file_store_ref,
-            program_path.replace("'", "\\'"),
+            program_filepath.replace("'", "\\'"),
             transformer.css_extension,
             css_variable_identifiers
                 .into_iter()

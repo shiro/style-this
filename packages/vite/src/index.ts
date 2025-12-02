@@ -5,6 +5,12 @@ import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
 
+const solidMock = `
+export const template = () => () => {};
+export const spread = () => {};
+export const mergeProps = () => {};
+`;
+
 interface Options {
   include?: RegExp[];
   exclude?: RegExp[];
@@ -36,6 +42,8 @@ const vitePlugin = (options: Options = {}) => {
   let styleThis: Transformer;
   const mocks = new Map<string, string>();
   const temporaryPrograms: string[] = [];
+
+  mocks.set("solid-js/web", solidMock);
 
   return {
     name: "vite:style-this",
