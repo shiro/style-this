@@ -3,7 +3,6 @@ import path from "node:path";
 import tsconfig from "./tsconfig.json";
 
 import styleThisVitePlugin from "@style-this/vite";
-import styleThisSolidVitePlugin from "@style-this/vite/solid-js";
 
 const babelPluginLabels = [
   "solid-labels/babel",
@@ -15,7 +14,6 @@ export default defineConfig({
   server: {
     baseURL: process.env.BASE_PATH,
   },
-  ssr: false,
 
   solid: {
     babel: {
@@ -42,11 +40,7 @@ export default defineConfig({
         ),
       },
       css: { transformer: "lightningcss" },
-      plugins: [
-        // options.router == "client" && styleThisSolidVitePlugin(),
-        options.router == "client" &&
-          styleThisVitePlugin({ filter: /.*\.tsx/ }),
-      ].filter(Boolean),
+      plugins: [styleThisVitePlugin({ filter: /.*\.tsx/ })],
     };
   },
 });
