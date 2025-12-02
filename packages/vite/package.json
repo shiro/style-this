@@ -11,12 +11,6 @@
   "types": "./dist/index.d.cts",
   "exports": {
     ".": "./dist/index.mjs",
-    "./solid-js": {
-      "types": "./dist/solid-js.d.cts",
-      "import": "./dist/solid-js.mjs",
-      "require": "./dist/solid-js.mjs",
-      "default": "./dist/solid-js.mjs"
-    },
     "./package.json": "./package.json"
   },
   "scripts": {
