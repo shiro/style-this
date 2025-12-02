@@ -1,4 +1,4 @@
 import "virtual:style-this:/entry-2.tsx.css";
 import { css } from "@style-this/core";
 import { num } from "./shared";
-const b = new String("b-klllmm");
+const b = "b-tq3g5a";
