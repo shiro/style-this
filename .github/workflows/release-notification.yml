@@ -1,17 +1,145 @@
 name: Release Notification
 
 on:
-  release:
-    types: [published, created, released]
+  push:
+    paths:
+      - 'packages/*/CHANGELOG.md'
+
+permissions:
+  contents: write
 
 jobs:
   notify:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print Release Information
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch at least 2 commits for git diff to work
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Setup Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Install dependencies
+        run: nix-shell --run "pnpm install"
+
+      - name: Build project
+        run: nix-shell --run "pnpm build"
+
+      - name: Test project
+        run: nix-shell --run "pnpm test"
+
+      - name: Detect Changed Packages
+        id: detect_changes
         run: |
-          echo "Release Title: ${{ github.event.release.name }}"
-          echo "Release Description:"
-          echo "${{ github.event.release.body }}"
+          # Get changed CHANGELOG.md files from the last commit
+          changed_files=$(git diff --name-only HEAD~1 HEAD | grep '^packages/.*/CHANGELOG\.md$' || true)
+
+          # Extract package names and create comma-separated list
+          changed_packages=$(echo "$changed_files" | sed 's|^packages/||; s|/CHANGELOG\.md$||' | sort -u | tr '\n' ',' | sed 's/,$//')
+
+          echo "Changed packages: $changed_packages"
+          echo "packages=$changed_packages" >> $GITHUB_OUTPUT
+
+      - name: Package
+        if: steps.detect_changes.outputs.packages != ''
+        run: |
+          IFS=',' read -ra PACKAGES <<< "${{ steps.detect_changes.outputs.packages }}"
+
+          for package in "${PACKAGES[@]}"; do
+            echo "Processing package: $package"
+
+            changelog_file="packages/$package/CHANGELOG.md"
+
+            if [ ! -f "$changelog_file" ]; then
+              echo "CHANGELOG.md not found for package $package, skipping"
+              continue
+            fi
+
+            # Parse the changelog to get the latest version
+            latest_version=$(grep -m 1 "^## " "$changelog_file" | sed 's/^## //')
+
+            if [ -z "$latest_version" ]; then
+              echo "No version found in CHANGELOG.md for package $package, skipping"
+              continue
+            fi
+
+            echo "Latest Version for $package: $latest_version"
+
+            # Extract description for the latest version
+            description=$(awk '/^## / {if(found) exit; found=1; next} found && /^## / {exit} found {print}' "$changelog_file" | sed '/^$/d')
+
+            # Extract version number for tag (e.g., "0.1.0" from "0.1.0 (2025-12-03)")
+            version_tag=$(echo "$latest_version" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?')
+
+            if [ -z "$version_tag" ]; then
+              echo "Could not extract version tag from: $latest_version for package $package, skipping"
+              continue
+            fi
+
+            # Create tag name with package prefix
+            tag_name="${package}-v${version_tag}"
+            release_name="${package} ${latest_version}"
+
+            # Check if release already exists using GitHub API
+            if gh release view "$tag_name" >/dev/null 2>&1; then
+              echo "Release $tag_name already exists, skipping"
+              continue
+            fi
+
+            # Create archive from package directory
+            cd "packages/$package"
+            archive_name="${package}-${version_tag}.tar.gz"
+            tar -czf "../../$archive_name" README.md package.json dist
+            cd ../..
+
+            # Create GitHub Release
+            gh release create "$tag_name" \
+              --title "$release_name" \
+              --notes "$description" \
+              "./$archive_name"
+
+            echo "Created release $tag_name with asset $archive_name"
+
+            # Clean up archive
+            rm -f "./$archive_name"
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to NPM
+        if: steps.detect_changes.outputs.packages != ''
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+
+          IFS=',' read -ra PACKAGES <<< "${{ steps.detect_changes.outputs.packages }}"
+
+          for package in "${PACKAGES[@]}"; do
+            package_dir="packages/$package"
+            cd "$package_dir"
+
+            # Get package name and version from package.json
+            package_name=$(node -p "require('./package.json').name")
+            package_version=$(node -p "require('./package.json').version")
+
+            echo "Publishing $package_name@$package_version"
+
+            # Check if this version is already published
+            if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+              echo "Version $package_version of $package_name is already published, skipping"
+              cd ../..
+              continue
+            fi
+
+            npm publish --access public
+
+            echo "Successfully published $package_name@$package_version"
+            cd ../..
+          done
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 

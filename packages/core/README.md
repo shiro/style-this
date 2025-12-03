@@ -1,4 +1,4 @@
-# @style-this/core
+# style-this - Core
 
 Core functionality for the style-this library with WebAssembly bindings.
 
@@ -11,7 +11,7 @@ pnpm add @style-this/core
 ## Usage
 
 ```typescript
-import { init, css, initialize } from '@style-this/core';
+import { init, css, initialize } from "@style-this/core";
 
 // Initialize the WebAssembly module
 await init();
@@ -38,4 +38,3 @@ pnpm build
 # Watch mode for development
 pnpm dev
 ```
-

@@ -12,9 +12,9 @@
   "exports": {
     ".": "./dist/index.mjs",
     "./compiler": {
-      "import": "./dist/compiler.cjs",
       "require": "./dist/compiler.cjs",
       "types": "./dist/compiler.d.cts",
+      "import": "./dist/compiler.cjs",
       "default": "./dist/compiler.cjs"
     },
     "./package.json": "./package.json"
@@ -41,3 +41,4 @@
     "@rollup/plugin-wasm": "6.2.2"
   }
 }
+

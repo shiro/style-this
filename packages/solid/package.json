@@ -18,10 +18,11 @@
     "dev": "tsdown --watch",
     "lint": "eslint",
     "lint:fix": "pnpm lint --fix",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "echo 'No tests yet' && exit 0",
+    "test:watch": "echo 'No tests yet' && exit 0"
   },
   "dependencies": {
     "solid-js": "1.9.10"
   }
 }
+

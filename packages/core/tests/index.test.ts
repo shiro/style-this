@@ -8,7 +8,7 @@ describe('@style-this/core', () => {
 
   it('should throw error when css is called at runtime', () => {
     expect(() => css`color: red;`).toThrow(
-      "vite:stylistic: called 'css' at runtime. This indicates an error in the transform."
+      "@style-this: called 'css' at runtime. This indicates an error in the transform."
     );
   });
 });
