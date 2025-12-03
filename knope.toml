@@ -19,3 +19,29 @@ versioned_files = [
 ]
 changelog = "packages/vite/CHANGELOG.md"
 scopes = ["vite"]
+
+
+[[workflows]]
+name = "release"
+
+[[workflows.steps]]
+type = "Command"
+command = "pnpm build"
+
+# Generates the new changelog and Cargo.toml version based on conventional commits.
+[[workflows.steps]]
+type = "PrepareRelease"
+
+# Commit the changes that PrepareRelease added
+[[workflows.steps]]
+type = "Command"
+command = "git commit -m \"chore: Bump to version\""
+
+# Push the changes to GitHub so the created tag will point to the right place.
+[[workflows.steps]]
+type = "Command"
+command = "git push"
+
+# Create a GitHub release with the new version and release notes created in PrepareRelease. Tag the commit just pushed with the new version.
+# [[workflows.steps]]
+# type = "Release"
