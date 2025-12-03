@@ -1,0 +1,21 @@
+[github]
+owner = "shiro"
+repo = "style-this"
+
+[packages.core]
+versioned_files = ["packages/core/package.json"]
+changelog = "packages/core/CHANGELOG.md"
+scopes = ["core"]
+
+[packages.solid]
+versioned_files = ["packages/solid/package.json"]
+changelog = "packages/solid/CHANGELOG.md"
+scopes = ["solid"]
+
+[packages.vite]
+versioned_files = [
+  "packages/vite/package.json",
+  { path = "packages/core/package.json", dependency = "vite" },
+]
+changelog = "packages/vite/CHANGELOG.md"
+scopes = ["vite"]
