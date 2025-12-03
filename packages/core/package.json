@@ -1,6 +1,6 @@
 {
   "name": "@style-this/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "CSS-in-JS library for the modern web - core module",
   "type": "module",
   "files": [
