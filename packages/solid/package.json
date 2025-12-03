@@ -1,6 +1,6 @@
 {
-  "name": "@style-this/solid-js",
-  "version": "0.1.0",
+  "name": "@style-this/solid",
+  "version": "0.0.0",
   "description": "CSS-in-JS library for the modern web - solid-js module",
   "type": "module",
   "files": [

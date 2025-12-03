@@ -11,7 +11,7 @@
     "@solidjs/router": "0.15.3",
     "@solidjs/start": "1.2.0",
     "@style-this/core": "workspace:",
-    "@style-this/solid-js": "workspace:",
+    "@style-this/solid": "workspace:",
     "@style-this/vite": "workspace:",
     "@styled/typescript-styled-plugin": "^1.0.1",
     "classnames": "2.5.1",

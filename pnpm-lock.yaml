@@ -51,9 +51,9 @@ importers:
       '@style-this/core':
         specifier: 'workspace:'
         version: link:../../packages/core
-      '@style-this/solid-js':
+      '@style-this/solid':
         specifier: 'workspace:'
-        version: link:../../packages/solid-js
+        version: link:../../packages/solid
       '@style-this/vite':
         specifier: 'workspace:'
         version: link:../../packages/vite
@@ -147,7 +147,7 @@ importers:
         specifier: ^0.6.2
         version: 0.6.2
 
-  packages/solid-js:
+  packages/solid:
     dependencies:
       solid-js:
         specifier: 1.9.10
