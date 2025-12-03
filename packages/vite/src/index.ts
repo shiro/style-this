@@ -4,6 +4,7 @@ import { Transformer, initializeStyleThis } from "@style-this/core/compiler";
 import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
+import fs from "fs";
 
 const solidMock = `
 export const template = () => () => {};
