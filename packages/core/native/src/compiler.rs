@@ -97,7 +97,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     program_filepath: &'a str,
     store: String,
     referenced_idents: Vec<HashSet<String>>,
-    css_variable_identifiers: HashMap<String, String>,
+    css_variable_identifiers: Vec<(String, String)>,
     style_variable_identifiers: HashSet<String>,
     exported_idents: HashSet<String>,
     scope_depth: u32,
@@ -162,7 +162,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     pub fn finish(
         self,
     ) -> (
-        HashMap<String, String>,
+        Vec<(String, String)>,
         HashSet<String>,
         HashMap<String, HashSet<String>>,
         HashSet<String>,
@@ -475,7 +475,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let span = it.span;
 
         self.css_variable_identifiers
-            .insert(variable_name.to_string(), class_name.to_string());
+            .push((variable_name.to_string(), class_name.to_string()));
 
         let mut quasis = it.quasi.quasis.clone_in(self.allocator);
         utils::trim_newlines(self.ast_builder, &mut quasis);
@@ -1670,7 +1670,7 @@ pub async fn evaluate_program<'alloc>(
     }
 
     if !css_variable_identifiers.is_empty() {
-        let mut css = css_variable_identifiers
+        let css = css_variable_identifiers
             .into_iter()
             .map(|(variable_name, class_name)| {
                 if class_name.starts_with("_Global") {
@@ -1682,10 +1682,8 @@ pub async fn evaluate_program<'alloc>(
 
                 format!("`.{class_name} {{\n${{{variable_name}.css}}\n}}`")
             })
-            .collect::<Vec<_>>();
-        // TODO preserve order
-        css.sort();
-        let css = css.join(",\n");
+            .collect::<Vec<_>>()
+            .join(",\n");
 
         tmp_program_js.push_str(&format!(
             "\n{}.set('{}.{}', [\n{css}\n].join('\\n'));",
