@@ -93,6 +93,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     ast_builder: &'a AstBuilder<'alloc>,
     allocator: &'alloc Allocator,
     entrypoint: bool,
+    cwd: &'a str,
     program_filepath: &'a str,
     store: String,
     referenced_idents: Vec<HashSet<String>>,
@@ -124,12 +125,14 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         entrypoint: bool,
         store: &str,
         referenced_idents: HashSet<String>,
+        cwd: &'a str,
         program_filepath: &'a str,
     ) -> Self {
         Self {
             ast_builder,
             allocator,
             entrypoint,
+            cwd,
             program_filepath,
             store: store.to_string(),
             referenced_idents: vec![referenced_idents],
@@ -269,10 +272,17 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             })
             .flatten()
             .unwrap_or_else(|| {
+                let relative_program_filepath = self
+                    .program_filepath
+                    .strip_prefix(self.cwd)
+                    .unwrap_or(self.program_filepath);
+
                 let random_suffix = self
                     .random
-                    .random_string(6, &format!("{}_{unique_number}", self.program_filepath));
+                    .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
+
                 let class_name = format!("{variable_name}-{random_suffix}");
+                // self.css_unique_number_counter
 
                 js_sys::eval(&format!(
                     "{} = {{...({} ?? {{}}), __css_{unique_number}: \"{}\"}};",
@@ -1169,6 +1179,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
 #[wasm_bindgen]
 pub struct Transformer {
+    cwd: String,
     load_file: js_sys::Function,
     css_file_store_ref: String,
     export_cache_ref: String,
@@ -1182,6 +1193,11 @@ impl Transformer {
     #[allow(clippy::new_without_default)]
     pub fn new(opts: JsValue) -> Self {
         let global = js_sys::global();
+
+        let cwd = js_sys::Reflect::get(&opts, &JsValue::from_str("cwd"))
+            .unwrap()
+            .as_string()
+            .unwrap();
 
         let load_file = js_sys::Reflect::get(&opts, &JsValue::from_str("loadFile"))
             .unwrap()
@@ -1219,6 +1235,7 @@ impl Transformer {
         .unwrap();
 
         Self {
+            cwd,
             load_file,
             css_file_store_ref,
             export_cache_ref,
@@ -1266,7 +1283,8 @@ pub async fn evaluate_program<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
     transformer: &Transformer,
     entrypoint: bool,
-    program_filepath: &String,
+    cwd: &str,
+    program_filepath: &str,
     program: &mut Program<'alloc>,
     referenced_idents: HashSet<String>,
     temporary_programs: &mut Vec<String>,
@@ -1332,6 +1350,7 @@ pub async fn evaluate_program<'alloc>(
         entrypoint,
         &store,
         referenced_idents.clone(),
+        cwd,
         program_filepath,
     );
     css_transformer.visit_program(program);
@@ -1616,6 +1635,7 @@ pub async fn evaluate_program<'alloc>(
             ast_builder,
             transformer,
             false,
+            cwd,
             &remote_filepath,
             &mut ast.program,
             remote_referenced_idents,
@@ -1641,38 +1661,37 @@ pub async fn evaluate_program<'alloc>(
 
     // we append all exported idents we evaluated to the cache
     if !exported_idents.is_empty() {
-        tmp_program_js.push_str(&format!(
-            "\n{store} = {{...({store} ?? {{}}), {}}};",
-            exported_idents
-                .into_iter()
-                .collect::<Vec<String>>()
-                .join(","),
-        ));
+        // TODO this only needs to be sorted for tests to stay consistent
+        let mut idents: Vec<String> = exported_idents.into_iter().collect();
+        idents.sort();
+        let idents = idents.join(",");
+
+        tmp_program_js.push_str(&format!("\n{store} = {{...({store} ?? {{}}), {idents}}};"));
     }
 
     if !css_variable_identifiers.is_empty() {
-        // const cssFile = [var.css, var2.css].join("\n\n");
+        let mut css = css_variable_identifiers
+            .into_iter()
+            .map(|(variable_name, class_name)| {
+                if class_name.starts_with("_Global") {
+                    return format!("`${{{variable_name}.css}}\n`");
+                }
+                if transformer.wrap_selectors_with_global {
+                    return format!("`:global(.{class_name}) {{\n${{{variable_name}.css}}\n}}`");
+                }
+
+                format!("`.{class_name} {{\n${{{variable_name}.css}}\n}}`")
+            })
+            .collect::<Vec<_>>();
+        // TODO preserve order
+        css.sort();
+        let css = css.join(",\n");
+
         tmp_program_js.push_str(&format!(
-            "\n{}.set('{}.{}', [\n{}\n].join('\\n'));",
+            "\n{}.set('{}.{}', [\n{css}\n].join('\\n'));",
             &transformer.css_file_store_ref,
             program_filepath.replace("'", "\\'"),
             transformer.css_extension,
-            css_variable_identifiers
-                .into_iter()
-                .map(|(variable_name, class_name)| {
-                    if class_name.starts_with("_Global") {
-                        return format!("`${{{variable_name}.css}}\n`");
-                    }
-                    if transformer.wrap_selectors_with_global {
-                        return format!(
-                            "`:global(.{class_name}) {{\n${{{variable_name}.css}}\n}}`"
-                        );
-                    }
-
-                    format!("`.{class_name} {{\n${{{variable_name}.css}}\n}}`")
-                })
-                .collect::<Vec<_>>()
-                .join(",\n")
         ));
     }
 
@@ -1753,6 +1772,7 @@ impl Transformer {
             &ast_builder,
             self,
             true,
+            &self.cwd,
             &filepath,
             &mut ast.program,
             HashSet::new(),

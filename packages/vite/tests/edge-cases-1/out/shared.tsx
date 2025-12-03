@@ -1,4 +1,4 @@
 import "virtual:style-this:/shared.tsx.css";
 import { css } from "@style-this/core";
 export const num = Math.random();
-const shared = "shared-wh2v8d";
+const shared = "shared-52bkdy";

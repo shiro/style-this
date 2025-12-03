@@ -1,3 +1,3 @@
 import "virtual:style-this:/entry.tsx.css";
 import { css } from "@style-this/core";
-const a = "a-izoli7";
+const a = "a-q3g9a7";

@@ -1,4 +1,6 @@
 use crate::*;
+use hex;
+use sha2::{Digest, Sha256};
 
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -125,6 +127,60 @@ impl SeededRandom {
                 self.chars[idx] as char
             })
             .collect()
+        // let mut rng: Pcg64 = Seeder::from(seed).into_rng();
+        // println!("{}", rng.random::<char>());
+
+        // // If we want to be more explicit, first we create a SipRng:
+        // let hasher = SipHasher::from("a sailboat");
+        // let mut hasher_rng = hasher.into_rng();
+        // // (Note: hasher_rng is a full RNG and can be used directly.)
+        //
+        // // Now, we use hasher_rng to create a seed:
+        // let mut seed: <Pcg64 as SeedableRng>::Seed = Default::default();
+        // hasher_rng.fill(&mut seed);
+        //
+        // // And create our RNG from that seed:
+        // let mut rng = Pcg64::from_seed(seed);
+        // println!("{}", rng.random::<char>());
+
+        // (0..length)
+        //     .map(|_| {
+        //         let idx = rng.random_range(0..self.chars.len());
+        //         self.chars[idx] as char
+        //     })
+        //     .collect()
+        // let mut hasher = Sha256::new();
+        //
+        // // Feed the string seed bytes into the hasher
+        // hasher.update(seed.as_bytes());
+        //
+        // // Finalize the hash and get the resulting bytes
+        // // let result_bytes = hasher.finalize();
+        //
+        // // Encode the bytes into a hexadecimal string for the ID
+        // // You can truncate this string if a shorter ID is acceptable,
+        // // but it increases the collision risk.
+        // // let ret = hex::encode(result_bytes);
+        //
+        // // let id1 = generate_deterministic_id(seed);
+        // // println!("Seed: \"{}\" -> ID: {}", seed1, id1);
+        //
+        // let result_bytes = hasher.finalize();
+        //
+        // // Convert bytes to characters using the charset
+        // (0..length)
+        //     .map(|i| {
+        //         let byte_index = i % result_bytes.len();
+        //         let char_index = (result_bytes[byte_index] as usize) % self.chars.len();
+        //         self.chars[char_index] as char
+        //     })
+        //     .collect()
+
+        // let result = Sha256::digest(seed);
+        // let hex_string = hex::encode(result);
+        //
+        // let ret = hex_string.chars().take(length).collect::<String>();
+        // format!("{seed}__{hex_string}")
     }
 }
 

@@ -1,16 +1,16 @@
 "use strict";
-let { css } = require("/home/shiro/project/style-this/packages/core/dist/index.mjs");
+let { css } = require("/packages/core/dist/index.mjs");
 let foo = "red";
-let a = new String("a-341afs");
+let a = new String("a-ole3wx");
 a.css = `background: ${foo};`;
-let b = new String("b-unspmr");
+let b = new String("b-r4x6jg");
 b.css = `background: ${foo};`;
 
-__styleThis_aabbbccc.set('/entry.tsx.css', [
-`.b-unspmr {
-${b.css}
-}`,
-`.a-341afs {
+__styleThis_aabbbccc.set('/packages/vite/tests/basic-2/entry.tsx.css', [
+`.a-ole3wx {
 ${a.css}
+}`,
+`.b-r4x6jg {
+${b.css}
 }`
 ].join('\n'));

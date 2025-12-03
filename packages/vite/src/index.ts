@@ -103,10 +103,13 @@ const vitePlugin = (options: Options = {}) => {
         // bundled one (that might not yet exist on disk)
         // also do not load the contents, the transformer should require(...) it as-is
         filepath = require.resolve(id);
+
         return [filepath, ""];
       };
 
       styleThis = new Transformer({
+        cwd,
+
         loadFile,
         cssFileStore: cssFiles,
         exportCache,

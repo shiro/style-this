@@ -22,6 +22,8 @@ wasm-bindgen = "0.2.105"
 wasm-bindgen-futures = "0.4.55"
 thiserror = "2.0.17"
 futures = "0.3.31"
+sha2 = "0.10.9"
+hex = "0.4.3"
 
 oxc_parser = "0.95.0"
 oxc_allocator = "0.95.0"

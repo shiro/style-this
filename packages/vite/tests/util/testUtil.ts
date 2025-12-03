@@ -2,8 +2,10 @@ import { beforeEach, vi } from "vitest";
 import { afterEach } from "vitest";
 import vitePlugin from "../../src/index";
 import { readdir, readFile } from "fs/promises";
-import { join } from "path";
+import { join, resolve } from "path";
 import { expect } from "vitest";
+
+const MONOREPO_ROOT_DIR = resolve(join(__dirname, "../../../.."));
 
 export const getResolver = async (testDir: string) => {
   const resolver = (await readdir(testDir, { withFileTypes: true }))
@@ -49,8 +51,8 @@ export const evaluateProgram = async (
 
   const temporaryPrograms = plugin
     .__getTemporaryPrograms()
-    .join("\n\n// entry:\n")
-    .replace(testDir, "");
+    .join("\n\n// virtual program:\n")
+    .replaceAll(MONOREPO_ROOT_DIR, "");
 
   await expect(temporaryPrograms).toMatchFileSnapshot(
     `${testDir}/out/compile_${entry}.js`,
