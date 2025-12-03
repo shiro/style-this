@@ -1,17 +1,37 @@
 name: Release Notification
 
 on:
-  release:
-    types: [published, created, released]
+  push:
+    paths:
+      - 'packages/core/CHANGELOG.md'
 
 jobs:
   notify:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print Release Information
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse Latest Release from CHANGELOG
         run: |
-          echo "Release Title: ${{ github.event.release.name }}"
+          # Extract the latest version title and description from CHANGELOG.md
+          changelog_file="packages/core/CHANGELOG.md"
+
+          # Parse the changelog to get the latest version
+          latest_version=$(grep -m 1 "^## " "$changelog_file" | sed 's/^## //')
+
+          if [ -z "$latest_version" ]; then
+            echo "No version found in CHANGELOG.md"
+            exit 1
+          fi
+
+          echo "Latest Version: $latest_version"
+
+          # Extract description for the latest version
+          # Get content between the first ## and the next ## (or end of file)
+          description=$(awk '/^## / {if(found) exit; found=1; next} found && /^## / {exit} found {print}' "$changelog_file" | sed '/^$/d')
+
           echo "Release Description:"
-          echo "${{ github.event.release.body }}"
+          echo "$description"
 
