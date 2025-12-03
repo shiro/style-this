@@ -7,10 +7,10 @@ let b = new String("b-r4x6jg");
 b.css = `background: ${foo};`;
 
 __styleThis_aabbbccc.set('/packages/vite/tests/basic-2/entry.tsx.css', [
-`.a-ole3wx {
-${a.css}
-}`,
 `.b-r4x6jg {
 ${b.css}
+}`,
+`.a-ole3wx {
+${a.css}
 }`
 ].join('\n'));

@@ -82,11 +82,17 @@ unrelated.css = `background: none;
   ${a.foo.css}`;
 
 __styleThis_aabbbccc.set('/packages/vite/tests/correctness-1/entry.tsx.css', [
-`.__styleThis_expression_11-g5yzc1 {
-${__styleThis_expression_11.css}
+`.unrelated-h6bsx2 {
+${unrelated.css}
+}`,
+`.s2-f0l6r0 {
+${s2.css}
 }`,
 `.__styleThis_expression_3-xirstq {
 ${__styleThis_expression_3.css}
+}`,
+`.s1-9ebsxi {
+${__styleThis_var_s1_4.css}
 }`,
 `.__styleThis_expression_6-t2j4xy {
 ${__styleThis_expression_6.css}
@@ -97,13 +103,7 @@ ${b.css}
 `.m-t2jk5y {
 ${__styleThis_var_m_7.css}
 }`,
-`.s1-9ebsxi {
-${__styleThis_var_s1_4.css}
-}`,
-`.s2-f0l6r0 {
-${s2.css}
-}`,
-`.unrelated-h6bsx2 {
-${unrelated.css}
+`.__styleThis_expression_11-g5yzc1 {
+${__styleThis_expression_11.css}
 }`
 ].join('\n'));

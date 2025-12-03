@@ -22,7 +22,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@style-this/core": "workspace:*",
+    "@style-this/core": "workspace:0.1.1",
     "vite": "7.2.2"
   },
   "peerDependencies": {
@@ -34,3 +34,4 @@
     }
   }
 }
+
