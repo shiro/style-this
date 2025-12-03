@@ -3,6 +3,7 @@ import { styled } from "@style-this/solid-js";
 
 const Counter: Component = () => {
   let count = $signal(0);
+
   return (
     <div class={CounterStyle}>
       {count}

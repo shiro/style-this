@@ -45,7 +45,6 @@ const LIBRARY_CORE_IMPORT_NAME: &str = "@style-this/core";
 const LIBRARY_SOLID_JS_IMPORT_NAME: &str = "@style-this/solid-js";
 
 pub use compiler::Transformer;
-pub use solid_js::SolidJsTransformer;
 
 #[wasm_bindgen]
 pub fn initialize() {
