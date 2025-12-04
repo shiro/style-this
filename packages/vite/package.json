@@ -1,6 +1,6 @@
 {
   "name": "@style-this/vite",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CSS-in-JS library for the modern web - vite plugin",
   "type": "module",
   "files": [
@@ -34,4 +34,3 @@
     }
   }
 }
-

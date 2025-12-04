@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+### Patch Changes
+
+- Fix dependency versions
+
 Documents changes in this package.
 
 ## 0.1.0 (2025-12-03)
