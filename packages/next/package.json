@@ -22,7 +22,7 @@
     "test:watch": "echo 'No tests yet' && exit 0"
   },
   "dependencies": {
-    "@style-this/core": "workspace:*",
+    "@style-this/core": "workspace:0.1.1",
     "@types/node": "^24.10.1",
     "@types/webpack-virtual-modules": "^0.4.2",
     "webpack": "^5.0.0",

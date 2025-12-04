@@ -13,12 +13,12 @@
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "test": "pnpm -r test",
-    "change:new": "knope new",
-    "change:save": "knope save",
-    "change:preview": "knope save --dry-run",
+    "change:new": "pnpm changeset",
+    "change:save": "pnpm changeset version",
     "test:watch": "pnpm -r test:watch"
   },
   "devDependencies": {
+    "@changesets/cli": "2.29.8",
     "@eslint/js": "9.39.1",
     "@vitest/eslint-plugin": "1.4.1",
     "eslint": "9.39.1",
