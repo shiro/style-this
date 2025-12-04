@@ -2,8 +2,8 @@ name: Release Notification
 
 on:
   push:
-    paths:
-      - 'packages/*/CHANGELOG.md'
+    branches:
+      - master
 
 permissions:
   contents: write
@@ -46,7 +46,7 @@ jobs:
           echo "packages=$changed_packages" >> $GITHUB_OUTPUT
 
       - name: Package
-        if: steps.detect_changes.outputs.packages != ''
+        # if: steps.detect_changes.outputs.packages != ''
         run: |
           IFS=',' read -ra PACKAGES <<< "${{ steps.detect_changes.outputs.packages }}"
 
@@ -112,34 +112,37 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to NPM
-        if: steps.detect_changes.outputs.packages != ''
+        # if: steps.detect_changes.outputs.packages != ''
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
 
-          IFS=',' read -ra PACKAGES <<< "${{ steps.detect_changes.outputs.packages }}"
+          nix-shell --run "pnpm changeset publish"
 
-          for package in "${PACKAGES[@]}"; do
-            package_dir="packages/$package"
-            cd "$package_dir"
-
-            # Get package name and version from package.json
-            package_name=$(node -p "require('./package.json').name")
-            package_version=$(node -p "require('./package.json').version")
-
-            echo "Publishing $package_name@$package_version"
-
-            # Check if this version is already published
-            if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
-              echo "Version $package_version of $package_name is already published, skipping"
-              cd ../..
-              continue
-            fi
-
-            npm publish --access public
-
-            echo "Successfully published $package_name@$package_version"
-            cd ../..
-          done
+          #
+          # IFS=',' read -ra PACKAGES <<< "${{ steps.detect_changes.outputs.packages }}"
+          #
+          # for package in "${PACKAGES[@]}"; do
+          #   package_dir="packages/$package"
+          #   cd "$package_dir"
+          #
+          #   # Get package name and version from package.json
+          #   package_name=$(node -p "require('./package.json').name")
+          #   package_version=$(node -p "require('./package.json').version")
+          #
+          #   echo "Publishing $package_name@$package_version"
+          #
+          #   # Check if this version is already published
+          #   if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+          #     echo "Version $package_version of $package_name is already published, skipping"
+          #     cd ../..
+          #     continue
+          #   fi
+          #
+          #   npm publish --access public
+          #
+          #   echo "Successfully published $package_name@$package_version"
+          #   cd ../..
+          # done
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
