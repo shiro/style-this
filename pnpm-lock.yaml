@@ -19,7 +19,7 @@ importers:
         version: 5.9.3
     devDependencies:
       '@changesets/cli':
-        specifier: ^2.29.8
+        specifier: 2.29.8
         version: 2.29.8(@types/node@24.10.1)
       '@eslint/js':
         specifier: 9.39.1
@@ -129,7 +129,7 @@ importers:
   packages/next:
     dependencies:
       '@style-this/core':
-        specifier: workspace:*
+        specifier: workspace:0.1.1
         version: link:../core
       '@types/node':
         specifier: ^24.10.1
