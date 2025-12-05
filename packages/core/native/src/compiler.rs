@@ -1002,71 +1002,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         self.exported_idents.insert(global_sentinel.to_string());
 
         match &it.declaration {
-            ExportDefaultDeclarationKind::Identifier(identifier) => {
-                let span = identifier.span;
-
-                // pretend the default export is actually a variable declaration
-                // for our meta variable
-                let mut variable_declaration = self.ast_builder.alloc_variable_declaration(
-                    span,
-                    VariableDeclarationKind::Let,
-                    self.ast_builder.vec1(self.ast_builder.variable_declarator(
-                        span,
-                        VariableDeclarationKind::Let,
-                        self.ast_builder.binding_pattern(
-                            BindingPatternKind::BindingIdentifier(
-                                self.ast_builder.alloc_binding_identifier(
-                                    span,
-                                    self.ast_builder.atom(global_sentinel),
-                                ),
-                            ),
-                            None as Option<oxc_allocator::Box<_>>,
-                            false,
-                        ),
-                        Some(Expression::Identifier(
-                            self.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.ast_builder.atom(&identifier.name),
-                            ),
-                        )),
-                        false,
-                    )),
-                    false,
-                );
-
-                self.visit_variable_declaration(&mut variable_declaration);
-            }
-            ExportDefaultDeclarationKind::CallExpression(call_expression) => {
-                let span = call_expression.span;
-
-                // pretend the default export is actually a variable declaration
-                // for our meta variable
-                let mut variable_declaration = self.ast_builder.alloc_variable_declaration(
-                    span,
-                    VariableDeclarationKind::Let,
-                    self.ast_builder.vec1(self.ast_builder.variable_declarator(
-                        span,
-                        VariableDeclarationKind::Let,
-                        self.ast_builder.binding_pattern(
-                            BindingPatternKind::BindingIdentifier(
-                                self.ast_builder.alloc_binding_identifier(
-                                    span,
-                                    self.ast_builder.atom(global_sentinel),
-                                ),
-                            ),
-                            None as Option<oxc_allocator::Box<_>>,
-                            false,
-                        ),
-                        Some(Expression::CallExpression(
-                            call_expression.clone_in(self.allocator),
-                        )),
-                        false,
-                    )),
-                    false,
-                );
-
-                self.visit_variable_declaration(&mut variable_declaration);
-            }
             ExportDefaultDeclarationKind::FunctionDeclaration(function) => {
                 let span = function.span;
 
@@ -1091,7 +1026,29 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let mut statement = Statement::ClassDeclaration(class);
                 self.visit_statement(&mut statement);
             }
-            _ => {}
+            rest => {
+                let span = rest.span();
+                let expression =
+                    utils::export_default_declaration_to_expression(self.allocator, rest);
+
+                // pretend the default export is actually a variable declaration
+                // for our meta variable
+                let variable_declarator = ast::build_variable_declarator(
+                    self.ast_builder,
+                    span,
+                    global_sentinel,
+                    expression,
+                );
+
+                let mut statement =
+                    Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                        span,
+                        VariableDeclarationKind::Let,
+                        self.ast_builder.vec1(variable_declarator),
+                        false,
+                    ));
+                self.visit_statement(&mut statement);
+            }
         }
     }
 

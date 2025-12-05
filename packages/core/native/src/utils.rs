@@ -1,6 +1,4 @@
 use crate::*;
-use hex;
-use sha2::{Digest, Sha256};
 
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -57,6 +55,84 @@ pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> Has
         }
     };
     idents
+}
+
+pub fn export_default_declaration_to_expression<'alloc>(
+    allocator: &'alloc Allocator,
+    declaration: &ExportDefaultDeclarationKind<'alloc>,
+) -> Expression<'alloc> {
+    match declaration.clone_in(allocator) {
+        ExportDefaultDeclarationKind::BooleanLiteral(it) => Expression::BooleanLiteral(it),
+        ExportDefaultDeclarationKind::NullLiteral(it) => Expression::NullLiteral(it),
+        ExportDefaultDeclarationKind::NumericLiteral(it) => Expression::NumericLiteral(it),
+        ExportDefaultDeclarationKind::BigIntLiteral(it) => Expression::BigIntLiteral(it),
+        ExportDefaultDeclarationKind::RegExpLiteral(it) => Expression::RegExpLiteral(it),
+        ExportDefaultDeclarationKind::StringLiteral(it) => Expression::StringLiteral(it),
+        ExportDefaultDeclarationKind::TemplateLiteral(it) => Expression::TemplateLiteral(it),
+        ExportDefaultDeclarationKind::Identifier(it) => Expression::Identifier(it),
+        ExportDefaultDeclarationKind::MetaProperty(it) => Expression::MetaProperty(it),
+        ExportDefaultDeclarationKind::Super(_) => todo!(),
+        ExportDefaultDeclarationKind::ArrayExpression(it) => Expression::ArrayExpression(it),
+        ExportDefaultDeclarationKind::ArrowFunctionExpression(it) => {
+            Expression::ArrowFunctionExpression(it)
+        }
+        ExportDefaultDeclarationKind::AssignmentExpression(it) => {
+            Expression::AssignmentExpression(it)
+        }
+        ExportDefaultDeclarationKind::AwaitExpression(it) => Expression::AwaitExpression(it),
+        ExportDefaultDeclarationKind::BinaryExpression(it) => Expression::BinaryExpression(it),
+        ExportDefaultDeclarationKind::CallExpression(it) => Expression::CallExpression(it),
+        ExportDefaultDeclarationKind::ChainExpression(it) => Expression::ChainExpression(it),
+        ExportDefaultDeclarationKind::ClassExpression(it) => Expression::ClassExpression(it),
+        ExportDefaultDeclarationKind::ConditionalExpression(it) => {
+            Expression::ConditionalExpression(it)
+        }
+        ExportDefaultDeclarationKind::FunctionExpression(it) => Expression::FunctionExpression(it),
+        ExportDefaultDeclarationKind::ImportExpression(it) => Expression::ImportExpression(it),
+        ExportDefaultDeclarationKind::LogicalExpression(it) => Expression::LogicalExpression(it),
+        ExportDefaultDeclarationKind::NewExpression(it) => Expression::NewExpression(it),
+        ExportDefaultDeclarationKind::ObjectExpression(it) => Expression::ObjectExpression(it),
+        ExportDefaultDeclarationKind::ParenthesizedExpression(it) => {
+            Expression::ParenthesizedExpression(it)
+        }
+        ExportDefaultDeclarationKind::SequenceExpression(it) => Expression::SequenceExpression(it),
+        ExportDefaultDeclarationKind::TaggedTemplateExpression(it) => {
+            Expression::TaggedTemplateExpression(it)
+        }
+        ExportDefaultDeclarationKind::ThisExpression(it) => Expression::ThisExpression(it),
+        ExportDefaultDeclarationKind::UnaryExpression(it) => Expression::UnaryExpression(it),
+        ExportDefaultDeclarationKind::UpdateExpression(it) => Expression::UpdateExpression(it),
+        ExportDefaultDeclarationKind::YieldExpression(it) => Expression::YieldExpression(it),
+        ExportDefaultDeclarationKind::PrivateInExpression(it) => {
+            Expression::PrivateInExpression(it)
+        }
+        ExportDefaultDeclarationKind::JSXElement(it) => Expression::JSXElement(it),
+        ExportDefaultDeclarationKind::JSXFragment(it) => Expression::JSXFragment(it),
+        ExportDefaultDeclarationKind::TSAsExpression(it) => Expression::TSAsExpression(it),
+        ExportDefaultDeclarationKind::TSSatisfiesExpression(it) => {
+            Expression::TSSatisfiesExpression(it)
+        }
+        ExportDefaultDeclarationKind::TSTypeAssertion(it) => Expression::TSTypeAssertion(it),
+        ExportDefaultDeclarationKind::TSNonNullExpression(it) => {
+            Expression::TSNonNullExpression(it)
+        }
+        ExportDefaultDeclarationKind::TSInstantiationExpression(it) => {
+            Expression::TSInstantiationExpression(it)
+        }
+        ExportDefaultDeclarationKind::V8IntrinsicExpression(it) => {
+            Expression::V8IntrinsicExpression(it)
+        }
+        ExportDefaultDeclarationKind::ComputedMemberExpression(it) => {
+            Expression::ComputedMemberExpression(it)
+        }
+        ExportDefaultDeclarationKind::StaticMemberExpression(it) => {
+            Expression::StaticMemberExpression(it)
+        }
+        ExportDefaultDeclarationKind::PrivateFieldExpression(it) => {
+            Expression::PrivateFieldExpression(it)
+        }
+        _ => unreachable!(),
+    }
 }
 
 // pub fn binding_pattern_kind_build_TODO<'alloc>(
