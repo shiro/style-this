@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+### Patch Changes
+
+- 0c9248e: Improve default export handling in compiler
+
 ## 0.1.1 (2025-12-03)
 
 ### Features
