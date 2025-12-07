@@ -1137,6 +1137,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 #[wasm_bindgen]
 pub struct Transformer {
     cwd: String,
+    ignored_imports: HashMap<String, Vec<String>>,
+
     load_file: js_sys::Function,
     css_file_store_ref: String,
     export_cache_ref: String,
@@ -1155,6 +1157,22 @@ impl Transformer {
             .unwrap()
             .as_string()
             .unwrap();
+
+        let ignored_imports = js_sys::Reflect::get(&opts, &JsValue::from_str("ignoredImports"))
+            .unwrap()
+            .dyn_into::<js_sys::Object>()
+            .unwrap();
+
+        let ignored_imports: HashMap<String, Vec<String>> = js_sys::Object::keys(&ignored_imports)
+            .iter()
+            .filter_map(|key| {
+                let key_str = key.as_string()?;
+                let value = js_sys::Reflect::get(&ignored_imports, &key).ok()?;
+                let array = js_sys::Array::from(&value);
+                let vec: Vec<String> = array.iter().filter_map(|item| item.as_string()).collect();
+                Some((key_str, vec))
+            })
+            .collect();
 
         let load_file = js_sys::Reflect::get(&opts, &JsValue::from_str("loadFile"))
             .unwrap()
@@ -1193,6 +1211,8 @@ impl Transformer {
 
         Self {
             cwd,
+            ignored_imports,
+
             load_file,
             css_file_store_ref,
             export_cache_ref,
@@ -1348,6 +1368,14 @@ pub async fn evaluate_program<'alloc>(
                     import.local.name.as_str()
                 }
             };
+
+            // if inside of ignored_imports, skip this import
+            if let Some(ignored_list) = transformer.ignored_imports.get(&remote_module_id)
+                && (ignored_list.is_empty() || ignored_list.contains(&local_name.to_string()))
+            {
+                return false;
+            }
+
             referenced_idents.contains(local_name)
         });
 
@@ -1382,10 +1410,11 @@ pub async fn evaluate_program<'alloc>(
                     let remote_name = import_specifier.imported.to_string();
                     let span = import_specifier.span;
 
+                    // node_modules imports
                     if code.is_empty() {
                         tmp_program.body.insert(
                             0,
-                            utils::make_require(
+                            utils::make_dynamic_import(
                                 ast_builder,
                                 BindingPatternKind::ObjectPattern(
                                     ast_builder.alloc_object_pattern(
@@ -1434,10 +1463,11 @@ pub async fn evaluate_program<'alloc>(
 
                     let span = import_default_specifier.span;
 
+                    // node_modules imports
                     if code.is_empty() {
                         tmp_program.body.insert(
                             0,
-                            utils::make_require(
+                            utils::make_dynamic_import(
                                 ast_builder,
                                 BindingPatternKind::ObjectPattern(
                                     ast_builder.alloc_object_pattern(
@@ -1489,10 +1519,11 @@ pub async fn evaluate_program<'alloc>(
 
                     let span = import.span;
 
+                    // node_modules imports
                     if code.is_empty() {
                         tmp_program.body.insert(
                             0,
-                            utils::make_require(
+                            utils::make_dynamic_import(
                                 ast_builder,
                                 BindingPatternKind::BindingIdentifier(
                                     ast_builder.alloc_binding_identifier(

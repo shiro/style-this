@@ -4,19 +4,24 @@ import { Transformer, initializeStyleThis } from "@style-this/core/compiler";
 import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
-import fs from "fs";
 
 const solidMock = `
 export const template = () => () => {};
 export const spread = () => {};
 export const mergeProps = () => {};
+export function use(fn, element, arg) {
+  // return untrack(() => fn(element, arg));
+}
 `;
+
+export const DefaultImport = Symbol();
 
 interface Options {
   include?: RegExp[];
   exclude?: RegExp[];
   cssExtension?: string;
   filter?: Filter | Filter[];
+  ignoredImports?: Record<string, true | (string | typeof DefaultImport)[]>;
 }
 
 interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
@@ -31,6 +36,24 @@ const vitePlugin = (options: Options = {}) => {
   let { cssExtension = "css", filter = [] } = options;
 
   if (!Array.isArray(filter)) filter = [filter];
+
+  if (options.ignoredImports) {
+    for (const [key, value] of Object.entries(options.ignoredImports)) {
+      if (value === true) {
+        options.ignoredImports[key] = [];
+        continue;
+      }
+      if (Array.isArray(value)) {
+        if (value.length == 0) {
+          delete options.ignoredImports[key];
+          continue;
+        }
+        options.ignoredImports[key] = value.map((item) =>
+          item === DefaultImport ? "__global__export__" : item,
+        );
+      }
+    }
+  }
 
   const virtualModulePrefix = "virtual:style-this:";
   const resolvedVirtualModulePrefix = "\0" + virtualModulePrefix;
@@ -110,6 +133,7 @@ const vitePlugin = (options: Options = {}) => {
 
       styleThis = new Transformer({
         cwd,
+        ignoredImports: options.ignoredImports,
 
         loadFile,
         cssFileStore: cssFiles,

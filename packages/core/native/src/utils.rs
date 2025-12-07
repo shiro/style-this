@@ -411,6 +411,44 @@ pub fn make_require<'a>(
     ))
 }
 
+pub fn make_dynamic_import<'a>(
+    ast_builder: &AstBuilder<'a>,
+    binding_pattern: BindingPatternKind<'a>,
+    source: &str,
+    span: Span,
+) -> Statement<'a> {
+    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+        span,
+        VariableDeclarationKind::Let,
+        ast_builder.vec1(ast_builder.variable_declarator(
+            span,
+            VariableDeclarationKind::Let,
+            ast_builder.binding_pattern(
+                binding_pattern,
+                None as Option<oxc_allocator::Box<_>>,
+                false,
+            ),
+            Some(Expression::AwaitExpression(
+                ast_builder.alloc_await_expression(
+                    span,
+                    Expression::ImportExpression(ast_builder.alloc_import_expression(
+                        span,
+                        Expression::StringLiteral(ast_builder.alloc_string_literal(
+                            span,
+                            ast_builder.atom(source),
+                            None,
+                        )),
+                        None,
+                        None,
+                    )),
+                ),
+            )),
+            false,
+        )),
+        false,
+    ))
+}
+
 pub fn trim_newlines<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     quasis: &mut oxc_allocator::Vec<'alloc, TemplateElement<'alloc>>,
