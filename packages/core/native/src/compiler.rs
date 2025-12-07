@@ -1809,9 +1809,17 @@ impl Transformer {
                     None,
                     ImportOrExportKind::Value,
                 );
+
+            let insert_pos = ast
+                .program
+                .body
+                .iter()
+                .position(|stmt| !matches!(stmt, Statement::ImportDeclaration(_)))
+                .unwrap_or(0);
+
             ast.program
                 .body
-                .insert(0, Statement::ImportDeclaration(import_declaration));
+                .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
         }
 
         let options = CodegenOptions {
