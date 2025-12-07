@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4
+
+### Patch Changes
+
+- 01e187b: Compiler improvements
+- Updated dependencies [01e187b]
+  - @style-this/core@0.1.3
+
 ## 0.1.3
 
 ### Patch Changes

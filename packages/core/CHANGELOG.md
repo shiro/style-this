@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+### Patch Changes
+
+- 01e187b: Compiler improvements
+
 ## 0.1.2
 
 ### Patch Changes
