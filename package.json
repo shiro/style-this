@@ -14,7 +14,7 @@
     "lint:fix": "pnpm -r lint:fix",
     "test": "pnpm -r test",
     "change:new": "pnpm changeset",
-    "change:save": "pnpm changeset version",
+    "change:save": "pnpm changeset version && pnpm install",
     "test:watch": "pnpm -r test:watch"
   },
   "devDependencies": {
