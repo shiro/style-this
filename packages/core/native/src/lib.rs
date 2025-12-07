@@ -42,7 +42,7 @@ mod solid_js;
 
 const PREFIX: &str = "__styleThis";
 const LIBRARY_CORE_IMPORT_NAME: &str = "@style-this/core";
-const LIBRARY_SOLID_JS_IMPORT_NAME: &str = "@style-this/solid-js";
+const LIBRARY_SOLID_JS_IMPORT_NAME: &str = "@style-this/solid";
 
 pub use compiler::Transformer;
 

@@ -1,4 +1,4 @@
-use crate::{utils::generate_random_id, *};
+use crate::*;
 
 struct SolidTransformer<'a, 'alloc> {
     ast_builder: &'a AstBuilder<'alloc>,
@@ -22,8 +22,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
         component_variable_name: &str,
     ) {
         let span = variable_declarator.span;
-        let random_suffix = generate_random_id(6);
-        let class_variable_name = format!("{component_variable_name}_{random_suffix}");
+        let class_variable_name = component_variable_name;
 
         // Extract the tagged template expression from the variable declarator
         let Some(Expression::TaggedTemplateExpression(tagged_template_expression)) =
@@ -83,7 +82,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                         BindingPatternKind::BindingIdentifier(
                             self.ast_builder.alloc_binding_identifier(
                                 span,
-                                self.ast_builder.atom(&class_variable_name),
+                                self.ast_builder.atom(class_variable_name),
                             ),
                         ),
                         None as Option<oxc_allocator::Box<_>>,
@@ -177,9 +176,51 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                     .jsx_attribute_name_identifier(span, self.ast_builder.atom("class")),
                 Some(self.ast_builder.jsx_attribute_value_expression_container(
                     span,
-                    JSXExpression::Identifier(self.ast_builder.alloc_identifier_reference(
+                    JSXExpression::BinaryExpression(self.ast_builder.alloc_binary_expression(
                         span,
-                        self.ast_builder.atom(&class_variable_name),
+                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                            span,
+                            self.ast_builder.atom(class_variable_name),
+                        )),
+                        oxc_ast::ast::BinaryOperator::Addition,
+                        Expression::BinaryExpression(self.ast_builder.alloc_binary_expression(
+                            span,
+                            Expression::StringLiteral(self.ast_builder.alloc_string_literal(
+                                span,
+                                self.ast_builder.atom(" "),
+                                None,
+                            )),
+                            oxc_ast::ast::BinaryOperator::Addition,
+                            Expression::LogicalExpression(
+                                self.ast_builder.alloc_logical_expression(
+                                    span,
+                                    Expression::StaticMemberExpression(
+                                        self.ast_builder.alloc_static_member_expression(
+                                            span,
+                                            Expression::Identifier(
+                                                self.ast_builder.alloc_identifier_reference(
+                                                    span,
+                                                    self.ast_builder.atom("props"),
+                                                ),
+                                            ),
+                                            self.ast_builder.identifier_name(
+                                                span,
+                                                self.ast_builder.atom("class"),
+                                            ),
+                                            false,
+                                        ),
+                                    ),
+                                    oxc_ast::ast::LogicalOperator::Coalesce,
+                                    Expression::StringLiteral(
+                                        self.ast_builder.alloc_string_literal(
+                                            span,
+                                            self.ast_builder.atom(""),
+                                            None,
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        )),
                     )),
                 )),
             ),
@@ -292,7 +333,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                                 Expression::Identifier(
                                     self.ast_builder.alloc_identifier_reference(
                                         span,
-                                        self.ast_builder.atom(&class_variable_name),
+                                        self.ast_builder.atom(class_variable_name),
                                     ),
                                 ),
                                 self.ast_builder
@@ -348,7 +389,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                                             Expression::Identifier(
                                                 self.ast_builder.alloc_identifier_reference(
                                                     span,
-                                                    self.ast_builder.atom(&class_variable_name),
+                                                    self.ast_builder.atom(class_variable_name),
                                                 ),
                                             ),
                                         ),
