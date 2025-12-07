@@ -95,6 +95,10 @@ pub struct VisitorTransformer<'a, 'alloc> {
     entrypoint: bool,
     cwd: &'a str,
     program_filepath: &'a str,
+
+    style_function_name: Option<String>,
+    css_function_name: Option<String>,
+
     store: String,
     referenced_idents: Vec<HashSet<String>>,
     css_variable_identifiers: Vec<(String, String)>,
@@ -119,6 +123,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
 }
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ast_builder: &'a AstBuilder<'alloc>,
         allocator: &'alloc Allocator,
@@ -127,6 +132,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         referenced_idents: HashSet<String>,
         cwd: &'a str,
         program_filepath: &'a str,
+        css_function_name: Option<String>,
+        style_function_name: Option<String>,
     ) -> Self {
         Self {
             ast_builder,
@@ -134,6 +141,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             entrypoint,
             cwd,
             program_filepath,
+            css_function_name,
+            style_function_name,
+
             store: store.to_string(),
             referenced_idents: vec![referenced_idents],
             css_variable_identifiers: Default::default(),
@@ -654,7 +664,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
         if let Expression::TaggedTemplateExpression(template) = it
             && let Some(tag) = utils::tagged_template_get_tag(template)
-            && (tag == "css" || tag == "style")
+            && (Some(tag) == self.css_function_name.as_deref()
+                || Some(tag) == self.style_function_name.as_deref())
         {
             oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
 
@@ -684,7 +695,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 .to_string();
 
             match tag {
-                "css" => {
+                tag if Some(tag) == self.css_function_name.as_deref() => {
                     let class_name = self.create_virtual_css_template(variable_name);
 
                     self.insert_into_virtual_program_css(
@@ -715,7 +726,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
                     *it = ast::build_string(self.ast_builder, span, &class_name);
                 }
-                "style" => {
+                tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
                     utils::trim_newlines(self.ast_builder, &mut quasis);
                     let variable_declarator = ast::build_variable_declarator(
@@ -781,7 +792,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         if let Expression::TaggedTemplateExpression(template) = init
             && let Some(tag) = utils::tagged_template_get_tag(template)
-            && (tag == "css" || tag == "style")
+            && (Some(tag) == self.css_function_name.as_deref()
+                || Some(tag) == self.style_function_name.as_deref())
         {
             let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
                 panic!("css variable declaration was not a regular variable declaration")
@@ -815,7 +827,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 .to_string();
 
             match tag {
-                "css" => {
+                tag if Some(tag) == self.css_function_name.as_deref() => {
                     let class_name = self.create_virtual_css_template(variable_name);
 
                     let variable_declarator = ast::build_variable_declarator(
@@ -846,7 +858,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
                     *init = ast::build_string(self.ast_builder, span, &class_name);
                 }
-                "style" => {
+                tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
                     utils::trim_newlines(self.ast_builder, &mut quasis);
                     let variable_declarator = ast::build_variable_declarator(
@@ -1256,6 +1268,7 @@ impl Transformer {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn evaluate_program<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
     transformer: &Transformer,
@@ -1271,40 +1284,49 @@ pub async fn evaluate_program<'alloc>(
     // find "css" import or quit early if entrypoint
     let mut return_early = entrypoint;
     let mut solid_prepass = false;
+    let mut style_function_name = None;
+    let mut css_function_name = None;
 
-    if return_early {
-        for stmt in &program.body {
-            let Statement::ImportDeclaration(import_decl) = stmt else {
-                break;
-            };
+    for stmt in &program.body {
+        let Statement::ImportDeclaration(import_decl) = stmt else {
+            break;
+        };
 
-            let Some(specifiers) = &import_decl.specifiers else {
-                continue;
-            };
+        let Some(specifiers) = &import_decl.specifiers else {
+            continue;
+        };
 
-            for specifier in specifiers.iter() {
-                match import_decl.source.value.as_str() {
-                    LIBRARY_CORE_IMPORT_NAME => {
-                        if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
-                            specifier
-                            && (spec.local.name == "css" || spec.local.name == "style")
+        for specifier in specifiers.iter() {
+            // TODO move loop 1 lvl up for perf
+            match import_decl.source.value.as_str() {
+                LIBRARY_CORE_IMPORT_NAME => {
+                    match specifier {
+                        oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec)
+                            if spec.imported.name() == "css" =>
                         {
-                            return_early = false;
-                            break;
+                            css_function_name = Some(spec.local.name.to_string());
                         }
-                    }
-                    LIBRARY_SOLID_JS_IMPORT_NAME => {
-                        solid_prepass = true;
-                        if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
-                            specifier
-                            && spec.local.name == "styled"
+                        oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec)
+                            if spec.imported.name() == "style" =>
                         {
-                            return_early = false;
-                            break;
+                            style_function_name = Some(spec.local.name.to_string());
                         }
-                    }
-                    _ => continue,
+                        _ => {
+                            continue;
+                        }
+                    };
+                    return_early = false;
                 }
+                LIBRARY_SOLID_JS_IMPORT_NAME => {
+                    solid_prepass = true;
+                    if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
+                        specifier
+                        && spec.local.name == "styled"
+                    {
+                        return_early = false;
+                    }
+                }
+                _ => continue,
             }
         }
     }
@@ -1329,6 +1351,8 @@ pub async fn evaluate_program<'alloc>(
         referenced_idents.clone(),
         cwd,
         program_filepath,
+        css_function_name,
+        style_function_name,
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
