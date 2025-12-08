@@ -1156,6 +1156,8 @@ pub struct Transformer {
     export_cache_ref: String,
     css_extension: String,
     wrap_selectors_with_global: bool,
+
+    use_require: bool,
 }
 
 #[wasm_bindgen]
@@ -1171,20 +1173,25 @@ impl Transformer {
             .unwrap();
 
         let ignored_imports = js_sys::Reflect::get(&opts, &JsValue::from_str("ignoredImports"))
-            .unwrap()
-            .dyn_into::<js_sys::Object>()
-            .unwrap();
+            .ok()
+            .and_then(|v| v.dyn_into::<js_sys::Object>().ok());
 
-        let ignored_imports: HashMap<String, Vec<String>> = js_sys::Object::keys(&ignored_imports)
-            .iter()
-            .filter_map(|key| {
-                let key_str = key.as_string()?;
-                let value = js_sys::Reflect::get(&ignored_imports, &key).ok()?;
-                let array = js_sys::Array::from(&value);
-                let vec: Vec<String> = array.iter().filter_map(|item| item.as_string()).collect();
-                Some((key_str, vec))
+        let ignored_imports: HashMap<String, Vec<String>> = ignored_imports
+            .as_ref()
+            .map(|ignored_imports| {
+                js_sys::Object::keys(ignored_imports)
+                    .iter()
+                    .filter_map(|key| {
+                        let key_str = key.as_string()?;
+                        let value = js_sys::Reflect::get(ignored_imports, &key).ok()?;
+                        let array = js_sys::Array::from(&value);
+                        let vec: Vec<String> =
+                            array.iter().filter_map(|item| item.as_string()).collect();
+                        Some((key_str, vec))
+                    })
+                    .collect()
             })
-            .collect();
+            .unwrap_or_default();
 
         let load_file = js_sys::Reflect::get(&opts, &JsValue::from_str("loadFile"))
             .unwrap()
@@ -1221,6 +1228,11 @@ impl Transformer {
         )
         .unwrap();
 
+        let use_require = js_sys::Reflect::get(&opts, &JsValue::from_str("useRequire"))
+            .unwrap()
+            .as_bool()
+            .unwrap_or_default();
+
         Self {
             cwd,
             ignored_imports,
@@ -1230,6 +1242,8 @@ impl Transformer {
             export_cache_ref,
             css_extension,
             wrap_selectors_with_global,
+
+            use_require,
         }
     }
 
@@ -1436,41 +1450,42 @@ pub async fn evaluate_program<'alloc>(
 
                     // node_modules imports
                     if code.is_empty() {
-                        tmp_program.body.insert(
-                            0,
-                            utils::make_dynamic_import(
-                                ast_builder,
-                                BindingPatternKind::ObjectPattern(
-                                    ast_builder.alloc_object_pattern(
-                                        span,
-                                        ast_builder.vec1(
-                                            ast_builder.binding_property(
-                                                span,
-                                                PropertyKey::StaticIdentifier(
-                                                    ast_builder.alloc_identifier_name(
-                                                        span,
-                                                        ast_builder.atom(&remote_name),
-                                                    ),
-                                                ),
-                                                ast_builder.binding_pattern(
-                                                    ast_builder
-                                                        .binding_pattern_kind_binding_identifier(
-                                                            span,
-                                                            ast_builder.atom(&local_name),
-                                                        ),
-                                                    None as Option<oxc_allocator::Box<_>>,
-                                                    false,
-                                                ),
-                                                true,
-                                                false,
-                                            ),
+                        let left =
+                            BindingPatternKind::ObjectPattern(ast_builder.alloc_object_pattern(
+                                span,
+                                ast_builder.vec1(ast_builder.binding_property(
+                                    span,
+                                    PropertyKey::StaticIdentifier(
+                                        ast_builder.alloc_identifier_name(
+                                            span,
+                                            ast_builder.atom(&remote_name),
+                                        ),
+                                    ),
+                                    ast_builder.binding_pattern(
+                                        ast_builder.binding_pattern_kind_binding_identifier(
+                                            span,
+                                            ast_builder.atom(&local_name),
                                         ),
                                         None as Option<oxc_allocator::Box<_>>,
+                                        false,
                                     ),
-                                ),
-                                &remote_filepath,
-                                span,
-                            ),
+                                    true,
+                                    false,
+                                )),
+                                None as Option<oxc_allocator::Box<_>>,
+                            ));
+                        tmp_program.body.insert(
+                            0,
+                            if transformer.use_require {
+                                utils::make_require(ast_builder, left, &remote_filepath, span)
+                            } else {
+                                utils::make_dynamic_import(
+                                    ast_builder,
+                                    left,
+                                    &remote_filepath,
+                                    span,
+                                )
+                            },
                         );
                         continue;
                     }
@@ -1489,41 +1504,42 @@ pub async fn evaluate_program<'alloc>(
 
                     // node_modules imports
                     if code.is_empty() {
-                        tmp_program.body.insert(
-                            0,
-                            utils::make_dynamic_import(
-                                ast_builder,
-                                BindingPatternKind::ObjectPattern(
-                                    ast_builder.alloc_object_pattern(
-                                        span,
-                                        ast_builder.vec1(
-                                            ast_builder.binding_property(
-                                                span,
-                                                PropertyKey::StaticIdentifier(
-                                                    ast_builder.alloc_identifier_name(
-                                                        span,
-                                                        ast_builder.atom("default"),
-                                                    ),
-                                                ),
-                                                ast_builder.binding_pattern(
-                                                    ast_builder
-                                                        .binding_pattern_kind_binding_identifier(
-                                                            span,
-                                                            ast_builder.atom(&local_name),
-                                                        ),
-                                                    None as Option<oxc_allocator::Box<_>>,
-                                                    false,
-                                                ),
-                                                true,
-                                                false,
-                                            ),
+                        let left =
+                            BindingPatternKind::ObjectPattern(ast_builder.alloc_object_pattern(
+                                span,
+                                ast_builder.vec1(ast_builder.binding_property(
+                                    span,
+                                    PropertyKey::StaticIdentifier(
+                                        ast_builder.alloc_identifier_name(
+                                            span,
+                                            ast_builder.atom("default"),
+                                        ),
+                                    ),
+                                    ast_builder.binding_pattern(
+                                        ast_builder.binding_pattern_kind_binding_identifier(
+                                            span,
+                                            ast_builder.atom(&local_name),
                                         ),
                                         None as Option<oxc_allocator::Box<_>>,
+                                        false,
                                     ),
-                                ),
-                                &remote_filepath,
-                                span,
-                            ),
+                                    true,
+                                    false,
+                                )),
+                                None as Option<oxc_allocator::Box<_>>,
+                            ));
+                        tmp_program.body.insert(
+                            0,
+                            if transformer.use_require {
+                                utils::make_require(ast_builder, left, &remote_filepath, span)
+                            } else {
+                                utils::make_dynamic_import(
+                                    ast_builder,
+                                    left,
+                                    &remote_filepath,
+                                    span,
+                                )
+                            },
                         );
                         continue;
                     }
@@ -1545,19 +1561,22 @@ pub async fn evaluate_program<'alloc>(
 
                     // node_modules imports
                     if code.is_empty() {
+                        let left = BindingPatternKind::BindingIdentifier(
+                            ast_builder
+                                .alloc_binding_identifier(span, ast_builder.atom(&namespace_name)),
+                        );
                         tmp_program.body.insert(
                             0,
-                            utils::make_dynamic_import(
-                                ast_builder,
-                                BindingPatternKind::BindingIdentifier(
-                                    ast_builder.alloc_binding_identifier(
-                                        span,
-                                        ast_builder.atom(&namespace_name),
-                                    ),
-                                ),
-                                &remote_filepath,
-                                span,
-                            ),
+                            if transformer.use_require {
+                                utils::make_require(ast_builder, left, &remote_filepath, span)
+                            } else {
+                                utils::make_dynamic_import(
+                                    ast_builder,
+                                    left,
+                                    &remote_filepath,
+                                    span,
+                                )
+                            },
                         );
                         continue;
                     }

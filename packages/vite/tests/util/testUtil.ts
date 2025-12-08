@@ -93,7 +93,7 @@ export const setupPlugin = async (resolver: Record<string, string>) => {
     addWatchFile: vi.fn(),
   } as any;
 
-  const plugin = vitePlugin();
+  const plugin = vitePlugin({ useRequire: true } as any);
 
   const config = plugin.config.bind(ctx);
   await config({});

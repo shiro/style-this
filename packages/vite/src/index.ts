@@ -140,6 +140,8 @@ const vitePlugin = (options: Options = {}) => {
         exportCache,
 
         cssExtension,
+
+        useRequire: (options as any).useRequire,
       });
     },
 

@@ -1,6 +1,6 @@
-import "virtual:style-this:/entry.tsx.css";
 import { css } from "@style-this/core";
 import { getNumber } from "some_lib";
+import "virtual:style-this:/entry.tsx.css";
 // const someLib = require("vite");
 // const someLib = require("some_lib");
 // const someLib = require("../../src/viteTests/edge-cases-library-imports/node_modules/some_lib/index");
