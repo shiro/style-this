@@ -133,7 +133,7 @@ const vitePlugin = (options: Options = {}) => {
 
       styleThis = new Transformer({
         cwd,
-        ignoredImports: options.ignoredImports,
+        ignoredImports: options.ignoredImports as Record<string, string[]>,
 
         loadFile,
         cssFileStore: cssFiles,
