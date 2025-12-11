@@ -18,6 +18,7 @@ pkgs.mkShell {
     nativeBuildInputs = with pkgs; [];
     packages = with pkgs; [
       wasm-pack
+      binaryen
     ];
 
     RUST_BACKTRACE = 1;

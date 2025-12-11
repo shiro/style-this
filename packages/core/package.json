@@ -22,7 +22,7 @@
   "scripts": {
     "build": "pnpm build:native && pnpm build:js",
     "build:dev": "pnpm build:native:dev && pnpm build:js",
-    "build:native": "cd native && wasm-pack build -t web --release",
+    "build:native": "cd native && wasm-pack build -t web --release && wasm-opt -O2 pkg/style_this_bg.wasm -o pkg/style_this_bg.wasm",
     "build:native:dev": "cd native && wasm-pack build -t web",
     "build:js": "tsdown",
     "dev": "tsdown --watch",
