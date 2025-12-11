@@ -1,6 +1,11 @@
+/// <reference path="../global.d.ts" />
 import { Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
-import { Transformer, initializeStyleThis } from "@style-this/core/compiler";
+import {
+  Transformer,
+  initializeStyleThis,
+  CssCachEntry,
+} from "@style-this/core/compiler";
 import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
@@ -14,6 +19,8 @@ export function use(fn, element, arg) {
 }
 `;
 
+const TIMEOUT_DURATION = 10000;
+const TIMEOUT = Symbol();
 export const DefaultImport = Symbol();
 
 interface Options {
@@ -58,14 +65,25 @@ const vitePlugin = (options: Options = {}) => {
   const virtualModulePrefix = "virtual:style-this:";
   const resolvedVirtualModulePrefix = "\0" + virtualModulePrefix;
 
-  const cssFiles = new Map<string, string>();
-  const exportCache = {} as Record<string, Record<string, any>>;
+  if (!global.__styleThis_cssCache) {
+    global.__styleThis_cssCache = new Map<string, CssCachEntry>();
+  }
+  const cssCache = global.__styleThis_cssCache;
+
+  if (!global.__styleThis_valueCache) {
+    global.__styleThis_valueCache = {};
+  }
+  const valueCache = global.__styleThis_valueCache;
+
   const filesContainingStyledTemplates = new Set<string>();
   let resolve: (id: string, importer: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
   let styleThis: Transformer;
   const mocks = new Map<string, string>();
   const temporaryPrograms: string[] = [];
+
+  // Timing variables
+  let totalTransformTime = 0;
 
   mocks.set("solid-js/web", solidMock);
 
@@ -136,8 +154,8 @@ const vitePlugin = (options: Options = {}) => {
         ignoredImports: options.ignoredImports as Record<string, string[]>,
 
         loadFile,
-        cssFileStore: cssFiles,
-        exportCache,
+        cssCache,
+        valueCache,
 
         cssExtension,
 
@@ -153,15 +171,21 @@ const vitePlugin = (options: Options = {}) => {
       }
     },
 
-    load(fullId) {
+    async load(fullId) {
       if (fullId.startsWith(resolvedVirtualModulePrefix)) {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
-        const raw = cssFiles.get(filepath);
 
-        if (raw == undefined)
+        const entry = cssCache.get(filepath);
+
+        if (entry == undefined)
           throw new Error(
             `failed to load virtual CSS file '${filepath}' from id '${id}'`,
+          );
+
+        if (typeof entry == "function")
+          throw new Error(
+            `virtual CSS file '${filepath}' from id '${id}' not yet ready`,
           );
 
         // tell Vite that this virtual CSS module depends on the source file
@@ -171,15 +195,37 @@ const vitePlugin = (options: Options = {}) => {
           : filepath;
         this.addWatchFile(sourceFilepath);
 
-        return raw;
+        let time = 0;
+
+        while (true) {
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(TIMEOUT), TIMEOUT_DURATION);
+          });
+
+          try {
+            const resolved = await Promise.race([entry, timeoutPromise]);
+            return resolved;
+          } catch (error) {
+            if (error == TIMEOUT) {
+              time += TIMEOUT_DURATION;
+              console.warn(
+                `CSS entry '${filepath}' loading for over ${time}sec, might be a deadlock`,
+              );
+            } else {
+              throw error;
+            }
+          }
+        }
       }
     },
 
     async handleHotUpdate(ctx) {
       if (!filesContainingStyledTemplates.has(ctx.file)) return;
 
-      // reset cache
-      exportCache[ctx.file] = {};
+      // remove from cache
+      valueCache[ctx.file] = {};
+      const cssFilepath = `${ctx.file}.${cssExtension}`;
+      cssCache.delete(cssFilepath);
 
       // invalidate all modules that import this one
       const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
@@ -215,14 +261,37 @@ const vitePlugin = (options: Options = {}) => {
 
       const importSource = `${virtualModulePrefix}${filepath}.${cssExtension}`;
       const cssFilepath = `${filepath}.${cssExtension}`;
-      cssFiles.delete(cssFilepath);
+      const skipCssEval = cssCache.has(cssFilepath);
 
       try {
+        const startTime = performance.now();
+
+        if (!skipCssEval) {
+          let resolve: CssCachEntry["resolve"] | undefined;
+          let reject: CssCachEntry["reject"] | undefined;
+          const promise = new Promise((_resolve, _reject) => {
+            resolve = _resolve;
+            reject = _reject;
+          }) as CssCachEntry;
+          promise.resolve = resolve!;
+          promise.reject = reject!;
+
+          cssCache.set(cssFilepath, promise);
+        }
+
         const transformedResult = await styleThis.transform(
           code,
           filepath,
+          skipCssEval,
           importSource,
         );
+        const endTime = performance.now();
+        const transformTime = endTime - startTime;
+        totalTransformTime += transformTime;
+
+        // console.log(
+        //   `Transform took ${transformTime.toFixed(2)}ms for ${filepath} (total: ${totalTransformTime.toFixed(2)}ms)`,
+        // );
 
         if (!transformedResult) {
           filesContainingStyledTemplates.delete(filepath);

@@ -7,6 +7,7 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
   transform(
     code: string,
     filepath: string,
+    skipCssEval: boolean,
     importSource?: string,
   ): Promise<
     | {
@@ -18,14 +19,21 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
   >;
 }
 
+export type CssCachEntry = Promise<string> & {
+  resolve: (value: string) => void;
+  reject: (error: Error) => void;
+};
+
 // fix types on rust-generated types
 export const Transformer = _Transformer as any as new (opts: {
   cwd: string;
   ignoredImports: Record<string, string[]>;
 
   loadFile: (filepath: string, importer: string) => Promise<[string, string]>;
-  cssFileStore: Map<string, string>;
-  exportCache: Record<string, Record<string, any>>;
+
+  cssCache: Map<string, CssCachEntry>;
+  valueCache: Record<string, Record<string, any>>;
+
   wrapSelectorsWithGlobal?: boolean;
 
   cssExtension: string;

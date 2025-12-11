@@ -5,7 +5,9 @@ use oxc_ast::ast::{
 use oxc_semantic::ScopeFlags;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::thread_local;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{
@@ -14,11 +16,12 @@ use crate::utils::{
     replace_in_statement_using_spans, transpile_ts_to_js,
 };
 use crate::*;
-use wasm_bindgen_futures::spawn_local;
+
+use futures::lock::Mutex as FutureMutex;
 
 thread_local! {
     static CSS_CLASSNAME_CACHE: RefCell<HashMap<String, HashMap<u32, String>>> = RefCell::new(HashMap::new());
-    static VALUE_CACHE: RefCell<HashMap<String, HashSet<String>>> = RefCell::new(HashMap::new());
+    static VALUE_CACHE: RefCell<HashMap<String, Rc<FutureMutex<HashSet<String>> >>> = RefCell::new(HashMap::new());
 }
 
 #[derive(Error, Debug)]
@@ -56,6 +59,33 @@ impl From<TransformError> for JsValue {
         };
 
         err.into()
+    }
+}
+
+struct ExportedJSValue {
+    value: JsValue,
+    js_ref: String,
+}
+
+impl ExportedJSValue {
+    fn new(value: JsValue) -> Self {
+        let js_ref = format!("{}_{}", PREFIX, utils::generate_random_id(8));
+        js_sys::Reflect::set(&js_sys::global(), &JsValue::from_str(&js_ref), &value).unwrap();
+
+        Self { value, js_ref }
+    }
+}
+
+impl std::fmt::Display for ExportedJSValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "global.{}", self.js_ref)
+    }
+}
+
+impl Drop for ExportedJSValue {
+    fn drop(&mut self) {
+        js_sys::Reflect::delete_property(&js_sys::global(), &JsValue::from_str(&self.js_ref))
+            .unwrap();
     }
 }
 
@@ -104,6 +134,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     entrypoint: bool,
     cwd: &'a str,
     program_filepath: &'a str,
+    value_cache: &'a mut HashSet<String>,
 
     style_function_name: Option<String>,
     css_function_name: Option<String>,
@@ -141,6 +172,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         referenced_idents: HashSet<String>,
         cwd: &'a str,
         program_filepath: &'a str,
+        value_cache: &'a mut HashSet<String>,
         css_function_name: Option<String>,
         style_function_name: Option<String>,
     ) -> Self {
@@ -150,6 +182,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             entrypoint,
             cwd,
             program_filepath,
+            value_cache,
+
             css_function_name,
             style_function_name,
 
@@ -379,12 +413,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         // if cached, grab from cache
         variable_names.retain(|variable_name| {
-            let cached = VALUE_CACHE.with(|cache| {
-                cache
-                    .borrow()
-                    .get(self.program_filepath)
-                    .is_some_and(|cache| cache.contains(variable_name))
-            });
+            let cached = self.value_cache.contains(variable_name);
             if cached {
                 let variable_declaration = ast::build_variable_declaration_ident(
                     self.ast_builder,
@@ -1164,13 +1193,14 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct Transformer {
     cwd: String,
     ignored_imports: HashMap<String, Vec<String>>,
 
     load_file: js_sys::Function,
     css_file_store_ref: String,
-    export_cache_ref: String,
+    value_cache_ref: String,
     css_extension: String,
     wrap_selectors_with_global: bool,
 
@@ -1226,24 +1256,15 @@ impl Transformer {
                 .as_bool()
                 .unwrap_or(false);
 
-        let css_file_store_ref = format!("{PREFIX}_{}", utils::generate_random_id(8));
-        let css_file_store =
-            js_sys::Reflect::get(&opts, &JsValue::from_str("cssFileStore")).unwrap();
-        js_sys::Reflect::set(
-            &global,
-            &JsValue::from_str(&css_file_store_ref),
-            &css_file_store,
-        )
-        .unwrap();
+        let random_suffix = utils::generate_random_id(8);
 
-        let export_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("exportCache")).unwrap();
-        let export_cache_ref = format!("{PREFIX}_{}", utils::generate_random_id(8));
-        js_sys::Reflect::set(
-            &global,
-            &JsValue::from_str(&export_cache_ref),
-            &export_cache,
-        )
-        .unwrap();
+        let css_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("cssCache")).unwrap();
+        let css_file_store_ref = format!("{PREFIX}_css_{random_suffix}");
+        js_sys::Reflect::set(&global, &JsValue::from_str(&css_file_store_ref), &css_cache).unwrap();
+
+        let value_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("valueCache")).unwrap();
+        let value_cache_ref = format!("{PREFIX}_vars_{random_suffix}");
+        js_sys::Reflect::set(&global, &JsValue::from_str(&value_cache_ref), &value_cache).unwrap();
 
         let use_require = js_sys::Reflect::get(&opts, &JsValue::from_str("useRequire"))
             .unwrap()
@@ -1256,7 +1277,7 @@ impl Transformer {
 
             load_file,
             css_file_store_ref,
-            export_cache_ref,
+            value_cache_ref,
             css_extension,
             wrap_selectors_with_global,
 
@@ -1305,12 +1326,35 @@ pub async fn evaluate_program<'alloc>(
     transformer: &Transformer,
     entrypoint: bool,
     cwd: &str,
-    program_filepath: &str,
+    program_filepath: String,
     program: &mut Program<'alloc>,
-    referenced_idents: HashSet<String>,
-    temporary_programs: &mut Vec<String>,
-) -> Result<EvaluateProgramReturnStatus, TransformError> {
+    mut referenced_idents: HashSet<String>,
+    // temporary_programs: &mut Vec<String>,
+    import_source: Option<String>,
+    tx: Option<futures::channel::oneshot::Sender<Result<Option<JsValue>, TransformError>>>,
+    skip_css_eval: bool,
+) {
     let allocator = &ast_builder.allocator;
+
+    // keep values until end of function
+    let value_cache_guard = VALUE_CACHE.with(|cache| {
+        cache
+            .borrow_mut()
+            .entry(program_filepath.clone())
+            .or_insert_with(|| Rc::new(FutureMutex::new(HashSet::new())))
+            .clone()
+    });
+
+    let mut value_cache = value_cache_guard.lock().await;
+
+    referenced_idents.retain(|ident| !value_cache.contains(ident));
+
+    if !entrypoint && referenced_idents.is_empty() {
+        if let Some(tx) = tx {
+            tx.send(Ok(None)).unwrap();
+        }
+        return;
+    }
 
     // find "css" import or quit early if entrypoint
     let mut return_early = entrypoint;
@@ -1363,14 +1407,18 @@ pub async fn evaluate_program<'alloc>(
     }
 
     if return_early {
-        return Ok(EvaluateProgramReturnStatus::NotTransformed);
+        // return Ok(EvaluateProgramReturnStatus::NotTransformed);
+        if let Some(tx) = tx {
+            tx.send(Ok(None)).unwrap();
+        }
+        return;
     }
 
     if solid_prepass {
         solid_js_prepass(ast_builder, program, false);
     }
 
-    let cache_ref = &transformer.export_cache_ref;
+    let cache_ref = &transformer.value_cache_ref;
     let store = format!("global.{cache_ref}[\"{program_filepath}\"]");
 
     // transform all css`...` expresisons into classname strings
@@ -1381,21 +1429,92 @@ pub async fn evaluate_program<'alloc>(
         &store,
         referenced_idents.clone(),
         cwd,
-        program_filepath,
+        &program_filepath,
+        &mut value_cache,
         css_function_name,
         style_function_name,
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
-        return Err(error);
+        if let Some(tx) = tx {
+            tx.send(Err(error)).unwrap();
+        }
+        return;
     }
     let (
         css_variable_identifiers,
         referenced_idents,
         mut namespace_imports,
         exported_idents,
-        mut tmp_program,
+        tmp_program,
     ) = css_transformer.finish();
+
+    // new entrypoint handling
+    if entrypoint {
+        // add import to virtual css
+        if let Some(import_source) = &import_source {
+            let import_declaration = ast_builder
+                .alloc_import_declaration::<Option<Box<WithClause>>>(
+                    program.span,
+                    None,
+                    ast_builder.string_literal(program.span, ast_builder.atom(import_source), None),
+                    None,
+                    None,
+                    ImportOrExportKind::Value,
+                );
+
+            let insert_pos = program
+                .body
+                .iter()
+                .position(|stmt| !matches!(stmt, Statement::ImportDeclaration(_)))
+                .unwrap_or(0);
+
+            program
+                .body
+                .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
+        }
+
+        let options = CodegenOptions {
+            source_map_path: Some(PathBuf::from_str(&program_filepath).unwrap()),
+            ..Default::default()
+        };
+        let output_js = Codegen::new().with_options(options).build(&program);
+
+        let result = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("code"),
+            &JsValue::from_str(&output_js.code),
+        )
+        .unwrap();
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("sourcemap"),
+            &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
+        )
+        .unwrap();
+
+        let temporary_programs: Vec<String> = vec![];
+
+        js_sys::Reflect::set(
+            &result,
+            &JsValue::from_str("temporaryPrograms"),
+            &Array::from_iter(temporary_programs.into_iter().map(JsValue::from)),
+        )
+        .unwrap();
+
+        if let Some(tx) = tx {
+            let _ = tx.send(Ok(Some(result.into())));
+        }
+    }
+
+    if skip_css_eval {
+        return;
+    }
+
+    let tmp_program = Rc::new(RefCell::new(tmp_program));
+
+    let mut futures = vec![];
 
     // handle imports - resolve other modules and rewrite return values into variable declarations
     for stmt in program.body.iter() {
@@ -1438,285 +1557,333 @@ pub async fn evaluate_program<'alloc>(
             continue;
         }
 
-        let (remote_filepath, code) = transformer
-            .load_file(&remote_module_id, program_filepath)
-            .await?;
+        let future = {
+            let tmp_program = tmp_program.clone();
+            let program_filepath = program_filepath.clone();
+            let specifiers = specifiers.clone_in(allocator);
+            let referenced_idents = referenced_idents.clone();
 
-        for specifier in specifiers.iter() {
-            // ignore `css` imports from us
-            if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME
-                && let ImportDeclarationSpecifier::ImportSpecifier(import_specifier) = specifier
-                && !matches!(
-                    &import_specifier.imported,
-                    ModuleExportName::IdentifierName(identifier_name)
-                    if identifier_name.name == "css"
-                )
-            {
-                continue;
-            }
+            std::boxed::Box::pin(async move {
+                let (remote_filepath, code) = transformer
+                    .load_file(&remote_module_id, &program_filepath)
+                    .await
+                    .unwrap();
 
-            let (local_name, remote_name, span) = match specifier {
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import_specifier) => {
-                    let local_name = import_specifier.local.name.to_string();
-                    if !referenced_idents.contains(&local_name) {
+                for specifier in specifiers.iter() {
+                    // ignore `css` imports from us
+                    if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME
+                        && let ImportDeclarationSpecifier::ImportSpecifier(import_specifier) =
+                            specifier
+                        && !matches!(
+                            &import_specifier.imported,
+                            ModuleExportName::IdentifierName(identifier_name)
+                            if identifier_name.name == "css"
+                        )
+                    {
                         continue;
                     }
 
-                    let remote_name = import_specifier.imported.to_string();
-                    let span = import_specifier.span;
+                    let (local_name, remote_name, span) =
+                        match specifier {
+                            oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(
+                                import_specifier,
+                            ) => {
+                                let local_name = import_specifier.local.name.to_string();
+                                if !referenced_idents.contains(&local_name) {
+                                    continue;
+                                }
 
-                    // node_modules imports
-                    if code.is_empty() {
-                        let left =
-                            BindingPatternKind::ObjectPattern(ast_builder.alloc_object_pattern(
-                                span,
-                                ast_builder.vec1(ast_builder.binding_property(
+                                let remote_name = import_specifier.imported.to_string();
+                                let span = import_specifier.span;
+
+                                // node_modules imports
+                                if code.is_empty() {
+                                    let left = BindingPatternKind::ObjectPattern(
+                                ast_builder.alloc_object_pattern(
                                     span,
-                                    PropertyKey::StaticIdentifier(
-                                        ast_builder.alloc_identifier_name(
-                                            span,
-                                            ast_builder.atom(&remote_name),
+                                    ast_builder.vec1(ast_builder.binding_property(
+                                        span,
+                                        PropertyKey::StaticIdentifier(
+                                            ast_builder.alloc_identifier_name(
+                                                span,
+                                                ast_builder.atom(&remote_name),
+                                            ),
                                         ),
-                                    ),
-                                    ast_builder.binding_pattern(
-                                        ast_builder.binding_pattern_kind_binding_identifier(
-                                            span,
-                                            ast_builder.atom(&local_name),
+                                        ast_builder.binding_pattern(
+                                            ast_builder.binding_pattern_kind_binding_identifier(
+                                                span,
+                                                ast_builder.atom(&local_name),
+                                            ),
+                                            None as Option<oxc_allocator::Box<_>>,
+                                            false,
                                         ),
-                                        None as Option<oxc_allocator::Box<_>>,
+                                        true,
                                         false,
-                                    ),
-                                    true,
-                                    false,
-                                )),
-                                None as Option<oxc_allocator::Box<_>>,
-                            ));
-                        tmp_program.body.insert(
-                            0,
-                            if transformer.use_require {
-                                utils::make_require(ast_builder, left, &remote_filepath, span)
-                            } else {
-                                utils::make_dynamic_import(
-                                    ast_builder,
-                                    left,
-                                    &remote_filepath,
+                                    )),
+                                    None as Option<oxc_allocator::Box<_>>,
+                                ),
+                            );
+                                    tmp_program.borrow_mut().body.insert(
+                                        0,
+                                        if transformer.use_require {
+                                            utils::make_require(
+                                                ast_builder,
+                                                left,
+                                                &remote_filepath,
+                                                span,
+                                            )
+                                        } else {
+                                            utils::make_dynamic_import(
+                                                ast_builder,
+                                                left,
+                                                &remote_filepath,
+                                                span,
+                                            )
+                                        },
+                                    );
+                                    continue;
+                                }
+
+                                (local_name, Some(remote_name), import_specifier.span)
+                            }
+                            oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(
+                                import_default_specifier,
+                            ) => {
+                                let local_name = import_default_specifier.local.name.to_string();
+                                if !referenced_idents.contains(&local_name) {
+                                    continue;
+                                }
+
+                                let span = import_default_specifier.span;
+
+                                // node_modules imports
+                                if code.is_empty() {
+                                    let left = BindingPatternKind::ObjectPattern(
+                                ast_builder.alloc_object_pattern(
                                     span,
-                                )
-                            },
-                        );
-                        continue;
-                    }
-
-                    (local_name, Some(remote_name), import_specifier.span)
-                }
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(
-                    import_default_specifier,
-                ) => {
-                    let local_name = import_default_specifier.local.name.to_string();
-                    if !referenced_idents.contains(&local_name) {
-                        continue;
-                    }
-
-                    let span = import_default_specifier.span;
-
-                    // node_modules imports
-                    if code.is_empty() {
-                        let left =
-                            BindingPatternKind::ObjectPattern(ast_builder.alloc_object_pattern(
-                                span,
-                                ast_builder.vec1(ast_builder.binding_property(
-                                    span,
-                                    PropertyKey::StaticIdentifier(
-                                        ast_builder.alloc_identifier_name(
-                                            span,
-                                            ast_builder.atom("default"),
+                                    ast_builder.vec1(ast_builder.binding_property(
+                                        span,
+                                        PropertyKey::StaticIdentifier(
+                                            ast_builder.alloc_identifier_name(
+                                                span,
+                                                ast_builder.atom("default"),
+                                            ),
                                         ),
-                                    ),
-                                    ast_builder.binding_pattern(
-                                        ast_builder.binding_pattern_kind_binding_identifier(
-                                            span,
-                                            ast_builder.atom(&local_name),
+                                        ast_builder.binding_pattern(
+                                            ast_builder.binding_pattern_kind_binding_identifier(
+                                                span,
+                                                ast_builder.atom(&local_name),
+                                            ),
+                                            None as Option<oxc_allocator::Box<_>>,
+                                            false,
                                         ),
-                                        None as Option<oxc_allocator::Box<_>>,
+                                        true,
                                         false,
-                                    ),
-                                    true,
-                                    false,
-                                )),
-                                None as Option<oxc_allocator::Box<_>>,
-                            ));
-                        tmp_program.body.insert(
-                            0,
-                            if transformer.use_require {
-                                utils::make_require(ast_builder, left, &remote_filepath, span)
-                            } else {
-                                utils::make_dynamic_import(
-                                    ast_builder,
-                                    left,
-                                    &remote_filepath,
-                                    span,
+                                    )),
+                                    None as Option<oxc_allocator::Box<_>>,
+                                ),
+                            );
+                                    tmp_program.borrow_mut().body.insert(
+                                        0,
+                                        if transformer.use_require {
+                                            utils::make_require(
+                                                ast_builder,
+                                                left,
+                                                &remote_filepath,
+                                                span,
+                                            )
+                                        } else {
+                                            utils::make_dynamic_import(
+                                                ast_builder,
+                                                left,
+                                                &remote_filepath,
+                                                span,
+                                            )
+                                        },
+                                    );
+                                    continue;
+                                }
+
+                                (
+                                    local_name,
+                                    Some("__global__export__".to_string()),
+                                    import_default_specifier.span,
                                 )
-                            },
-                        );
-                        continue;
-                    }
+                            }
+                            oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(
+                                import,
+                            ) => {
+                                let namespace_name = import.local.name.to_string();
 
-                    (
-                        local_name,
-                        Some("__global__export__".to_string()),
-                        import_default_specifier.span,
-                    )
-                }
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(import) => {
-                    let namespace_name = import.local.name.to_string();
+                                if !referenced_idents.contains(&namespace_name) {
+                                    continue;
+                                }
 
-                    if !referenced_idents.contains(&namespace_name) {
-                        continue;
-                    }
+                                let span = import.span;
 
-                    let span = import.span;
+                                // node_modules imports
+                                if code.is_empty() {
+                                    let left = BindingPatternKind::BindingIdentifier(
+                                        ast_builder.alloc_binding_identifier(
+                                            span,
+                                            ast_builder.atom(&namespace_name),
+                                        ),
+                                    );
+                                    tmp_program.borrow_mut().body.insert(
+                                        0,
+                                        if transformer.use_require {
+                                            utils::make_require(
+                                                ast_builder,
+                                                left,
+                                                &remote_filepath,
+                                                span,
+                                            )
+                                        } else {
+                                            utils::make_dynamic_import(
+                                                ast_builder,
+                                                left,
+                                                &remote_filepath,
+                                                span,
+                                            )
+                                        },
+                                    );
+                                    continue;
+                                }
 
-                    // node_modules imports
-                    if code.is_empty() {
-                        let left = BindingPatternKind::BindingIdentifier(
-                            ast_builder
-                                .alloc_binding_identifier(span, ast_builder.atom(&namespace_name)),
-                        );
-                        tmp_program.body.insert(
-                            0,
-                            if transformer.use_require {
-                                utils::make_require(ast_builder, left, &remote_filepath, span)
-                            } else {
-                                utils::make_dynamic_import(
-                                    ast_builder,
-                                    left,
-                                    &remote_filepath,
-                                    span,
-                                )
-                            },
-                        );
-                        continue;
-                    }
+                                (namespace_name, None, import.span)
+                            }
+                        };
 
-                    (namespace_name, None, import.span)
-                }
-            };
+                    let cache_source = if let Some(remote_name) = &remote_name {
+                        format!("{cache_ref}[\"{remote_filepath}\"][\"{remote_name}\"]")
+                    } else {
+                        format!("{cache_ref}[\"{remote_filepath}\"]")
+                    };
 
-            let cache_source = if let Some(remote_name) = &remote_name {
-                format!("{cache_ref}[\"{remote_filepath}\"][\"{remote_name}\"]")
-            } else {
-                format!("{cache_ref}[\"{remote_filepath}\"]")
-            };
-
-            // add new variable declaration to our tmp program
-            let variable_declaration =
-                Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
-                    span,
-                    VariableDeclarationKind::Const,
-                    ast_builder.vec1(
-                        ast_builder.variable_declarator(
+                    // add new variable declaration to our tmp program
+                    let variable_declaration =
+                        Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
                             span,
                             VariableDeclarationKind::Const,
-                            ast_builder.binding_pattern(
-                                BindingPatternKind::BindingIdentifier(
-                                    ast_builder.alloc_binding_identifier(
-                                        span,
-                                        ast_builder.atom(&local_name),
+                            ast_builder.vec1(ast_builder.variable_declarator(
+                                span,
+                                VariableDeclarationKind::Const,
+                                ast_builder.binding_pattern(
+                                    BindingPatternKind::BindingIdentifier(
+                                        ast_builder.alloc_binding_identifier(
+                                            span,
+                                            ast_builder.atom(&local_name),
+                                        ),
                                     ),
+                                    None as Option<oxc_allocator::Box<_>>,
+                                    false,
                                 ),
-                                None as Option<oxc_allocator::Box<_>>,
+                                Some(Expression::Identifier(
+                                    ast_builder.alloc_identifier_reference(
+                                        span,
+                                        ast_builder.atom(&cache_source),
+                                    ),
+                                )),
                                 false,
-                            ),
-                            Some(Expression::Identifier(
-                                ast_builder.alloc_identifier_reference(
-                                    span,
-                                    ast_builder.atom(&cache_source),
-                                ),
                             )),
                             false,
-                        ),
-                    ),
+                        ));
+                    tmp_program
+                        .borrow_mut()
+                        .body
+                        .insert(0, variable_declaration);
+                    if let Some(remote_name) = remote_name {
+                        remote_referenced_idents.insert(remote_name);
+                    }
+                }
+
+                // if nothing referenced, nothing to do
+                if remote_referenced_idents.is_empty() {
+                    // continue;
+                    return Ok(());
+                }
+
+                let source_type = SourceType::from_path(&remote_filepath)
+                    .map_err(|_| TransformError::UknownExtension {
+                        filepath: remote_filepath.clone(),
+                    })
+                    .unwrap();
+
+                let allocator = Allocator::default();
+                let ast_builder = AstBuilder::new(&allocator);
+
+                let ast = Parser::new(&allocator, &code, source_type)
+                    .with_options(ParseOptions {
+                        parse_regular_expression: true,
+                        ..ParseOptions::default()
+                    })
+                    .parse();
+
+                if ast.panicked {
+                    return Err(TransformError::RawParseFailed {
+                        filepath: remote_filepath,
+                    });
+                }
+
+                let mut remote_program = ast.program;
+
+                evaluate_program(
+                    &ast_builder,
+                    transformer,
                     false,
-                ));
-            tmp_program.body.insert(0, variable_declaration);
-            if let Some(remote_name) = remote_name {
-                remote_referenced_idents.insert(remote_name);
-            }
-        }
+                    cwd,
+                    remote_filepath,
+                    &mut remote_program,
+                    remote_referenced_idents,
+                    // temporary_programs,
+                    None,
+                    None,
+                    skip_css_eval,
+                )
+                .await;
 
-        // if nothing referenced, nothing to do
-        if remote_referenced_idents.is_empty() {
-            continue;
-        }
-
-        let source_type = SourceType::from_path(&remote_filepath).map_err(|_| {
-            TransformError::UknownExtension {
-                filepath: remote_filepath.clone(),
-            }
-        })?;
-
-        let mut ast = Parser::new(allocator, &code, source_type)
-            .with_options(ParseOptions {
-                parse_regular_expression: true,
-                ..ParseOptions::default()
+                Ok(())
             })
-            .parse();
-        if ast.panicked {
-            return Err(TransformError::RawParseFailed {
-                filepath: remote_filepath,
-            });
-        }
-
-        let all_cached = remote_referenced_idents.iter().all(|ident| {
-            VALUE_CACHE.with(|cache| {
-                cache
-                    .borrow()
-                    .get(&remote_filepath)
-                    .is_some_and(|cache| cache.contains(ident))
-            })
-        });
-
-        if all_cached {
-            continue;
-        }
-
-        std::boxed::Box::pin(evaluate_program(
-            ast_builder,
-            transformer,
-            false,
-            cwd,
-            &remote_filepath,
-            &mut ast.program,
-            remote_referenced_idents,
-            temporary_programs,
-        ))
-        .await?;
+        };
+        futures.push(future);
     }
 
-    transpile_ts_to_js(allocator, &mut tmp_program);
+    let css_file_store_ref = &transformer.css_file_store_ref;
+    let value_cache_ref = &transformer.value_cache_ref;
+    let css_filepath = format!("'{program_filepath}.{}'", transformer.css_extension);
 
-    if !tmp_program.body.is_empty()
-        && matches!(tmp_program.body[0], Statement::ImportDeclaration(_))
+    if let Err(err) = futures::future::try_join_all(futures).await {
+        let err = ExportedJSValue::new(err.into());
+        js_sys::eval(&format!(
+            "
+            {css_file_store_ref}.get({css_filepath}).reject({err});
+            "
+        ))
+        .unwrap();
+        return;
+    }
+
+    transpile_ts_to_js(allocator, &mut tmp_program.borrow_mut());
+
+    if !tmp_program.borrow().body.is_empty()
+        && matches!(
+            tmp_program.borrow().body[0],
+            Statement::ImportDeclaration(_)
+        )
     {
-        tmp_program.body.remove(0);
+        tmp_program.borrow_mut().body.remove(0);
     }
 
     let mut tmp_program_js = Codegen::new()
         .with_options(CodegenOptions::default())
-        .build(&tmp_program)
+        .build(&tmp_program.borrow())
         .code;
 
     // js_sys::eval(&format!("console.log('program', '{program_path}')",)).unwrap();
 
     // we append all exported idents we evaluated to the cache
     if !exported_idents.is_empty() {
-        VALUE_CACHE.with(|cache| {
-            cache
-                .borrow_mut()
-                .entry(program_filepath.to_string())
-                .or_default()
-                .extend(exported_idents.iter().cloned());
-        });
+        value_cache.extend(exported_idents.iter().cloned());
 
         // TODO this only needs to be sorted for tests to stay consistent
         let mut idents: Vec<String> = exported_idents.into_iter().collect();
@@ -1728,7 +1895,7 @@ pub async fn evaluate_program<'alloc>(
 
     let has_css = !css_variable_identifiers.is_empty();
 
-    if has_css {
+    if entrypoint && has_css {
         let css = css_variable_identifiers
             .into_iter()
             .map(|(variable_name, class_name)| {
@@ -1745,69 +1912,62 @@ pub async fn evaluate_program<'alloc>(
             .join(",\n");
 
         tmp_program_js.push_str(&format!(
-            "\n{}.set('{}.{}', [\n{css}\n].join('\\n'));",
-            &transformer.css_file_store_ref,
-            program_filepath.replace("'", "\\'"),
-            transformer.css_extension,
+            "
+            {css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'));
+            ",
         ));
-
-        // tmp_program_js.push_str(&format!("\nreturn [\n{css}\n].join('\\n');"));
     }
 
-    temporary_programs.push(tmp_program_js.to_string());
-
-    let css_file_store_ref = &transformer.css_file_store_ref;
-    let export_cache_ref = &transformer.export_cache_ref;
     // wrap into promise
-    let mut tmp_program_js = format!(
-        "//let eval;
+    let tmp_program_js = format!(
+        "
         const global = {{
             {css_file_store_ref},
-            {export_cache_ref},
+            {value_cache_ref},
         }};
+
         (async () => {{
             \"use strict\";
             {tmp_program_js}
-        }})()"
+        }})()
+        "
     );
 
-    // if has_css {
-    //     tmp_program_js.push_str(&format!(
-    //         "\n{}.set('{}.{}', ret);",
-    //         &transformer.css_file_store_ref,
-    //         program_filepath.replace("'", "\\'"),
-    //         transformer.css_extension,
-    //     ));
-    // }
-
     let evaluated =
-        js_sys::eval(&tmp_program_js).map_err(|cause| TransformError::EvaluationFailed {
+        match js_sys::eval(&tmp_program_js).map_err(|cause| TransformError::EvaluationFailed {
             program: tmp_program_js.clone(),
             cause,
-        })?;
-
-    // TODO
-    // spawn_local(async move {
-    //     use async_std::task;
-    //     use std::time::Duration;
-    //     task::sleep(Duration::from_secs(1)).await;
-    //     js_sys::eval(&format!("console.log('hi')",)).unwrap();
-    // });
+        }) {
+            Ok(v) => v,
+            Err(err) => {
+                let err = ExportedJSValue::new(err.into());
+                js_sys::eval(&format!(
+                    "
+                    {css_file_store_ref}.get({css_filepath}).reject({err});
+                    "
+                ))
+                .unwrap();
+                return;
+            }
+        };
 
     let promise = js_sys::Promise::from(evaluated);
     let future = wasm_bindgen_futures::JsFuture::from(promise);
-    future
+    if let Err(err) = future
         .await
         .map_err(|cause| TransformError::EvaluationFailed {
-            program: tmp_program_js,
+            program: tmp_program_js.clone(),
             cause,
-        })?;
-
-    if !entrypoint {
-        return Ok(EvaluateProgramReturnStatus::NotTransformed);
+        })
+    {
+        let err = ExportedJSValue::new(err.into());
+        js_sys::eval(&format!(
+            "
+            {css_file_store_ref}.get({css_filepath}).reject({err});
+            "
+        ))
+        .unwrap();
     }
-
-    Ok(EvaluateProgramReturnStatus::Transfomred)
 }
 
 #[derive(PartialEq)]
@@ -1822,99 +1982,52 @@ impl Transformer {
         &self,
         code: String,
         filepath: String,
+        skip_css_eval: bool,
         import_source: Option<String>,
     ) -> Result<Option<JsValue>, TransformError> {
-        let allocator = Allocator::default();
-        let ast_builder = AstBuilder::new(&allocator);
-        let mut temporary_programs = vec![];
+        let _self = self.clone();
+        let (tx, rx) = futures::channel::oneshot::channel();
 
-        let source_type =
-            SourceType::from_path(&filepath).map_err(|_| TransformError::UknownExtension {
-                filepath: filepath.clone(),
-            })?;
-        let mut ast = Parser::new(&allocator, &code, source_type)
-            .with_options(ParseOptions {
-                parse_regular_expression: true,
-                ..ParseOptions::default()
-            })
-            .parse();
+        spawn_local(async move {
+            let allocator = Allocator::default();
+            let ast_builder = AstBuilder::new(&allocator);
+            // let mut temporary_programs = vec![];
 
-        if ast.panicked {
-            // panic!(format!("{:?}", ast.errors));
-            return Err(TransformError::BundlerParseFailed { id: filepath });
-        }
+            let source_type = SourceType::from_path(&filepath)
+                .map_err(|_| TransformError::UknownExtension {
+                    filepath: filepath.clone(),
+                })
+                .unwrap();
 
-        let status = evaluate_program(
-            &ast_builder,
-            self,
-            true,
-            &self.cwd,
-            &filepath,
-            &mut ast.program,
-            HashSet::new(),
-            &mut temporary_programs,
-        )
-        .await?;
+            let mut ast = Parser::new(&allocator, &code, source_type)
+                .with_options(ParseOptions {
+                    parse_regular_expression: true,
+                    ..ParseOptions::default()
+                })
+                .parse();
 
-        if status == EvaluateProgramReturnStatus::NotTransformed {
-            return Ok(None);
-        }
+            if ast.panicked {
+                tx.send(Err(TransformError::RawParseFailed { filepath }))
+                    .unwrap();
+                return;
+            }
 
-        // add import to virtual css
-        if let Some(import_source) = &import_source {
-            let import_declaration = ast_builder
-                .alloc_import_declaration::<Option<Box<WithClause>>>(
-                    ast.program.span,
-                    None,
-                    ast_builder.string_literal(
-                        ast.program.span,
-                        ast_builder.atom(import_source),
-                        None,
-                    ),
-                    None,
-                    None,
-                    ImportOrExportKind::Value,
-                );
+            evaluate_program(
+                &ast_builder,
+                &_self,
+                true,
+                &_self.cwd,
+                filepath.clone(),
+                &mut ast.program,
+                HashSet::new(),
+                // &mut temporary_programs,
+                import_source,
+                Some(tx),
+                skip_css_eval,
+            )
+            .await;
+        });
 
-            let insert_pos = ast
-                .program
-                .body
-                .iter()
-                .position(|stmt| !matches!(stmt, Statement::ImportDeclaration(_)))
-                .unwrap_or(0);
-
-            ast.program
-                .body
-                .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
-        }
-
-        let options = CodegenOptions {
-            source_map_path: Some(PathBuf::from_str(&filepath).unwrap()),
-            ..Default::default()
-        };
-        let output_js = Codegen::new().with_options(options).build(&ast.program);
-
-        let result = js_sys::Object::new();
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from_str("code"),
-            &JsValue::from_str(&output_js.code),
-        )
-        .unwrap();
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from_str("sourcemap"),
-            &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
-        )
-        .unwrap();
-
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from_str("temporaryPrograms"),
-            &Array::from_iter(temporary_programs.into_iter().map(JsValue::from)),
-        )
-        .unwrap();
-
-        Ok(Some(result.into()))
+        rx.await.unwrap()
     }
 }
