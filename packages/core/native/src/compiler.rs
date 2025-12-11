@@ -3,6 +3,9 @@ use oxc_ast::ast::{
     ModuleExportName,
 };
 use oxc_semantic::ScopeFlags;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::thread_local;
 
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{
@@ -11,6 +14,12 @@ use crate::utils::{
     replace_in_statement_using_spans, transpile_ts_to_js,
 };
 use crate::*;
+use wasm_bindgen_futures::spawn_local;
+
+thread_local! {
+    static CSS_CLASSNAME_CACHE: RefCell<HashMap<String, HashMap<u32, String>>> = RefCell::new(HashMap::new());
+    static VALUE_CACHE: RefCell<HashMap<String, HashSet<String>>> = RefCell::new(HashMap::new());
+}
 
 #[derive(Error, Debug)]
 pub enum TransformError {
@@ -276,9 +285,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let unique_number = self.css_unique_number();
         self.entrypoint
             .then(|| {
-                js_sys::eval(&format!("{}?.__css_{unique_number}", self.store))
-                    .unwrap()
-                    .as_string()
+                CSS_CLASSNAME_CACHE.with(|cache| {
+                    cache
+                        .borrow()
+                        .get(self.program_filepath)
+                        .and_then(|file_cache| file_cache.get(&unique_number))
+                        .cloned()
+                })
             })
             .flatten()
             .unwrap_or_else(|| {
@@ -292,13 +305,17 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
 
                 let class_name = format!("{variable_name}-{random_suffix}");
-                // self.css_unique_number_counter
 
-                js_sys::eval(&format!(
-                    "{} = {{...({} ?? {{}}), __css_{unique_number}: \"{}\"}};",
-                    self.store, self.store, class_name
-                ))
-                .unwrap();
+                CSS_CLASSNAME_CACHE.with(|cache| {
+                    cache
+                        .borrow_mut()
+                        .entry(self.program_filepath.to_string())
+                        .or_default()
+                        .entry(unique_number)
+                        .or_insert_with(|| class_name.clone())
+                        .clone()
+                });
+
                 class_name
             })
     }
@@ -362,12 +379,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         // if cached, grab from cache
         variable_names.retain(|variable_name| {
-            let cached = js_sys::eval(&format!(
-                "{}?.hasOwnProperty('{variable_name}')",
-                self.store
-            ))
-            .unwrap()
-            .is_truthy();
+            let cached = VALUE_CACHE.with(|cache| {
+                cache
+                    .borrow()
+                    .get(self.program_filepath)
+                    .is_some_and(|cache| cache.contains(variable_name))
+            });
             if cached {
                 let variable_declaration = ast::build_variable_declaration_ident(
                     self.ast_builder,
@@ -1650,12 +1667,13 @@ pub async fn evaluate_program<'alloc>(
             });
         }
 
-        let cache_ref = &transformer.export_cache_ref;
-        let store = format!("global.{cache_ref}[\"{remote_filepath}\"]");
         let all_cached = remote_referenced_idents.iter().all(|ident| {
-            js_sys::eval(&format!("{store}?.hasOwnProperty('{ident}')",))
-                .unwrap()
-                .is_truthy()
+            VALUE_CACHE.with(|cache| {
+                cache
+                    .borrow()
+                    .get(&remote_filepath)
+                    .is_some_and(|cache| cache.contains(ident))
+            })
         });
 
         if all_cached {
@@ -1692,6 +1710,14 @@ pub async fn evaluate_program<'alloc>(
 
     // we append all exported idents we evaluated to the cache
     if !exported_idents.is_empty() {
+        VALUE_CACHE.with(|cache| {
+            cache
+                .borrow_mut()
+                .entry(program_filepath.to_string())
+                .or_default()
+                .extend(exported_idents.iter().cloned());
+        });
+
         // TODO this only needs to be sorted for tests to stay consistent
         let mut idents: Vec<String> = exported_idents.into_iter().collect();
         idents.sort();
@@ -1700,7 +1726,9 @@ pub async fn evaluate_program<'alloc>(
         tmp_program_js.push_str(&format!("\n{store} = {{...({store} ?? {{}}), {idents}}};"));
     }
 
-    if !css_variable_identifiers.is_empty() {
+    let has_css = !css_variable_identifiers.is_empty();
+
+    if has_css {
         let css = css_variable_identifiers
             .into_iter()
             .map(|(variable_name, class_name)| {
@@ -1722,6 +1750,8 @@ pub async fn evaluate_program<'alloc>(
             program_filepath.replace("'", "\\'"),
             transformer.css_extension,
         ));
+
+        // tmp_program_js.push_str(&format!("\nreturn [\n{css}\n].join('\\n');"));
     }
 
     temporary_programs.push(tmp_program_js.to_string());
@@ -1729,7 +1759,7 @@ pub async fn evaluate_program<'alloc>(
     let css_file_store_ref = &transformer.css_file_store_ref;
     let export_cache_ref = &transformer.export_cache_ref;
     // wrap into promise
-    let tmp_program_js = format!(
+    let mut tmp_program_js = format!(
         "//let eval;
         const global = {{
             {css_file_store_ref},
@@ -1741,11 +1771,28 @@ pub async fn evaluate_program<'alloc>(
         }})()"
     );
 
+    // if has_css {
+    //     tmp_program_js.push_str(&format!(
+    //         "\n{}.set('{}.{}', ret);",
+    //         &transformer.css_file_store_ref,
+    //         program_filepath.replace("'", "\\'"),
+    //         transformer.css_extension,
+    //     ));
+    // }
+
     let evaluated =
         js_sys::eval(&tmp_program_js).map_err(|cause| TransformError::EvaluationFailed {
             program: tmp_program_js.clone(),
             cause,
         })?;
+
+    // TODO
+    // spawn_local(async move {
+    //     use async_std::task;
+    //     use std::time::Duration;
+    //     task::sleep(Duration::from_secs(1)).await;
+    //     js_sys::eval(&format!("console.log('hi')",)).unwrap();
+    // });
 
     let promise = js_sys::Promise::from(evaluated);
     let future = wasm_bindgen_futures::JsFuture::from(promise);
