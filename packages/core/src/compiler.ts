@@ -21,13 +21,15 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
 // fix types on rust-generated types
 export const Transformer = _Transformer as any as new (opts: {
   cwd: string;
-  ignoredImports: string[];
+  ignoredImports: Record<string, string[]>;
 
   loadFile: (filepath: string, importer: string) => Promise<[string, string]>;
   cssFileStore: Map<string, string>;
   exportCache: Record<string, Record<string, any>>;
-  cssExtension: string;
   wrapSelectorsWithGlobal?: boolean;
+
+  cssExtension: string;
+  useRequire?: boolean;
 }) => Transformer;
 
 export const initializeStyleThis = async () => {

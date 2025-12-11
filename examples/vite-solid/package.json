@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm vinxi dev",
-    "build": "vinxi build"
+    "build": "vinxi build",
+    "build:dev": "pnpm build"
   },
   "dependencies": {
     "@solidjs/meta": "0.29.4",

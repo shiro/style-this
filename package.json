@@ -6,10 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter '!example/*' build",
-    "build:core": "pnpm --filter @style-this/core build",
-    "build:vite": "pnpm --filter @style-this/vite build",
-    "build:webpack": "pnpm --filter @style-this/webpack build",
-    "dev": "pnpm -r dev",
+    "build:dev": "pnpm --filter '!example/*' build:dev",
+    "dev": "pnpm build:dev --watch",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "test": "pnpm -r test",

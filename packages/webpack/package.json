@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "build:dev": "pnpm build",
     "dev": "tsdown --watch",
     "lint": "eslint",
     "lint:fix": "pnpm lint --fix",
