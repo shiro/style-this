@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+### Patch Changes
+
+- 48664f7: Publish
+
 ## 0.1.1
 
 ### Patch Changes
