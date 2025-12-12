@@ -1,3 +1,4 @@
+// /packages/vite/tests/expressions-1/entry.tsx: {"css", "doPromise", "Promise", "a", "setTimeout"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let doPromise = async () => {
@@ -6,8 +7,7 @@ let doPromise = async () => {
 };
 let a = new String("a-y789mr");
 a.css = `background: ${doPromise()};`;
-
-__styleThis_aabbbccc.set('/packages/vite/tests/expressions-1/entry.tsx.css', [
+__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.css').resolve([
 `.a-y789mr {
 ${a.css}
 }`

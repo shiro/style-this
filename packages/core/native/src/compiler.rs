@@ -1,3 +1,4 @@
+use indoc::{formatdoc, indoc};
 use oxc_ast::ast::{
     Class, Declaration, ExportDefaultDeclaration, Function, ImportDeclarationSpecifier,
     ModuleExportName,
@@ -1205,6 +1206,7 @@ pub struct Transformer {
     wrap_selectors_with_global: bool,
 
     use_require: bool,
+    debug: bool,
 }
 
 #[wasm_bindgen]
@@ -1271,6 +1273,11 @@ impl Transformer {
             .as_bool()
             .unwrap_or_default();
 
+        let debug = js_sys::Reflect::get(&opts, &JsValue::from_str("debug"))
+            .unwrap()
+            .as_bool()
+            .unwrap_or_default();
+
         Self {
             cwd,
             ignored_imports,
@@ -1282,6 +1289,7 @@ impl Transformer {
             wrap_selectors_with_global,
 
             use_require,
+            debug,
         }
     }
 
@@ -1327,9 +1335,10 @@ pub async fn evaluate_program<'alloc>(
     entrypoint: bool,
     cwd: &str,
     program_filepath: String,
+    importer_filepath: Option<&str>,
     program: &mut Program<'alloc>,
     mut referenced_idents: HashSet<String>,
-    // temporary_programs: &mut Vec<String>,
+    temporary_programs: Rc<RefCell<HashMap<String, String>>>,
     import_source: Option<String>,
     tx: Option<futures::channel::oneshot::Sender<Result<Option<JsValue>, TransformError>>>,
     skip_css_eval: bool,
@@ -1494,15 +1503,6 @@ pub async fn evaluate_program<'alloc>(
         )
         .unwrap();
 
-        let temporary_programs: Vec<String> = vec![];
-
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from_str("temporaryPrograms"),
-            &Array::from_iter(temporary_programs.into_iter().map(JsValue::from)),
-        )
-        .unwrap();
-
         if let Some(tx) = tx {
             let _ = tx.send(Ok(Some(result.into())));
         }
@@ -1562,6 +1562,7 @@ pub async fn evaluate_program<'alloc>(
             let program_filepath = program_filepath.clone();
             let specifiers = specifiers.clone_in(allocator);
             let referenced_idents = referenced_idents.clone();
+            let temporary_programs = temporary_programs.clone();
 
             std::boxed::Box::pin(async move {
                 let (remote_filepath, code) = transformer
@@ -1833,9 +1834,10 @@ pub async fn evaluate_program<'alloc>(
                     false,
                     cwd,
                     remote_filepath,
+                    Some(&program_filepath),
                     &mut remote_program,
                     remote_referenced_idents,
-                    // temporary_programs,
+                    temporary_programs,
                     None,
                     None,
                     skip_css_eval,
@@ -1911,15 +1913,38 @@ pub async fn evaluate_program<'alloc>(
             .collect::<Vec<_>>()
             .join(",\n");
 
-        tmp_program_js.push_str(&format!(
+        tmp_program_js.push_str(&formatdoc!(
             "
             {css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'));
             ",
         ));
     }
 
+    if transformer.debug {
+        let importer_part = if let Some(importer_filepath) = importer_filepath {
+            format!(" ({importer_filepath})")
+        } else {
+            String::new()
+        };
+        let key = format!("{program_filepath}{importer_part}: {referenced_idents:?}");
+        js_sys::eval(&format!(
+            "
+            if(global.{PREFIX}_temporaryPrograms)
+                global.{PREFIX}_temporaryPrograms['{}'] = '{}';
+            ",
+            key.replace('\\', "\\\\")
+                .replace('\'', "\\'")
+                .replace('\n', "\\n"),
+            tmp_program_js
+                .replace('\\', "\\\\")
+                .replace('\'', "\\'")
+                .replace('\n', "\\n")
+        ))
+        .unwrap();
+    }
+
     // wrap into promise
-    let tmp_program_js = format!(
+    let tmp_program_js = formatdoc!(
         "
         const global = {{
             {css_file_store_ref},
@@ -1935,7 +1960,7 @@ pub async fn evaluate_program<'alloc>(
 
     let evaluated =
         match js_sys::eval(&tmp_program_js).map_err(|cause| TransformError::EvaluationFailed {
-            program: tmp_program_js.clone(),
+            program: tmp_program_js.to_string(),
             cause,
         }) {
             Ok(v) => v,
@@ -1956,7 +1981,7 @@ pub async fn evaluate_program<'alloc>(
     if let Err(err) = future
         .await
         .map_err(|cause| TransformError::EvaluationFailed {
-            program: tmp_program_js.clone(),
+            program: tmp_program_js.to_string(),
             cause,
         })
     {
@@ -1991,7 +2016,7 @@ impl Transformer {
         spawn_local(async move {
             let allocator = Allocator::default();
             let ast_builder = AstBuilder::new(&allocator);
-            // let mut temporary_programs = vec![];
+            let temporary_programs = Rc::new(RefCell::new(Default::default()));
 
             let source_type = SourceType::from_path(&filepath)
                 .map_err(|_| TransformError::UknownExtension {
@@ -2018,9 +2043,10 @@ impl Transformer {
                 true,
                 &_self.cwd,
                 filepath.clone(),
+                None,
                 &mut ast.program,
                 HashSet::new(),
-                // &mut temporary_programs,
+                temporary_programs.clone(),
                 import_source,
                 Some(tx),
                 skip_css_eval,

@@ -1,3 +1,4 @@
+// /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"__styleThis_expression_2", "__styleThis_expression_1", "foo", "css", "__global__export__"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let foo = new String("foo-4hazsh");
@@ -14,23 +15,12 @@ class __global__export__ {
 	}
 }
 
-global.__styleThis_dddeefff["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_dddeefff["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
-__styleThis_aabbbccc.set('/packages/vite/tests/correctness-1/a.tsx.css', [
-`.__styleThis_expression_1-hezg16 {
-${__styleThis_expression_1.css}
-}`,
-`.__styleThis_expression_2-s5qr4d {
-${__styleThis_expression_2.css}
-}`,
-`.foo-4hazsh {
-${foo.css}
-}`
-].join('\n'));
+global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
-// virtual program:
+// /packages/vite/tests/correctness-1/entry.tsx: {"s2", "st", "__styleThis_expression_6", "a1", "style", "__styleThis_expression_3", "comp", "__styleThis_expression_11", "unrelated", "css", "color", "b", "mib", "mutate", "a"}
 "use strict";
-const a = __styleThis_dddeefff["/packages/vite/tests/correctness-1/a.tsx"];
-const mib = __styleThis_dddeefff["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
+const a = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"];
+const mib = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
 let { css } = require("/packages/core/dist/index.mjs");
 let mutate = (v) => v;
 let __styleThis_expression_11 = new String("__styleThis_expression_11-g5yzc1");
@@ -80,8 +70,7 @@ s2.css = `${st}
 let unrelated = new String("unrelated-h6bsx2");
 unrelated.css = `background: none;
   ${a.foo.css}`;
-
-__styleThis_aabbbccc.set('/packages/vite/tests/correctness-1/entry.tsx.css', [
+__styleThis_css_aabbbccc.get('/packages/vite/tests/correctness-1/entry.tsx.css').resolve([
 `.unrelated-h6bsx2 {
 ${unrelated.css}
 }`,

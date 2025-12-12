@@ -13,7 +13,6 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
     | {
         code: string;
         sourcemap: string;
-        temporaryPrograms: string[];
       }
     | undefined
   >;
@@ -38,6 +37,7 @@ export const Transformer = _Transformer as any as new (opts: {
 
   cssExtension: string;
   useRequire?: boolean;
+  debug?: boolean;
 }) => Transformer;
 
 export const initializeStyleThis = async () => {

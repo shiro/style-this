@@ -49,15 +49,15 @@ export const evaluateProgram = async (
     `${testDir}/out/${entry}.${plugin.cssExtension}`,
   );
 
-  // TODO re-enable this
-  // const temporaryPrograms = plugin
-  //   .__getTemporaryPrograms()
-  //   .join("\n\n// virtual program:\n")
-  //   .replaceAll(MONOREPO_ROOT_DIR, "");
-  //
-  // await expect(temporaryPrograms).toMatchFileSnapshot(
-  //   `${testDir}/out/compile_${entry}.js`,
-  // );
+  const temporaryPrograms = Object.entries(plugin.__getTemporaryPrograms())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `// ${key}\n${value}`)
+    .join("\n\n")
+    .replaceAll(MONOREPO_ROOT_DIR, "");
+
+  await expect(temporaryPrograms).toMatchFileSnapshot(
+    `${testDir}/out/compile_${entry}.js`,
+  );
 };
 
 const originalRandom = Math.random;
@@ -94,7 +94,7 @@ export const setupPlugin = async (resolver: Record<string, string>) => {
     addWatchFile: vi.fn(),
   } as any;
 
-  const plugin = vitePlugin({ useRequire: true } as any);
+  const plugin = vitePlugin({ debug: true, useRequire: true } as any);
 
   const config = plugin.config.bind(ctx);
   await config({});

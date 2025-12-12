@@ -1,9 +1,25 @@
+// /packages/vite/tests/expressions-1/entry.tsx: {"css", "doPromise", "Promise", "a", "setTimeout"}
+"use strict";
+let { css } = require("/packages/core/dist/index.mjs");
+let doPromise = async () => {
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	return "red";
+};
+let a = new String("a-y789mr");
+a.css = `background: ${doPromise()};`;
+__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.css').resolve([
+`.a-y789mr {
+${a.css}
+}`
+].join('\n'));
+
+
+// /packages/vite/tests/expressions-2/entry.tsx: {"css", "a"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-kde34p");
 a.css = `margin: ${() => 99}px;`;
-
-__styleThis_aabbbccc.set('/packages/vite/tests/expressions-2/entry.tsx.css', [
+__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-2/entry.tsx.css').resolve([
 `.a-kde34p {
 ${a.css}
 }`

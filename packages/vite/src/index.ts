@@ -29,6 +29,7 @@ interface Options {
   cssExtension?: string;
   filter?: Filter | Filter[];
   ignoredImports?: Record<string, true | (string | typeof DefaultImport)[]>;
+  debug?: boolean;
 }
 
 interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
@@ -36,11 +37,11 @@ interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
 export interface ExtraFields {
   cssExtension: string;
   __mocks: Map<string, string>;
-  __getTemporaryPrograms: () => string[];
+  __getTemporaryPrograms: () => Record<string, string>;
 }
 
 const vitePlugin = (options: Options = {}) => {
-  let { cssExtension = "css", filter = [] } = options;
+  let { cssExtension = "css", filter = [], debug } = options;
 
   if (!Array.isArray(filter)) filter = [filter];
 
@@ -75,12 +76,15 @@ const vitePlugin = (options: Options = {}) => {
   }
   const valueCache = global.__styleThis_valueCache;
 
+  if (debug && !global.__styleThis_temporaryPrograms) {
+    global.__styleThis_temporaryPrograms = {};
+  }
+
   const filesContainingStyledTemplates = new Set<string>();
   let resolve: (id: string, importer: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
   let styleThis: Transformer;
   const mocks = new Map<string, string>();
-  const temporaryPrograms: string[] = [];
 
   // Timing variables
   let totalTransformTime = 0;
@@ -93,8 +97,7 @@ const vitePlugin = (options: Options = {}) => {
 
     cssExtension,
     __mocks: mocks,
-    __getTemporaryPrograms: () =>
-      temporaryPrograms.splice(0, temporaryPrograms.length),
+    __getTemporaryPrograms: () => ({ ...global.__styleThis_temporaryPrograms }),
 
     configureServer(viteServer) {
       server = viteServer;
@@ -160,6 +163,7 @@ const vitePlugin = (options: Options = {}) => {
         cssExtension,
 
         useRequire: (options as any).useRequire,
+        debug,
       });
     },
 
@@ -203,7 +207,10 @@ const vitePlugin = (options: Options = {}) => {
           });
 
           try {
-            const resolved = await Promise.race([entry, timeoutPromise]);
+            const resolved = (await Promise.race([
+              entry,
+              timeoutPromise,
+            ])) as string;
             return resolved;
           } catch (error) {
             if (error == TIMEOUT) {
@@ -305,8 +312,6 @@ const vitePlugin = (options: Options = {}) => {
           const module = server.moduleGraph.getModuleById(virtualModuleId);
           if (module) server.reloadModule(module);
         }
-
-        temporaryPrograms.push(...transformedResult.temporaryPrograms);
 
         return {
           code: transformedResult.code,
