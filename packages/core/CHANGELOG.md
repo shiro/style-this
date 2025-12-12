@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+### Patch Changes
+
+- 22e88ff: Add async compilation
+
 ## 0.1.3
 
 ### Patch Changes

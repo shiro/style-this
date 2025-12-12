@@ -1,5 +1,12 @@
 # @style-this/next
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [22e88ff]
+  - @style-this/core@0.1.4
+
 ## 0.0.2
 
 ### Patch Changes

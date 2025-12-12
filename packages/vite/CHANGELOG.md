@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.5
+
+### Patch Changes
+
+- 22e88ff: Add async compilation
+- Updated dependencies [22e88ff]
+  - @style-this/core@0.1.4
+
 ## 0.1.4
 
 ### Patch Changes

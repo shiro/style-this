@@ -1,6 +1,6 @@
 {
   "name": "@style-this/next",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "CSS-in-JS library for the modern web - nextjs plugin",
   "type": "module",
   "files": [
@@ -23,7 +23,7 @@
     "test:watch": "echo 'No tests yet' && exit 0"
   },
   "dependencies": {
-    "@style-this/core": "workspace:0.1.3",
+    "@style-this/core": "workspace:0.1.4",
     "@types/node": "^24.10.1",
     "@types/webpack-virtual-modules": "^0.4.2",
     "webpack": "^5.0.0",
