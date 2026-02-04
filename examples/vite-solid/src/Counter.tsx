@@ -1,5 +1,5 @@
 import { css } from "@style-this/core";
-import { styled } from "@style-this/solid-js";
+import { styled } from "@style-this/solid";
 
 const Counter: Component = () => {
   let count = $signal(0);
