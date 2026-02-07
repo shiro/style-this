@@ -1,3 +1,5 @@
+#![feature(try_blocks)]
+
 mod utils;
 use js_sys::Array;
 use oxc_ast::ast::JSXExpression;
@@ -38,6 +40,7 @@ use oxc_span::Span;
 
 mod ast;
 mod compiler;
+mod error_mapping;
 mod solid_js;
 
 const PREFIX: &str = "__styleThis";

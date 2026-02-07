@@ -10,6 +10,7 @@ use std::rc::Rc;
 use std::thread_local;
 use wasm_bindgen_futures::spawn_local;
 
+use crate::error_mapping::get_pos_from_offset;
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{
     binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
@@ -27,20 +28,34 @@ thread_local! {
 
 #[derive(Error, Debug)]
 pub enum TransformError {
-    #[error("failed to parse program from bundler 'bundler-id:{id}'")]
-    BundlerParseFailed { id: String },
-    #[error("failed to parse program from file '{filepath}'")]
-    RawParseFailed { filepath: String },
+    #[error("failed to parse program: {message}")]
+    RawParseFailed {
+        message: String,
+        filepath: String,
+        row: usize,
+        column: usize,
+    },
     #[error("failed to determine program type from extension '{filepath}'")]
-    UknownExtension { filepath: String },
-    #[error("failed to run program:\n{program}")]
-    EvaluationFailed { program: String, cause: JsValue },
+    UknownExtension {
+        filepath: String,
+        row: usize,
+        column: usize,
+    },
+    #[error("failed to run program '{filepath}'{}", program.as_ref().map(|p| format!("\n{p}")).unwrap_or_default())]
+    EvaluationFailed {
+        filepath: String,
+        program: Option<String>,
+        cause: JsValue,
+    },
     #[error("failed to read file '{filepath}'")]
     ReadFileError { filepath: String, cause: JsValue },
-    #[error(
-        "tried to access dynamic variable '{variable}' during style evaluation in '{filepath}'"
-    )]
-    AccessDynamicVariableError { variable: String, filepath: String },
+    #[error("tried to access dynamic variable '{variable}'")]
+    AccessDynamicVariableError {
+        variable: String,
+        filepath: String,
+        row: usize,
+        column: usize,
+    },
 }
 
 impl From<TransformError> for JsValue {
@@ -48,13 +63,40 @@ impl From<TransformError> for JsValue {
         let err = js_sys::Error::new(&from.to_string());
 
         // stack trace points to wasm wrapper, delete it
-        js_sys::Reflect::set(&err, &JsValue::from_str("stack"), &JsValue::from_str("")).unwrap();
+        js_sys::Reflect::set(&err, &JsValue::from_str("stack"), &JsValue::UNDEFINED).unwrap();
 
         // set cause property for variants that have one
         match &from {
             TransformError::EvaluationFailed { cause, .. }
             | TransformError::ReadFileError { cause, .. } => {
                 js_sys::Reflect::set(&err, &JsValue::from_str("cause"), cause).unwrap();
+            }
+            TransformError::RawParseFailed {
+                filepath,
+                row,
+                column,
+                ..
+            }
+            | TransformError::UknownExtension {
+                filepath,
+                row,
+                column,
+            }
+            | TransformError::AccessDynamicVariableError {
+                filepath,
+                row,
+                column,
+                ..
+            } => {
+                let message = from.to_string();
+                let stack_trace =
+                    format!("{message}\n    at <anonymous> ({filepath}:{row}:{column})",);
+                js_sys::Reflect::set(
+                    &err,
+                    &JsValue::from_str("stack"),
+                    &JsValue::from_str(&stack_trace),
+                )
+                .unwrap();
             }
             _ => (),
         };
@@ -135,6 +177,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     entrypoint: bool,
     cwd: &'a str,
     program_filepath: &'a str,
+    program_code: &'a str,
     value_cache: &'a mut HashSet<String>,
 
     style_function_name: Option<String>,
@@ -173,6 +216,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         referenced_idents: HashSet<String>,
         cwd: &'a str,
         program_filepath: &'a str,
+        program_code: &'a str,
         value_cache: &'a mut HashSet<String>,
         css_function_name: Option<String>,
         style_function_name: Option<String>,
@@ -183,6 +227,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             entrypoint,
             cwd,
             program_filepath,
+            program_code,
             value_cache,
 
             css_function_name,
@@ -266,9 +311,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
             for ident in &right_references {
                 if self.get_dynamic_variable(ident) {
+                    let (row, column) =
+                        get_pos_from_offset(self.program_code, body.span().start as usize);
                     self.error = Some(TransformError::AccessDynamicVariableError {
                         variable: ident.to_string(),
                         filepath: self.program_filepath.to_string(),
+                        row,
+                        column,
                     });
                     return;
                 }
@@ -723,9 +772,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             for ident in &right_references {
                 if self.get_dynamic_variable(ident) {
+                    let (row, column) =
+                        get_pos_from_offset(self.program_code, template.span().start as usize);
                     self.error = Some(TransformError::AccessDynamicVariableError {
                         variable: ident.to_string(),
                         filepath: self.program_filepath.to_string(),
+                        row,
+                        column,
                     });
                     return;
                 }
@@ -855,9 +908,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             for ident in &right_references {
                 if self.get_dynamic_variable(ident) {
+                    let (row, column) =
+                        get_pos_from_offset(self.program_code, template.span().start as usize);
                     self.error = Some(TransformError::AccessDynamicVariableError {
                         variable: ident.to_string(),
                         filepath: self.program_filepath.to_string(),
+                        row,
+                        column,
                     });
                     return;
                 }
@@ -967,9 +1024,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         for ident in &right_references {
             if self.get_dynamic_variable(ident) {
+                let (row, column) =
+                    get_pos_from_offset(self.program_code, init.span().start as usize);
                 self.error = Some(TransformError::AccessDynamicVariableError {
                     variable: ident.to_string(),
                     filepath: self.program_filepath.to_string(),
+                    row,
+                    column,
                 });
                 return;
             }
@@ -1336,6 +1397,7 @@ pub async fn evaluate_program<'alloc>(
     cwd: &str,
     program_filepath: String,
     importer_filepath: Option<&str>,
+    program_code: &str,
     program: &mut Program<'alloc>,
     mut referenced_idents: HashSet<String>,
     temporary_programs: Rc<RefCell<HashMap<String, String>>>,
@@ -1360,7 +1422,7 @@ pub async fn evaluate_program<'alloc>(
 
     if !entrypoint && referenced_idents.is_empty() {
         if let Some(tx) = tx {
-            tx.send(Ok(None)).unwrap();
+            let _ = tx.send(Ok(None));
         }
         return;
     }
@@ -1418,7 +1480,7 @@ pub async fn evaluate_program<'alloc>(
     if return_early {
         // return Ok(EvaluateProgramReturnStatus::NotTransformed);
         if let Some(tx) = tx {
-            tx.send(Ok(None)).unwrap();
+            let _ = tx.send(Ok(None));
         }
         return;
     }
@@ -1439,6 +1501,7 @@ pub async fn evaluate_program<'alloc>(
         referenced_idents.clone(),
         cwd,
         &program_filepath,
+        program_code,
         &mut value_cache,
         css_function_name,
         style_function_name,
@@ -1446,7 +1509,7 @@ pub async fn evaluate_program<'alloc>(
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
         if let Some(tx) = tx {
-            tx.send(Err(error)).unwrap();
+            let _ = tx.send(Err(error));
         }
         return;
     }
@@ -1512,7 +1575,7 @@ pub async fn evaluate_program<'alloc>(
         return;
     }
 
-    let tmp_program = Rc::new(RefCell::new(tmp_program));
+    let eval_program = Rc::new(RefCell::new(tmp_program));
 
     let mut futures = vec![];
 
@@ -1558,7 +1621,7 @@ pub async fn evaluate_program<'alloc>(
         }
 
         let future = {
-            let tmp_program = tmp_program.clone();
+            let tmp_program = eval_program.clone();
             let program_filepath = program_filepath.clone();
             let specifiers = specifiers.clone_in(allocator);
             let referenced_idents = referenced_idents.clone();
@@ -1807,6 +1870,8 @@ pub async fn evaluate_program<'alloc>(
                 let source_type = SourceType::from_path(&remote_filepath)
                     .map_err(|_| TransformError::UknownExtension {
                         filepath: remote_filepath.clone(),
+                        row: 1,
+                        column: 1,
                     })
                     .unwrap();
 
@@ -1823,6 +1888,9 @@ pub async fn evaluate_program<'alloc>(
                 if ast.panicked {
                     return Err(TransformError::RawParseFailed {
                         filepath: remote_filepath,
+                        message: ast.errors.first().unwrap().message.to_string(),
+                        row: 1,
+                        column: 1,
                     });
                 }
 
@@ -1835,6 +1903,7 @@ pub async fn evaluate_program<'alloc>(
                     cwd,
                     remote_filepath,
                     Some(&program_filepath),
+                    &code,
                     &mut remote_program,
                     remote_referenced_idents,
                     temporary_programs,
@@ -1865,20 +1934,20 @@ pub async fn evaluate_program<'alloc>(
         return;
     }
 
-    transpile_ts_to_js(allocator, &mut tmp_program.borrow_mut());
+    transpile_ts_to_js(allocator, &mut eval_program.borrow_mut());
 
-    if !tmp_program.borrow().body.is_empty()
+    if !eval_program.borrow().body.is_empty()
         && matches!(
-            tmp_program.borrow().body[0],
+            eval_program.borrow().body[0],
             Statement::ImportDeclaration(_)
         )
     {
-        tmp_program.borrow_mut().body.remove(0);
+        eval_program.borrow_mut().body.remove(0);
     }
 
-    let mut tmp_program_js = Codegen::new()
+    let mut eval_program_js = Codegen::new()
         .with_options(CodegenOptions::default())
-        .build(&tmp_program.borrow())
+        .build(&eval_program.borrow())
         .code;
 
     // js_sys::eval(&format!("console.log('program', '{program_path}')",)).unwrap();
@@ -1892,7 +1961,7 @@ pub async fn evaluate_program<'alloc>(
         idents.sort();
         let idents = idents.join(",");
 
-        tmp_program_js.push_str(&format!("\n{store} = {{...({store} ?? {{}}), {idents}}};"));
+        eval_program_js.push_str(&format!("\n{store} = {{...({store} ?? {{}}), {idents}}};"));
     }
 
     let has_css = !css_variable_identifiers.is_empty();
@@ -1913,7 +1982,7 @@ pub async fn evaluate_program<'alloc>(
             .collect::<Vec<_>>()
             .join(",\n");
 
-        tmp_program_js.push_str(&formatdoc!(
+        eval_program_js.push_str(&formatdoc!(
             "
             {css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'));
             ",
@@ -1935,7 +2004,7 @@ pub async fn evaluate_program<'alloc>(
             key.replace('\\', "\\\\")
                 .replace('\'', "\\'")
                 .replace('\n', "\\n"),
-            tmp_program_js
+            eval_program_js
                 .replace('\\', "\\\\")
                 .replace('\'', "\\'")
                 .replace('\n', "\\n")
@@ -1944,7 +2013,7 @@ pub async fn evaluate_program<'alloc>(
     }
 
     // wrap into promise
-    let tmp_program_js = formatdoc!(
+    let eval_program_js = formatdoc!(
         "
         const global = {{
             {css_file_store_ref},
@@ -1953,14 +2022,20 @@ pub async fn evaluate_program<'alloc>(
 
         (async () => {{
             \"use strict\";
-            {tmp_program_js}
+            // start
+{eval_program_js}
         }})()
         "
     );
 
     let evaluated =
-        match js_sys::eval(&tmp_program_js).map_err(|cause| TransformError::EvaluationFailed {
-            program: tmp_program_js.to_string(),
+        match js_sys::eval(&eval_program_js).map_err(|cause| TransformError::EvaluationFailed {
+            filepath: program_filepath.clone(),
+            program: if transformer.debug {
+                Some(eval_program_js.to_string())
+            } else {
+                None
+            },
             cause,
         }) {
             Ok(v) => v,
@@ -1968,7 +2043,7 @@ pub async fn evaluate_program<'alloc>(
                 let err = ExportedJSValue::new(err.into());
                 js_sys::eval(&format!(
                     "
-                    {css_file_store_ref}.get({css_filepath}).reject({err});
+                    {css_file_store_ref}.get({css_filepath}).resolve({err});
                     "
                 ))
                 .unwrap();
@@ -1980,15 +2055,30 @@ pub async fn evaluate_program<'alloc>(
     let future = wasm_bindgen_futures::JsFuture::from(promise);
     if let Err(err) = future
         .await
+        .inspect_err(|err| {
+            error_mapping::resolve_err(
+                allocator,
+                err,
+                &program_filepath,
+                program_code,
+                &eval_program.borrow(),
+                &eval_program_js,
+            );
+        })
         .map_err(|cause| TransformError::EvaluationFailed {
-            program: tmp_program_js.to_string(),
+            filepath: program_filepath,
+            program: if transformer.debug {
+                Some(eval_program_js.to_string())
+            } else {
+                None
+            },
             cause,
         })
     {
         let err = ExportedJSValue::new(err.into());
         js_sys::eval(&format!(
             "
-            {css_file_store_ref}.get({css_filepath}).reject({err});
+            {css_file_store_ref}.get({css_filepath}).resolve({err});
             "
         ))
         .unwrap();
@@ -2018,11 +2108,14 @@ impl Transformer {
             let ast_builder = AstBuilder::new(&allocator);
             let temporary_programs = Rc::new(RefCell::new(Default::default()));
 
-            let source_type = SourceType::from_path(&filepath)
-                .map_err(|_| TransformError::UknownExtension {
+            let Ok(source_type) = SourceType::from_path(&filepath) else {
+                let _ = tx.send(Err(TransformError::UknownExtension {
                     filepath: filepath.clone(),
-                })
-                .unwrap();
+                    row: 1,
+                    column: 1,
+                }));
+                return;
+            };
 
             let mut ast = Parser::new(&allocator, &code, source_type)
                 .with_options(ParseOptions {
@@ -2032,8 +2125,12 @@ impl Transformer {
                 .parse();
 
             if ast.panicked {
-                tx.send(Err(TransformError::RawParseFailed { filepath }))
-                    .unwrap();
+                let _ = tx.send(Err(TransformError::RawParseFailed {
+                    filepath,
+                    message: ast.errors.first().unwrap().message.to_string(),
+                    row: 1,
+                    column: 1,
+                }));
                 return;
             }
 
@@ -2044,6 +2141,7 @@ impl Transformer {
                 &_self.cwd,
                 filepath.clone(),
                 None,
+                &code,
                 &mut ast.program,
                 HashSet::new(),
                 temporary_programs.clone(),

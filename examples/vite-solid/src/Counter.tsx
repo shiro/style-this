@@ -1,7 +1,7 @@
 import { css } from "@style-this/core";
 import { styled } from "@style-this/solid";
 
-const Counter: Component = () => {
+const Counter: Component = (p) => {
   let count = $signal(0);
 
   return (
@@ -26,7 +26,7 @@ export const CounterStyle = css`
   border-radius: ${spacing / 2}px;
 `;
 
-const FancyButton = styled.button`
+export const FancyButton = styled.button`
   background: none;
   border: 1px solid blue;
   border-radius: 2px;

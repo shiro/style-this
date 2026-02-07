@@ -18,9 +18,9 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
   >;
 }
 
-export type CssCachEntry = Promise<string> & {
-  resolve: (value: string) => void;
-  reject: (error: Error) => void;
+export type CssCachEntry = Promise<string | Error> & {
+  resolve: (value: string | Error) => void;
+  code: string;
 };
 
 // fix types on rust-generated types

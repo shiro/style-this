@@ -80,7 +80,8 @@ const vitePlugin = (options: Options = {}) => {
     global.__styleThis_temporaryPrograms = {};
   }
 
-  const filesContainingStyledTemplates = new Set<string>();
+  /** Files that contain styled templates, changes cause all importers to reload. */
+  const watchedFiles = new Set<string>();
   let resolve: (id: string, importer: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
   let styleThis: Transformer;
@@ -207,10 +208,11 @@ const vitePlugin = (options: Options = {}) => {
           });
 
           try {
-            const resolved = (await Promise.race([
-              entry,
-              timeoutPromise,
-            ])) as string;
+            const resolved = await Promise.race([entry, timeoutPromise]);
+
+            if (resolved instanceof Error)
+              handleTransformError(id, entry.code, resolved);
+
             return resolved;
           } catch (error) {
             if (error == TIMEOUT) {
@@ -227,7 +229,7 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async handleHotUpdate(ctx) {
-      if (!filesContainingStyledTemplates.has(ctx.file)) return;
+      if (!watchedFiles.has(ctx.file)) return;
 
       // remove from cache
       valueCache[ctx.file] = {};
@@ -275,15 +277,13 @@ const vitePlugin = (options: Options = {}) => {
 
         if (!skipCssEval) {
           let resolve: CssCachEntry["resolve"] | undefined;
-          let reject: CssCachEntry["reject"] | undefined;
-          const promise = new Promise((_resolve, _reject) => {
+          const entry = new Promise((_resolve, _reject) => {
             resolve = _resolve;
-            reject = _reject;
           }) as CssCachEntry;
-          promise.resolve = resolve!;
-          promise.reject = reject!;
+          entry.resolve = resolve!;
+          entry.code = code;
 
-          cssCache.set(cssFilepath, promise);
+          cssCache.set(cssFilepath, entry);
         }
 
         const transformedResult = await styleThis.transform(
@@ -301,10 +301,10 @@ const vitePlugin = (options: Options = {}) => {
         // );
 
         if (!transformedResult) {
-          filesContainingStyledTemplates.delete(filepath);
+          watchedFiles.delete(filepath);
           return;
         }
-        filesContainingStyledTemplates.add(filepath);
+        watchedFiles.add(filepath);
 
         // during dev, invalidate the virtual CSS module
         if (server) {
@@ -318,7 +318,10 @@ const vitePlugin = (options: Options = {}) => {
           map: transformedResult.sourcemap,
         };
       } catch (err) {
-        handleTransformError(err);
+        // we need to watch it since it might contain style templates
+        watchedFiles.add(filepath);
+
+        handleTransformError(filepath, code, err);
       }
     },
   } satisfies Plugin & ExtraFields;

@@ -24,6 +24,7 @@ thiserror = "2.0.17"
 futures = "0.3.31"
 async-std = "1.13.2"
 indoc = "2.0.7"
+itertools = "0.14.0"
 
 oxc_parser = "0.95.0"
 oxc_allocator = "0.95.0"
