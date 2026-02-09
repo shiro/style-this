@@ -1,36 +1,48 @@
-use crate::*;
+use crate::{utils::SeededRandom, *};
 
 struct SolidTransformer<'a, 'alloc> {
     ast_builder: &'a AstBuilder<'alloc>,
     skip_jsx: bool,
+    variable_name: Option<String>,
     current_statement_index: usize,
+    anonymous_component_name_counter: usize,
+    filepath: String,
+    component_counter: usize,
 }
 
 impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
-    fn new(ast_builder: &'a AstBuilder<'alloc>, skip_jsx: bool) -> Self {
+    fn new(ast_builder: &'a AstBuilder<'alloc>, skip_jsx: bool, filepath: String) -> Self {
         Self {
             ast_builder,
             skip_jsx,
+            filepath,
+            variable_name: None,
             current_statement_index: 0,
+            anonymous_component_name_counter: 0,
+            component_counter: 0,
         }
     }
 
     fn transform_styled_component(
         &mut self,
-        variable_declarator: &mut VariableDeclarator<'alloc>,
+        expression: &mut Expression<'alloc>,
         jsx_tag: &'alloc str,
-        component_variable_name: &str,
     ) {
-        let span = variable_declarator.span;
-        let class_variable_name = component_variable_name;
+        self.component_counter += 1;
+        let class_variable_name = self.variable_name.clone().unwrap_or_else(|| {
+            let name = format!("component_{}", self.anonymous_component_name_counter);
+            self.anonymous_component_name_counter += 1;
+            name
+        });
+        let span = expression.span();
 
         // Extract the tagged template expression from the variable declarator
-        let Some(Expression::TaggedTemplateExpression(tagged_template_expression)) =
-            &variable_declarator.init
+        let Expression::TaggedTemplateExpression(tagged_template_expression) = &mut *expression
         else {
             return;
         };
 
+        // A styled css`...` template derived from the styled component template
         let mut simple_tagged_template_expression =
             tagged_template_expression.clone_in(self.ast_builder.allocator);
         simple_tagged_template_expression.tag = Expression::Identifier(
@@ -41,33 +53,40 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
         // Substitute arrow functions with CSS variables
         let mut captured_expressions = Vec::new();
         let mut var_counter = 1;
+        let mut random = SeededRandom::new();
 
-        // Iterate through template expressions and replace arrow functions
+        // Iterate through template expressions and replace arrow functions with variables
         for expression in simple_tagged_template_expression
             .quasi
             .expressions
             .iter_mut()
         {
             if let Expression::ArrowFunctionExpression(_) = expression {
-                // Capture the original arrow function expression
-                captured_expressions.push(expression.clone_in(self.ast_builder.allocator));
-
                 // Replace with variable string (var1, var2, etc.)
-                let var_name = format!("var(--var{var_counter})");
-                *expression = Expression::StringLiteral(self.ast_builder.alloc_string_literal(
-                    expression.span(),
-                    self.ast_builder.atom(&var_name),
-                    None,
-                ));
+                let random_suffix = random.random_string(
+                    6,
+                    &format!("{}_{}_{var_counter}", self.filepath, self.component_counter),
+                );
+                let var_name = format!("var(--var{var_counter}-{random_suffix})");
+
+                let prev_expression = std::mem::replace(
+                    expression,
+                    Expression::StringLiteral(self.ast_builder.alloc_string_literal(
+                        expression.span(),
+                        self.ast_builder.atom(&var_name),
+                        None,
+                    )),
+                );
+                // Capture the original arrow function expression
+                captured_expressions.push(prev_expression);
                 var_counter += 1;
             }
         }
 
         // treat the styled component like a regular css`...` definition
         if self.skip_jsx {
-            variable_declarator.init = Some(Expression::TaggedTemplateExpression(
-                simple_tagged_template_expression,
-            ));
+            *tagged_template_expression =
+                simple_tagged_template_expression.clone_in(self.ast_builder.allocator);
             return;
         }
 
@@ -82,7 +101,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                         BindingPatternKind::BindingIdentifier(
                             self.ast_builder.alloc_binding_identifier(
                                 span,
-                                self.ast_builder.atom(class_variable_name),
+                                self.ast_builder.atom(&class_variable_name),
                             ),
                         ),
                         None as Option<oxc_allocator::Box<_>>,
@@ -101,7 +120,13 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
             .iter()
             .enumerate()
             .map(|(i, arrow_fn)| {
-                let var_name = format!("--var{}", i + 1);
+                let var_counter = i + 1;
+                let random_suffix = random.random_string(
+                    6,
+                    &format!("{}_{}_{var_counter}", self.filepath, self.component_counter),
+                );
+                let var_name = format!("--var{var_counter}-{random_suffix}");
+
                 self.ast_builder.object_property_kind_object_property(
                     span,
                     oxc_ast::ast::PropertyKind::Init,
@@ -114,20 +139,56 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                             arrow_fn.clone_in(self.ast_builder.allocator),
                             None as Option<oxc_allocator::Box<_>>,
                             self.ast_builder.vec1(
-                                Expression::StaticMemberExpression(
-                                    self.ast_builder.alloc_static_member_expression(
+                                // we pass in `{ ...styleProps, props }`
+                                Expression::ObjectExpression(
+                                    self.ast_builder.alloc_object_expression(
                                         span,
-                                        Expression::Identifier(
-                                            self.ast_builder.alloc_identifier_reference(
+                                        self.ast_builder.vec_from_iter([
+                                            // ...styleProps
+                                            self.ast_builder.object_property_kind_spread_property(
                                                 span,
-                                                self.ast_builder.atom("props"),
+                                                Expression::StaticMemberExpression(
+                                                    self.ast_builder
+                                                        .alloc_static_member_expression(
+                                                            span,
+                                                            Expression::Identifier(
+                                                                self.ast_builder
+                                                                    .alloc_identifier_reference(
+                                                                        span,
+                                                                        self.ast_builder
+                                                                            .atom("props"),
+                                                                    ),
+                                                            ),
+                                                            self.ast_builder.identifier_name(
+                                                                span,
+                                                                self.ast_builder.atom("styleProps"),
+                                                            ),
+                                                            false,
+                                                        ),
+                                                ),
                                             ),
-                                        ),
-                                        self.ast_builder.identifier_name(
-                                            span,
-                                            self.ast_builder.atom("styleProps"),
-                                        ),
-                                        false,
+                                            // props: props
+                                            self.ast_builder.object_property_kind_object_property(
+                                                span,
+                                                oxc_ast::ast::PropertyKind::Init,
+                                                self.ast_builder
+                                                    .expression_string_literal(
+                                                        span,
+                                                        self.ast_builder.atom("props"),
+                                                        None,
+                                                    )
+                                                    .into(),
+                                                Expression::Identifier(
+                                                    self.ast_builder.alloc_identifier_reference(
+                                                        span,
+                                                        self.ast_builder.atom("props"),
+                                                    ),
+                                                ),
+                                                false,
+                                                false,
+                                                false,
+                                            ),
+                                        ]),
                                     ),
                                 )
                                 .into(),
@@ -143,6 +204,38 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
             .collect();
 
         let style_attribute = if !captured_expressions.is_empty() {
+            // Add spread element for props.style ?? {} after the CSS custom properties
+            let mut all_style_properties = style_properties;
+            all_style_properties.push(
+                self.ast_builder.object_property_kind_spread_property(
+                    span,
+                    Expression::LogicalExpression(
+                        self.ast_builder.alloc_logical_expression(
+                            span,
+                            Expression::StaticMemberExpression(
+                                self.ast_builder.alloc_static_member_expression(
+                                    span,
+                                    Expression::Identifier(
+                                        self.ast_builder.alloc_identifier_reference(
+                                            span,
+                                            self.ast_builder.atom("props"),
+                                        ),
+                                    ),
+                                    self.ast_builder
+                                        .identifier_name(span, self.ast_builder.atom("style")),
+                                    false,
+                                ),
+                            ),
+                            oxc_ast::ast::LogicalOperator::Coalesce,
+                            Expression::ObjectExpression(
+                                self.ast_builder
+                                    .alloc_object_expression(span, self.ast_builder.vec()),
+                            ),
+                        ),
+                    ),
+                ),
+            );
+
             Some(
                 self.ast_builder.jsx_attribute_item_attribute(
                     span,
@@ -152,7 +245,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                         span,
                         JSXExpression::ObjectExpression(self.ast_builder.alloc_object_expression(
                             span,
-                            self.ast_builder.vec_from_iter(style_properties),
+                            self.ast_builder.vec_from_iter(all_style_properties),
                         )),
                     )),
                 ),
@@ -180,7 +273,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                         span,
                         Expression::Identifier(self.ast_builder.alloc_identifier_reference(
                             span,
-                            self.ast_builder.atom(class_variable_name),
+                            self.ast_builder.atom(&class_variable_name),
                         )),
                         oxc_ast::ast::BinaryOperator::Addition,
                         Expression::BinaryExpression(self.ast_builder.alloc_binary_expression(
@@ -333,7 +426,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                                 Expression::Identifier(
                                     self.ast_builder.alloc_identifier_reference(
                                         span,
-                                        self.ast_builder.atom(class_variable_name),
+                                        self.ast_builder.atom(&class_variable_name),
                                     ),
                                 ),
                                 self.ast_builder
@@ -389,7 +482,7 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
                                             Expression::Identifier(
                                                 self.ast_builder.alloc_identifier_reference(
                                                     span,
-                                                    self.ast_builder.atom(class_variable_name),
+                                                    self.ast_builder.atom(&class_variable_name),
                                                 ),
                                             ),
                                         ),
@@ -425,16 +518,16 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
 
         // build this schema:
         // ```.ts
-        // const testStyle = css`
-        //   color: white;
-        // `;
         // const Test: Component<any> & { class: string } = (() => {
+        //   const testStyle = css`
+        //     color: var(--var1-xxxxxx);
+        //   `;
         //   const comp = (props: any) => {
         //     const [var1, rest] = splitProps(props, ["var1"])
         //     return <div
         //       {...rest}
-        //       style={{"--var1": arrowFn(props)}}
-        //       class={testStyle}
+        //       style={{"--var1-xxxxxx": arrowFn(props)}}
+        //       class={testStyle + " " + class}
         //     />;
         //   };
         //   comp.css = testStyle.css;
@@ -443,33 +536,29 @@ impl<'a, 'alloc> SolidTransformer<'a, 'alloc> {
         // })()
         // TODO Object.freeze
         // ```
-        variable_declarator.init = Some(Expression::CallExpression(
-            self.ast_builder.alloc_call_expression(
+        *expression = Expression::CallExpression(self.ast_builder.alloc_call_expression(
+            span,
+            Expression::ArrowFunctionExpression(self.ast_builder.alloc_arrow_function_expression(
                 span,
-                Expression::ArrowFunctionExpression(
-                    self.ast_builder.alloc_arrow_function_expression(
-                        span,
-                        false,
-                        false,
-                        None as Option<oxc_allocator::Box<_>>,
-                        self.ast_builder.alloc_formal_parameters(
-                            span,
-                            oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-                            self.ast_builder.vec(),
-                            None as Option<oxc_allocator::Box<_>>,
-                        ),
-                        None as Option<oxc_allocator::Box<_>>,
-                        self.ast_builder.alloc_function_body(
-                            span,
-                            self.ast_builder.vec(),
-                            self.ast_builder.vec_from_iter(function_body_statements),
-                        ),
-                    ),
+                false,
+                false,
+                None as Option<oxc_allocator::Box<_>>,
+                self.ast_builder.alloc_formal_parameters(
+                    span,
+                    oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
+                    self.ast_builder.vec(),
+                    None as Option<oxc_allocator::Box<_>>,
                 ),
                 None as Option<oxc_allocator::Box<_>>,
-                self.ast_builder.vec(),
-                false,
-            ),
+                self.ast_builder.alloc_function_body(
+                    span,
+                    self.ast_builder.vec(),
+                    self.ast_builder.vec_from_iter(function_body_statements),
+                ),
+            )),
+            None as Option<oxc_allocator::Box<_>>,
+            self.ast_builder.vec(),
+            false,
         ));
     }
 }
@@ -482,57 +571,64 @@ impl<'a, 'alloc> VisitMut<'alloc> for SolidTransformer<'a, 'alloc> {
         }
     }
 
-    fn visit_variable_declarator(&mut self, variable_declarator: &mut VariableDeclarator<'alloc>) {
-        // Check if this is a styled component before doing anything else
-        let should_transform =
-            if let Some(Expression::TaggedTemplateExpression(tagged_template_expression)) =
-                &variable_declarator.init
-                && let Expression::StaticMemberExpression(static_member_expression) =
-                    &tagged_template_expression.tag
-                && let Expression::Identifier(object_identifier) = &static_member_expression.object
-                && object_identifier.name == "styled"
-            {
-                true
-            } else {
-                false
-            };
+    fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
+        if let Expression::TaggedTemplateExpression(tagged_template_expression) = &it
+            && let Expression::CallExpression(call_expression) = &tagged_template_expression.tag
+            && let Expression::Identifier(identifier) = &call_expression.callee
+            && identifier.name == "styled"
+            && call_expression.arguments.len() == 1
+            && let oxc_ast::ast::Argument::Identifier(component_identifier) =
+                &call_expression.arguments[0]
+        {
+            let base_component_name = component_identifier.name.as_str();
 
-        if should_transform {
-            // Extract the necessary information before transforming
-            let jsx_tag =
-                if let Some(Expression::TaggedTemplateExpression(tagged_template_expression)) =
-                    &variable_declarator.init
-                    && let Expression::StaticMemberExpression(static_member_expression) =
-                        &tagged_template_expression.tag
-                {
-                    static_member_expression.property.name.as_str()
-                } else {
-                    ""
-                };
+            let mut modified_tagged_template_expression =
+                tagged_template_expression.clone_in(self.ast_builder.allocator);
+            modified_tagged_template_expression.tag = Expression::Identifier(
+                self.ast_builder
+                    .alloc_identifier_reference(it.span(), self.ast_builder.atom("style")),
+            );
 
-            let component_variable_name = match &variable_declarator.id.kind {
-                BindingPatternKind::BindingIdentifier(binding_identifier) => {
-                    binding_identifier.name.as_str()
-                }
-                _ => {
-                    // Skip non-identifier patterns for now
-                    oxc_ast_visit::walk_mut::walk_variable_declarator(self, variable_declarator);
-                    return;
-                }
-            };
+            *it = Expression::TaggedTemplateExpression(modified_tagged_template_expression);
+            self.transform_styled_component(it, base_component_name);
 
-            self.transform_styled_component(variable_declarator, jsx_tag, component_variable_name);
-        } else {
-            oxc_ast_visit::walk_mut::walk_variable_declarator(self, variable_declarator);
+            return;
         }
+
+        if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
+            && let Expression::StaticMemberExpression(static_member_expression) =
+                &tagged_template_expression.tag
+            && let Expression::Identifier(object_identifier) = &static_member_expression.object
+            && object_identifier.name == "styled"
+        {
+            let jsx_tag = static_member_expression.property.name.as_str();
+            self.transform_styled_component(it, jsx_tag);
+            return;
+        }
+
+        oxc_ast_visit::walk_mut::walk_expression(self, it);
+    }
+
+    fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'alloc>) {
+        let prev = self.variable_name.take();
+        self.variable_name = match &it.id.kind {
+            BindingPatternKind::BindingIdentifier(binding_identifier) => {
+                Some(binding_identifier.name.to_string())
+            }
+            // Skip non-identifier patterns for now
+            _ => None,
+        };
+        oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
+        self.variable_name = prev;
     }
 }
 
 pub fn solid_js_prepass<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
+    filepath: String,
     program: &mut Program<'alloc>,
     skip_jsx: bool,
 ) {
-    let mut transformer = SolidTransformer::new(ast_builder, skip_jsx);
+    let mut transformer = SolidTransformer::new(ast_builder, skip_jsx, filepath);
     transformer.visit_program(program);
 }

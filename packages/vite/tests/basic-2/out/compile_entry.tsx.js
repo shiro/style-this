@@ -19,10 +19,10 @@ a.css = `background: ${foo};`;
 let b = new String("b-r4x6jg");
 b.css = `background: ${foo};`;
 __styleThis_css_aabbbccc.get('/packages/vite/tests/basic-2/entry.tsx.css').resolve([
-`.b-r4x6jg {
-${b.css}
-}`,
 `.a-ole3wx {
 ${a.css}
+}`,
+`.b-r4x6jg {
+${b.css}
 }`
 ].join('\n'));

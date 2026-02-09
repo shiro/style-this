@@ -259,7 +259,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
     #[allow(clippy::type_complexity)]
     pub fn finish(
-        self,
+        mut self,
     ) -> (
         Vec<(String, String)>,
         HashSet<String>,
@@ -272,6 +272,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .into_iter()
             .map(|(_, (module_id, referenced_idents))| (module_id, referenced_idents))
             .collect();
+
+        // since we collected variable names buttom-up we reverse
+        self.css_variable_identifiers.reverse();
 
         (
             self.css_variable_identifiers,
@@ -1486,7 +1489,7 @@ pub async fn evaluate_program<'alloc>(
     }
 
     if solid_prepass {
-        solid_js_prepass(ast_builder, program, false);
+        solid_js_prepass(ast_builder, program_filepath.clone(), program, false);
     }
 
     let cache_ref = &transformer.value_cache_ref;

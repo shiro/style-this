@@ -19,6 +19,7 @@ export const getResolver = async (testDir: string) => {
       {} as Record<string, string>,
     );
   resolver["@style-this/core"] = "";
+  resolver["@style-this/solid"] = "";
   return resolver;
 };
 

@@ -71,28 +71,28 @@ let unrelated = new String("unrelated-h6bsx2");
 unrelated.css = `background: none;
   ${a.foo.css}`;
 __styleThis_css_aabbbccc.get('/packages/vite/tests/correctness-1/entry.tsx.css').resolve([
-`.unrelated-h6bsx2 {
-${unrelated.css}
-}`,
-`.s2-f0l6r0 {
-${s2.css}
-}`,
-`.__styleThis_expression_3-xirstq {
-${__styleThis_expression_3.css}
-}`,
-`.s1-9ebsxi {
-${__styleThis_var_s1_4.css}
-}`,
-`.__styleThis_expression_6-t2j4xy {
-${__styleThis_expression_6.css}
-}`,
-`.b-0hyvwp {
-${b.css}
+`.__styleThis_expression_11-g5yzc1 {
+${__styleThis_expression_11.css}
 }`,
 `.m-t2jk5y {
 ${__styleThis_var_m_7.css}
 }`,
-`.__styleThis_expression_11-g5yzc1 {
-${__styleThis_expression_11.css}
+`.b-0hyvwp {
+${b.css}
+}`,
+`.__styleThis_expression_6-t2j4xy {
+${__styleThis_expression_6.css}
+}`,
+`.s1-9ebsxi {
+${__styleThis_var_s1_4.css}
+}`,
+`.__styleThis_expression_3-xirstq {
+${__styleThis_expression_3.css}
+}`,
+`.s2-f0l6r0 {
+${s2.css}
+}`,
+`.unrelated-h6bsx2 {
+${unrelated.css}
 }`
 ].join('\n'));
