@@ -13,7 +13,7 @@ pkgs.mkShell {
       rust
     ] ++ (with pkgs; [
       nodejs_20
-      nodePackages.pnpm
+      pnpm
     ]);
     nativeBuildInputs = with pkgs; [];
     packages = with pkgs; [
