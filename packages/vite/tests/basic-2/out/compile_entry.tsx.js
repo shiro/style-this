@@ -10,7 +10,7 @@ ${a.css}
 ].join('\n'));
 
 
-// /packages/vite/tests/basic-2/entry.tsx: {"foo", "css", "b", "a"}
+// /packages/vite/tests/basic-2/entry.tsx: {"b", "css", "foo", "a"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let foo = "red";

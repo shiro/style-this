@@ -7,7 +7,7 @@ exported.css = `background: ${color};`;
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] ?? {}), color};
 
-// /packages/vite/tests/multi-1/entry.tsx: {"css", "a", "color"}
+// /packages/vite/tests/multi-1/entry.tsx: {"css", "color", "a"}
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");

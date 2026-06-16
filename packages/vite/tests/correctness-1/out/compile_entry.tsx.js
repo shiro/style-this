@@ -1,4 +1,4 @@
-// /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"__styleThis_expression_2", "__styleThis_expression_1", "foo", "css", "__global__export__"}
+// /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"__styleThis_expression_1", "css", "__styleThis_expression_2", "__global__export__", "foo"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let foo = new String("foo-4hazsh");
@@ -17,7 +17,7 @@ class __global__export__ {
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
-// /packages/vite/tests/correctness-1/entry.tsx: {"s2", "st", "__styleThis_expression_6", "a1", "style", "__styleThis_expression_3", "comp", "__styleThis_expression_11", "unrelated", "css", "color", "b", "mib", "mutate", "a"}
+// /packages/vite/tests/correctness-1/entry.tsx: {"__styleThis_expression_11", "b", "a1", "comp", "mib", "s2", "mutate", "unrelated", "st", "color", "css", "a", "__styleThis_expression_6", "style", "__styleThis_expression_3"}
 "use strict";
 const a = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"];
 const mib = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
