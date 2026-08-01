@@ -9,4 +9,4 @@ import "virtual:style-this:/entry.tsx.css";
 // const someLib = require("../../src/viteTests/edge-cases-library-imports/hi.js");
 // const { getNumber } = someLib;
 // const { getNumber } = require("some_lib/index.js");
-const a = "a-wtyj0x";
+const a = "a-tej8d6";
