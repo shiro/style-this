@@ -12,6 +12,7 @@ import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
 
+console.log("[VITE-PLUGIN-LOADED] @style-this/vite plugin loaded");
 const solidMock = `
 export const template = () => () => {};
 export const spread = () => {};
@@ -185,6 +186,7 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async load(fullId) {
+      console.log(`[NEW-load] Called with: ${fullId}`);
       if (fullId.startsWith(resolvedVirtualModulePrefix)) {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
@@ -228,6 +230,7 @@ const vitePlugin = (options: Options = {}) => {
 
             // Generate source map if we have metadata
             const metadata = cssSourceMapMetadata.get(filepath);
+            console.log(`[load] Has metadata for ${filepath}:`, !!metadata);
             if (metadata) {
               // Ensure source filepath is absolute for proper browser resolution
               const absoluteSourcePath = sourceFilepath.startsWith('/')
@@ -242,11 +245,13 @@ const vitePlugin = (options: Options = {}) => {
                 filepath,
               );
 
-              // Inline the sourcemap as a base64 data URL comment
-              // This ensures it survives through Lightning CSS processing
-              // which would otherwise generate its own sourcemap and lose the original source mapping
+              // Inline the sourcemap as a base64 comment
+              // Lightning CSS will then preserve this in its output
               const base64Map = Buffer.from(JSON.stringify(sourcemap)).toString('base64');
               const cssWithSourceMap = `${resolved}\n/*# sourceMappingURL=data:application/json;base64,${base64Map}*/`;
+
+              console.log(`[load] Returning CSS with inline sourcemap, length: ${cssWithSourceMap.length}`);
+              console.log(`[load] Sourcemap points to:`, sourcemap.sources);
 
               return {
                 code: cssWithSourceMap,

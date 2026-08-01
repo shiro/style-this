@@ -1,28 +1,71 @@
-#!/usr/bin/env nix-shell
-#!nix-shell -i bash
+#!/usr/bin/env bash
+set -e
 
-# Test script to verify CSS source maps are working
+# Kill any existing node processes
+pkill -9 node 2>/dev/null || true
+sleep 1
 
-cd examples/vite-solid
-
-# Start dev server in background
 echo "Starting dev server..."
-pnpm vinxi dev > /tmp/dev-server.log 2>&1 &
-DEV_PID=$!
+nix-shell --run "zsh -ic 'cd /home/shiro/project/style-this/examples/vite-solid && web dev'" > /tmp/vite-server.log 2>&1 &
+SERVER_PID=$!
 
-# Wait for server to start
-echo "Waiting 5 seconds for server to start..."
-sleep 5
-
-# Fetch page and output head section
-echo "Fetching page and showing <head> section:"
-echo "---"
-curl -s http://localhost:3000 | sed -n '1,/<\/head>/p'
-
-# Clean up
-kill $DEV_PID 2>/dev/null
-wait $DEV_PID 2>/dev/null
+echo "Waiting for server to be ready..."
+for i in {1..30}; do
+  if curl -s http://localhost:3000/ > /dev/null 2>&1; then
+    echo "Server is ready after $i seconds!"
+    sleep 2  # Extra time for module graph to be ready
+    break
+  fi
+  echo "  Waiting... ($i/30)"
+  sleep 1
+done
 
 echo ""
-echo "---"
-echo "Dev server stopped"
+echo "=== Initial SSR HTML (up to </head>) ==="
+curl -s http://localhost:3000/ | awk '/<\/head>/{print; exit} {print}'
+
+echo ""
+echo "=== Client-side CSS module source map (from /@id/__x00__...) ==="
+curl -s 'http://localhost:3000/@id/__x00__virtual:style-this:/home/shiro/project/style-this/examples/vite-solid/src/Counter.tsx.css' 2>/dev/null | grep -o 'sourceMappingURL=data:application/json;base64,[^"]*' | sed 's/.*base64,//' | base64 -d 2>/dev/null | python3 -c "
+import sys, json
+try:
+    m = json.load(sys.stdin)
+    print('Sources:', m['sources'])
+    if '.tsx' in str(m['sources']) and '.tsx.css' not in str(m['sources']):
+        print('✓ Sourcemaps point to .tsx files!')
+    else:
+        print('✗ Sourcemaps still point to virtual .css files')
+except:
+    print('✗ No sourcemap found or parse error')
+"
+
+echo ""
+echo "=== After-hydration HTML (up to </head>) ==="
+HYDRATED_HTML=$(chromium --headless --disable-gpu --dump-dom 'http://localhost:3000/' 2>/dev/null)
+echo "$HYDRATED_HTML" | awk '/<\/head>/{print; exit} {print}'
+
+echo ""
+echo "=== First injected sourcemap from hydrated HTML ==="
+FIRST_SOURCEMAP=$(echo "$HYDRATED_HTML" | grep -o 'sourceMappingURL=data:application/json;base64,[^"]*' | head -1 | sed 's/.*base64,//')
+if [ -n "$FIRST_SOURCEMAP" ]; then
+  echo "$FIRST_SOURCEMAP" | base64 -d 2>/dev/null | python3 -c "
+import sys, json
+try:
+    m = json.load(sys.stdin)
+    print('Sources:', m['sources'])
+    if '.tsx' in str(m['sources']) and '.tsx.css' not in str(m['sources']):
+        print('✓ Sourcemaps point to .tsx files!')
+    else:
+        print('✗ Sourcemaps still point to virtual .css files')
+except:
+    print('✗ No sourcemap found or parse error')
+"
+else
+  echo "✗ No sourcemap found in hydrated HTML"
+fi
+
+echo ""
+echo "Cleaning up..."
+pkill -9 node 2>/dev/null || true
+
+echo "Done."

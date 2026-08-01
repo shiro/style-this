@@ -43,11 +43,9 @@ export default defineConfig({
         ),
       },
       css: { 
-        transformer: "lightningcss",
-        devSourcemap: true, // Enable dev source maps
-        lightningcss: {
-          sourceMap: true, // Tell lightningcss to preserve/chain source maps
-        },
+        // Disable Lightning CSS transformer to test sourcemaps
+        // transformer: "lightningcss",
+        devSourcemap: true,
       },
       plugins: [styleThisVitePlugin({ filter: /.*\.tsx/ })],
     };
