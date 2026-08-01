@@ -32,10 +32,11 @@ pub struct VisitorTransformer<'a, 'alloc> {
 
     style_function_name: Option<String>,
     css_function_name: Option<String>,
+    extra_class_function_name: Option<String>,
 
     store: String,
     referenced_idents: Vec<HashSet<String>>,
-    css_variable_identifiers: Vec<(String, String)>,
+    css_variable_identifiers: Vec<(String, String, Vec<String>)>,
     style_variable_identifiers: HashSet<String>,
     exported_idents: HashSet<String>,
     scope_depth: u32,
@@ -70,6 +71,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         value_cache: &'a mut HashSet<String>,
         css_function_name: Option<String>,
         style_function_name: Option<String>,
+        extra_class_function_name: Option<String>,
     ) -> Self {
         Self {
             ast_builder,
@@ -82,6 +84,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
             css_function_name,
             style_function_name,
+            extra_class_function_name,
 
             store: store.to_string(),
             referenced_idents: vec![referenced_idents],
@@ -111,7 +114,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     pub fn finish(
         mut self,
     ) -> (
-        Vec<(String, String)>,
+        Vec<(String, String, Vec<String>)>,
         HashSet<String>,
         HashMap<String, HashSet<String>>,
         HashSet<String>,
@@ -423,19 +426,86 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         it: &TaggedTemplateExpression<'alloc>,
         variable_name: &str,
         class_name: &str,
+        extra_classes: Vec<String>,
     ) {
         let span = it.span;
 
         self.css_variable_identifiers
-            .push((variable_name.to_string(), class_name.to_string()));
+            .push((variable_name.to_string(), class_name.to_string(), extra_classes));
 
-        let mut quasis = it.quasi.quasis.clone_in(self.allocator);
-        utils::trim_newlines(self.ast_builder, &mut quasis);
+        // Filter out extraClass calls from expressions and adjust quasis accordingly
+        let mut new_quasis = oxc_allocator::Vec::new_in(self.allocator);
+        let mut new_expressions = oxc_allocator::Vec::new_in(self.allocator);
+        
+        let extra_class_name = self.extra_class_function_name.as_deref();
+        let mut quasi_iter = it.quasi.quasis.iter();
+        
+        // First quasi always exists
+        if let Some(first_quasi) = quasi_iter.next() {
+            let mut current_quasi_raw = first_quasi.value.raw.as_str();
+            let mut current_span = first_quasi.span;
+            let mut current_tail = first_quasi.tail;
+            
+            for expr in it.quasi.expressions.iter() {
+                let is_extra_class = if let Some(name) = extra_class_name {
+                    if let Expression::CallExpression(call) = expr {
+                        if let Expression::Identifier(ident) = &call.callee {
+                            ident.name.as_str() == name
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                
+                let next_quasi = quasi_iter.next().unwrap();
+                
+                if is_extra_class {
+                    // Merge this quasi with the next one
+                    let merged_value = format!("{}{}", current_quasi_raw, next_quasi.value.raw);
+                    current_quasi_raw = self.allocator.alloc_str(&merged_value);
+                    current_tail = next_quasi.tail;
+                } else {
+                    // Keep the expression and add current quasi
+                    let value = oxc_ast::ast::TemplateElementValue {
+                        raw: self.ast_builder.atom(current_quasi_raw),
+                        cooked: Some(self.ast_builder.atom(current_quasi_raw)),
+                    };
+                    new_quasis.push(oxc_ast::ast::TemplateElement {
+                        span: current_span,
+                        tail: current_tail,
+                        value,
+                        lone_surrogates: false,
+                    });
+                    new_expressions.push(expr.clone_in(self.allocator));
+                    current_quasi_raw = next_quasi.value.raw.as_str();
+                    current_span = next_quasi.span;
+                    current_tail = next_quasi.tail;
+                }
+            }
+            
+            // Add the final quasi
+            let value = oxc_ast::ast::TemplateElementValue {
+                raw: self.ast_builder.atom(current_quasi_raw),
+                cooked: Some(self.ast_builder.atom(current_quasi_raw)),
+            };
+            new_quasis.push(oxc_ast::ast::TemplateElement {
+                span: current_span,
+                tail: current_tail,
+                value,
+                lone_surrogates: false,
+            });
+        }
+
+        utils::trim_newlines(self.ast_builder, &mut new_quasis);
 
         let mut right = self.ast_builder.expression_template_literal(
             span,
-            quasis,
-            it.quasi.expressions.clone_in(self.allocator),
+            new_quasis,
+            new_expressions,
         );
 
         replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
@@ -458,6 +528,34 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .unwrap()
             .push(stmt);
     }
+
+    /// extracts extraClass("a b c") calls from template expressions
+    fn extract_extra_classes(&self, it: &TaggedTemplateExpression<'alloc>) -> Vec<String> {
+        let mut extra_classes = Vec::new();
+        
+        if let Some(extra_class_name) = &self.extra_class_function_name {
+            for expr in &it.quasi.expressions {
+                if let Expression::CallExpression(call) = expr {
+                    if let Expression::Identifier(ident) = &call.callee {
+                        if ident.name.as_str() == extra_class_name {
+                            // Extract string arguments
+                            for arg in &call.arguments {
+                                if let oxc_ast::ast::Argument::StringLiteral(str_lit) = arg {
+                                    // Split by whitespace and collect class names
+                                    for class in str_lit.value.split_whitespace() {
+                                        extra_classes.push(class.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        extra_classes
+    }
+
 
     fn alias_binding_pattern(&self, pattern: &mut BindingPatternKind<'alloc>) {
         match pattern {
@@ -633,18 +731,25 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             match tag {
                 tag if Some(tag) == self.css_function_name.as_deref() => {
                     let class_name = self.create_virtual_css_template(variable_name);
+                    let extra_classes = self.extract_extra_classes(template);
+                    
+                    // Build the full class list including generated class and extra classes
+                    let mut full_class_list = vec![class_name.clone()];
+                    full_class_list.extend(extra_classes.clone());
+                    let full_class_string = full_class_list.join(" ");
 
                     self.insert_into_virtual_program_css(
                         template,
                         &resolved_variable_name,
                         &class_name,
+                        extra_classes,
                     );
 
                     let variable_declarator = ast::build_variable_declarator(
                         self.ast_builder,
                         span,
                         &resolved_variable_name,
-                        ast::build_decorated_string(self.ast_builder, span, &class_name),
+                        ast::build_decorated_string(self.ast_builder, span, &full_class_string),
                     );
 
                     self.insert_into_virtual_program(
@@ -660,7 +765,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         )),
                     );
 
-                    *it = ast::build_string(self.ast_builder, span, &class_name);
+                    *it = ast::build_string(self.ast_builder, span, &full_class_string);
                 }
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
@@ -759,18 +864,25 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             match tag {
                 tag if Some(tag) == self.css_function_name.as_deref() => {
                     let class_name = self.create_virtual_css_template(variable_name);
+                    let extra_classes = self.extract_extra_classes(template);
+                    
+                    // Build the full class list including generated class and extra classes
+                    let mut full_class_list = vec![class_name.clone()];
+                    full_class_list.extend(extra_classes.clone());
+                    let full_class_string = full_class_list.join(" ");
 
                     let variable_declarator = ast::build_variable_declarator(
                         self.ast_builder,
                         span,
                         &resolved_variable_name,
-                        ast::build_decorated_string(self.ast_builder, span, &class_name),
+                        ast::build_decorated_string(self.ast_builder, span, &full_class_string),
                     );
 
                     self.insert_into_virtual_program_css(
                         template,
                         &resolved_variable_name,
                         &class_name,
+                        extra_classes,
                     );
 
                     self.insert_into_virtual_program(
@@ -786,7 +898,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         )),
                     );
 
-                    *init = ast::build_string(self.ast_builder, span, &class_name);
+                    *init = ast::build_string(self.ast_builder, span, &full_class_string);
                 }
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);

@@ -1,4 +1,4 @@
-import { css } from "@style-this/core";
+import { css, extraClass } from "@style-this/core";
 import { styled } from "@style-this/solid";
 import { Component } from "solid-js";
 
@@ -32,6 +32,7 @@ export const CounterStyle = css`
   border: 1px solid blue;
   border-radius: ${spacing / 2}px;
   background: white;
+  ${extraClass("something")}
 `;
 
 export const FancyButton = styled.button<{ a: number }>`

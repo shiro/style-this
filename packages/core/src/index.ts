@@ -23,3 +23,9 @@ export const style = (
   }
   return res;
 };
+
+export const extraClass = (..._classes: string[]): string => {
+  throw new Error(
+    "@style-this: called 'extraClass' at runtime. This indicates an error in the transform.",
+  );
+};

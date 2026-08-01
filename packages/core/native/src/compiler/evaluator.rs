@@ -80,6 +80,7 @@ pub async fn evaluate_program<'alloc>(
     let mut react_prepass_enabled = false;
     let mut style_function_name = None;
     let mut css_function_name = None;
+    let mut extra_class_function_name = None;
 
     for stmt in &program.body {
         let Statement::ImportDeclaration(import_decl) = stmt else {
@@ -104,6 +105,11 @@ pub async fn evaluate_program<'alloc>(
                             if spec.imported.name() == "style" =>
                         {
                             style_function_name = Some(spec.local.name.to_string());
+                        }
+                        oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec)
+                            if spec.imported.name() == "extraClass" =>
+                        {
+                            extra_class_function_name = Some(spec.local.name.to_string());
                         }
                         _ => {
                             continue;
@@ -166,6 +172,7 @@ pub async fn evaluate_program<'alloc>(
         &mut value_cache,
         css_function_name,
         style_function_name,
+        extra_class_function_name,
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
@@ -620,7 +627,7 @@ pub async fn evaluate_program<'alloc>(
     if entrypoint && has_css {
         let css = css_variable_identifiers
             .into_iter()
-            .map(|(variable_name, class_name)| {
+            .map(|(variable_name, class_name, _extra_classes)| {
                 if class_name.starts_with("_Global") {
                     return format!("`${{{variable_name}.css}}\n`");
                 }

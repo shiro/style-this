@@ -1,12 +1,12 @@
-// /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"__global__export__", "foo", "css", "__styleThis_expression_1", "__styleThis_expression_2"}
+// /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"__styleThis_expression_2", "__styleThis_expression_1", "foo", "css", "__global__export__"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let foo = new String("foo-l6j05a");
+let foo = new String("foo-4hazsh");
 foo.css = `color: white;`;
-let __styleThis_expression_2 = new String("__styleThis_expression_2-wduf4d");
+let __styleThis_expression_2 = new String("__styleThis_expression_2-s5qr4d");
 __styleThis_expression_2.css = `color: hotpink;
   `;
-let __styleThis_expression_1 = new String("__styleThis_expression_1-gp6rwx");
+let __styleThis_expression_1 = new String("__styleThis_expression_1-hezg16");
 __styleThis_expression_1.css = `color: green;
     `;
 class __global__export__ {
@@ -17,13 +17,13 @@ class __global__export__ {
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
-// /packages/vite/tests/correctness-1/entry.tsx: {"__styleThis_expression_3", "unrelated", "style", "s2", "comp", "mib", "__styleThis_expression_11", "b", "mutate", "a", "color", "__styleThis_expression_6", "a1", "css", "st"}
+// /packages/vite/tests/correctness-1/entry.tsx: {"s2", "st", "__styleThis_expression_6", "a1", "style", "__styleThis_expression_3", "comp", "__styleThis_expression_11", "unrelated", "css", "color", "b", "mib", "mutate", "a"}
 "use strict";
 const a = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"];
 const mib = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
 let { css } = require("/packages/core/dist/index.mjs");
 let mutate = (v) => v;
-let __styleThis_expression_11 = new String("__styleThis_expression_11-abwhir");
+let __styleThis_expression_11 = new String("__styleThis_expression_11-g5yzc1");
 __styleThis_expression_11.css = `a`;
 let __styleThis_var_a2_9 = () => {
 	const a3 = () => {
@@ -32,7 +32,7 @@ let __styleThis_var_a2_9 = () => {
 	return [0];
 };
 let __styleThis_var_wi_8 = __styleThis_var_a2_9();
-let __styleThis_var_m_7 = new String("m-9ib41m");
+let __styleThis_var_m_7 = new String("m-t2jk5y");
 __styleThis_var_m_7.css = `${__styleThis_var_wi_8}
   `;
 let a1 = () => {
@@ -40,16 +40,16 @@ let a1 = () => {
 	const wi = __styleThis_var_wi_8;
 	const m = __styleThis_var_m_7;
 };
-let b = new String("b-aj4l6b");
+let b = new String("b-0hyvwp");
 b.css = `${a1}`;
-let __styleThis_expression_6 = new String("__styleThis_expression_6-irk5mb");
+let __styleThis_expression_6 = new String("__styleThis_expression_6-t2j4xy");
 __styleThis_expression_6.css = `background: blue;
     `;
 let __styleThis_var_c_5 = () => __styleThis_expression_6;
-let __styleThis_var_s1_4 = new String("s1-gta3sx");
+let __styleThis_var_s1_4 = new String("s1-9ebsxi");
 __styleThis_var_s1_4.css = `${__styleThis_var_c_5().css}
     `;
-let __styleThis_expression_3 = new String("__styleThis_expression_3-q74xyr");
+let __styleThis_expression_3 = new String("__styleThis_expression_3-xirstq");
 __styleThis_expression_3.css = ``;
 let comp = () => {
 ("foob");
@@ -64,35 +64,35 @@ let __styleThis_expression_1 = { color: "blue" };
 let { color } = __styleThis_expression_1;
 let st = `color: ${color};
   ${mib.foo().css}`;
-let s2 = new String("s2-3ctqjk");
+let s2 = new String("s2-f0l6r0");
 s2.css = `${st}
   ${comp().css}`;
-let unrelated = new String("unrelated-5y7cxe");
+let unrelated = new String("unrelated-h6bsx2");
 unrelated.css = `background: none;
   ${a.foo.css}`;
 __styleThis_css_aabbbccc.get('/packages/vite/tests/correctness-1/entry.tsx.css').resolve([
-`.__styleThis_expression_11-abwhir {
+`.__styleThis_expression_11-g5yzc1 {
 ${__styleThis_expression_11.css}
 }`,
-`.m-9ib41m {
+`.m-t2jk5y {
 ${__styleThis_var_m_7.css}
 }`,
-`.b-aj4l6b {
+`.b-0hyvwp {
 ${b.css}
 }`,
-`.__styleThis_expression_6-irk5mb {
+`.__styleThis_expression_6-t2j4xy {
 ${__styleThis_expression_6.css}
 }`,
-`.s1-gta3sx {
+`.s1-9ebsxi {
 ${__styleThis_var_s1_4.css}
 }`,
-`.__styleThis_expression_3-q74xyr {
+`.__styleThis_expression_3-xirstq {
 ${__styleThis_expression_3.css}
 }`,
-`.s2-3ctqjk {
+`.s2-f0l6r0 {
 ${s2.css}
 }`,
-`.unrelated-5y7cxe {
+`.unrelated-h6bsx2 {
 ${unrelated.css}
 }`
 ].join('\n'));
