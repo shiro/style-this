@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { css } from "@style-this/core";
 import { getNumber } from "some_lib";
 import "virtual:style-this:/entry.tsx.css";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
 import "virtual:style-this:/entry.tsx.css";

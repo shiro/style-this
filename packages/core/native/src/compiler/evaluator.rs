@@ -4,9 +4,10 @@ use super::transformer::Transformer;
 use super::types::ExportedJSValue;
 use super::visitor::VisitorTransformer;
 use crate::error_mapping;
+use crate::react::react_prepass;
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{self, transpile_ts_to_js};
-use crate::{LIBRARY_CORE_IMPORT_NAME, LIBRARY_SOLID_JS_IMPORT_NAME, PREFIX};
+use crate::{LIBRARY_CORE_IMPORT_NAME, LIBRARY_REACT_IMPORT_NAME, LIBRARY_SOLID_JS_IMPORT_NAME, PREFIX};
 use futures::lock::Mutex as FutureMutex;
 use indoc::formatdoc;
 use oxc_allocator::{Allocator, CloneIn};
@@ -76,6 +77,7 @@ pub async fn evaluate_program<'alloc>(
     // find "css" import or quit early if entrypoint
     let mut return_early = entrypoint;
     let mut solid_prepass = false;
+    let mut react_prepass_enabled = false;
     let mut style_function_name = None;
     let mut css_function_name = None;
 
@@ -118,6 +120,15 @@ pub async fn evaluate_program<'alloc>(
                         return_early = false;
                     }
                 }
+                LIBRARY_REACT_IMPORT_NAME => {
+                    react_prepass_enabled = true;
+                    if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
+                        specifier
+                        && spec.local.name == "styled"
+                    {
+                        return_early = false;
+                    }
+                }
                 _ => continue,
             }
         }
@@ -133,6 +144,10 @@ pub async fn evaluate_program<'alloc>(
 
     if solid_prepass {
         solid_js_prepass(ast_builder, program_filepath.clone(), program, false);
+    }
+
+    if react_prepass_enabled {
+        react_prepass(ast_builder, program_filepath.clone(), program, false);
     }
 
     let cache_ref = &transformer.value_cache_ref;
@@ -202,7 +217,7 @@ pub async fn evaluate_program<'alloc>(
         js_sys::Reflect::set(
             &result,
             &JsValue::from_str("code"),
-            &JsValue::from_str(&output_js.code),
+            &JsValue::from_str(&format!("// @ts-nocheck\n{}", output_js.code)),
         )
         .unwrap();
         js_sys::Reflect::set(

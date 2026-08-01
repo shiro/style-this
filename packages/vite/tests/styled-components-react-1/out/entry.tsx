@@ -1,11 +1,11 @@
 // @ts-nocheck
-import { styled } from "@style-this/solid";
+import { styled } from "@style-this/react";
 import { css } from "@style-this/core";
 import "virtual:style-this:/entry.tsx.css";
 export const FancyButton = (() => {
-	let FancyButton = "FancyButton-3slijs";
-	let comp = (props) => <button {...props} class={FancyButton + (" " + (props.class ?? ""))} style={{
-		"--var1-c5iro5": (({ a }) => a)({
+	let FancyButton = "FancyButton-b05mnk";
+	let comp = (props) => <button {...props} className={FancyButton + (" " + (props.className ?? ""))} style={{
+		"--var1-2nwhuj": (({ a }) => a)({
 			...props.styleProps,
 			"props": props
 		}),
@@ -14,4 +14,4 @@ export const FancyButton = (() => {
 	comp.toString = () => FancyButton;
 	return comp;
 })();
-const unrelated = "unrelated-96jgdy";
+const unrelated = "unrelated-hqnklm";

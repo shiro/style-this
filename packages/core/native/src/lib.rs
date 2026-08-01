@@ -32,10 +32,13 @@ use oxc_span::Span;
 mod ast;
 mod compiler;
 mod error_mapping;
+mod react;
 mod solid_js;
+mod styled_component_transformer;
 
 const PREFIX: &str = "__styleThis";
 const LIBRARY_CORE_IMPORT_NAME: &str = "@style-this/core";
+const LIBRARY_REACT_IMPORT_NAME: &str = "@style-this/react";
 const LIBRARY_SOLID_JS_IMPORT_NAME: &str = "@style-this/solid";
 
 pub use compiler::Transformer;
