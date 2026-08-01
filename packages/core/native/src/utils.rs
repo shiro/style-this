@@ -489,8 +489,11 @@ pub fn replace_in_expression_using_spans<'alloc>(
 
     t.visit_expression(expression);
 
-    t.ast_builder = None;
-    t.replacement_points = None;
+    #[allow(unused_assignments)]
+    {
+        t.ast_builder = None;
+        t.replacement_points = None;
+    }
 }
 
 pub fn replace_in_statement_using_spans<'alloc>(
@@ -512,8 +515,11 @@ pub fn replace_in_statement_using_spans<'alloc>(
 
     t.visit_statement(statement);
 
-    t.ast_builder = None;
-    t.replacement_points = None;
+    #[allow(unused_assignments)]
+    {
+        t.ast_builder = None;
+        t.replacement_points = None;
+    }
 }
 
 pub fn replace_in_class_body_using_spans<'alloc>(
@@ -535,8 +541,11 @@ pub fn replace_in_class_body_using_spans<'alloc>(
 
     t.visit_class_body(class_body);
 
-    t.ast_builder = None;
-    t.replacement_points = None;
+    #[allow(unused_assignments)]
+    {
+        t.ast_builder = None;
+        t.replacement_points = None;
+    }
 }
 
 impl<'a, 'alloc> VisitMut<'alloc> for SpanReplacer<'a, 'alloc> {
@@ -583,8 +592,11 @@ pub fn replace_in_expression_using_identifiers<'alloc, F>(
 
     t.visit_expression(expression);
 
-    t.ast_builder = None;
-    t.get_replacement = None;
+    #[allow(unused_assignments)]
+    {
+        t.ast_builder = None;
+        t.get_replacement = None;
+    }
 }
 
 impl<'a, 'alloc, F> VisitMut<'alloc> for IdentifierReplacer<'a, 'alloc, F>

@@ -69,6 +69,7 @@ pub fn build_identifier<'alloc>(
     Expression::Identifier(ast_builder.alloc_identifier_reference(span, ast_builder.atom(name)))
 }
 
+#[allow(dead_code)]
 pub fn build_assignment<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     span: Span,
