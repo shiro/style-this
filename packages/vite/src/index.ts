@@ -185,7 +185,6 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async load(fullId) {
-      console.log(`[style-this load hook] Called with: ${fullId}`);
       if (fullId.startsWith(resolvedVirtualModulePrefix)) {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
@@ -229,34 +228,28 @@ const vitePlugin = (options: Options = {}) => {
 
             // Generate source map if we have metadata
             const metadata = cssSourceMapMetadata.get(filepath);
-            console.log(`[style-this] Loading CSS for ${filepath}, has metadata: ${!!metadata}`);
-            console.log(`[style-this] sourceFilepath: ${sourceFilepath}`);
             if (metadata) {
-              console.log(`[style-this] Generating source map with ${metadata.sourcemapData.length} entries`);
+              // Ensure source filepath is absolute for proper browser resolution
+              const absoluteSourcePath = sourceFilepath.startsWith('/')
+                ? sourceFilepath
+                : `/${sourceFilepath}`;
+              
               const sourcemap = generateCssSourceMap(
                 resolved,
                 metadata.sourcemapData,
-                sourceFilepath,
+                absoluteSourcePath,
                 metadata.originalSource,
-                filepath, // Generated file path for the 'file' property
+                filepath,
               );
 
-              console.log(`[style-this] Source map structure:`, {
-                version: sourcemap.version,
-                file: sourcemap.file,
-                sources: sourcemap.sources,
-                hasSourcesContent: !!sourcemap.sourcesContent?.length,
-                mappingsLength: sourcemap.mappings.length,
-              });
-              
-              console.log(`[style-this] CSS (first 200 chars):`);
-              console.log(resolved.substring(0, 200));
+              // Inline the sourcemap as a base64 data URL comment
+              // This ensures it survives through Lightning CSS processing
+              // which would otherwise generate its own sourcemap and lose the original source mapping
+              const base64Map = Buffer.from(JSON.stringify(sourcemap)).toString('base64');
+              const cssWithSourceMap = `${resolved}\n/*# sourceMappingURL=data:application/json;base64,${base64Map}*/`;
 
-              // Return the CSS without embedding the source map
-              // Vite will handle source map chaining
               return {
-                code: resolved,
-                map: sourcemap,
+                code: cssWithSourceMap,
               };
             }
 
@@ -340,7 +333,6 @@ const vitePlugin = (options: Options = {}) => {
                 sourcemapData &&
                 filepath
               ) {
-                console.log(`[style-this] Storing source map metadata for ${filepath}, entries: ${sourcemapData.length}`);
                 cssSourceMapMetadata.set(filepath, {
                   sourcemapData,
                   originalSource: code,
