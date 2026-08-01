@@ -9,7 +9,7 @@ export default defineConfig({
     styleThisVitePlugin({ filter: /.*\.tsx/ })
   ],
   server: {
-    port: 3001,
+    port: 3000,
   },
   build: {
     sourcemap: true,

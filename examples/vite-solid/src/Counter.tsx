@@ -10,9 +10,9 @@ const Counter: Component = (p) => {
       {count}
 
       <FancyButton2
-        disabled
         styleProps={{ a: 8, b: 16 }}
         onClick={() => ++count}
+        disabled={count >= 3}
       >
         count me
       </FancyButton2>
@@ -31,6 +31,7 @@ export const CounterStyle = css`
   padding: ${spacing}px;
   border: 1px solid blue;
   border-radius: ${spacing / 2}px;
+  background: white;
 `;
 
 export const FancyButton = styled.button<{ a: number }>`
@@ -40,9 +41,10 @@ export const FancyButton = styled.button<{ a: number }>`
   padding: ${({ a }) => `${a}px`};
 `;
 
-export const FancyButton2 = styled(FancyButton)<{ b: number }>`
+export const FancyButton2 = styled(FancyButton) <{ b: number }>`
   margin: ${({ b }) => `${b}px`};
   min-height: ${({ b }) => `${b}px`};
+  cursor: pointer;
 
   background: ${({ props }) => (props.disabled ? "red" : "green")};
 `;
