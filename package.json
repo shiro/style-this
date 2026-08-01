@@ -10,10 +10,10 @@
     "dev": "pnpm build:dev --watch",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
-    "test": "pnpm -r test",
+    "test": "vitest run",
     "change:new": "pnpm changeset",
     "change:save": "pnpm changeset version && pnpm install",
-    "test:watch": "pnpm -r test:watch"
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.0",
