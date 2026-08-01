@@ -625,24 +625,41 @@ pub async fn evaluate_program<'alloc>(
     let has_css = !css_variable_identifiers.is_empty();
 
     if entrypoint && has_css {
+        // Build source map metadata for JavaScript
+        let sourcemap_data = css_variable_identifiers
+            .iter()
+            .map(|css_var| {
+                let line = css_var.span.start;
+                let end_line = css_var.span.end;
+                format!(
+                    "{{className:'{}',start:{},end:{}}}",
+                    css_var.class_name.replace('\'', "\\'"),
+                    line,
+                    end_line
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+
         let css = css_variable_identifiers
             .into_iter()
-            .map(|(variable_name, class_name, _extra_classes)| {
-                if class_name.starts_with("_Global") {
-                    return format!("`${{{variable_name}.css}}\n`");
+            .map(|css_var| {
+                if css_var.class_name.starts_with("_Global") {
+                    return format!("`${{{}.css}}\n`", css_var.variable_name);
                 }
                 if transformer.wrap_selectors_with_global {
-                    return format!("`:global(.{class_name}) {{\n${{{variable_name}.css}}\n}}`");
+                    return format!("`:global(.{}) {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name);
                 }
 
-                format!("`.{class_name} {{\n${{{variable_name}.css}}\n}}`")
+                format!("`.{} {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name)
             })
             .collect::<Vec<_>>()
             .join(",\n");
 
         eval_program_js.push_str(&formatdoc!(
             "
-            global.{css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'));
+            const cssSourcemapData = [{sourcemap_data}];
+            global.{css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'), cssSourcemapData, {css_filepath});
             ",
         ));
     }

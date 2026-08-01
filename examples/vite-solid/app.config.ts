@@ -30,7 +30,10 @@ export default defineConfig({
         port: 3000,
         warmup: { clientFiles: ["./src/app.tsx"] },
       },
-      build: { sourcemap: true },
+      build: { 
+        sourcemap: true,
+        cssMinify: "lightningcss",
+      },
       resolve: {
         alias: Object.fromEntries(
           Object.entries(tsconfig.compilerOptions.paths).map(([key, value]) => [
@@ -39,7 +42,13 @@ export default defineConfig({
           ]),
         ),
       },
-      css: { transformer: "lightningcss" },
+      css: { 
+        transformer: "lightningcss",
+        devSourcemap: true, // Enable dev source maps
+        lightningcss: {
+          sourceMap: true, // Tell lightningcss to preserve/chain source maps
+        },
+      },
       plugins: [styleThisVitePlugin({ filter: /.*\.tsx/ })],
     };
   },

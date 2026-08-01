@@ -1,5 +1,6 @@
 mod cache;
 mod compiler;
+mod css_sourcemap;
 mod error;
 mod evaluator;
 mod transformer;

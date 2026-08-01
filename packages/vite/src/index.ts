@@ -5,7 +5,9 @@ import {
   Transformer,
   initializeStyleThis,
   CssCachEntry,
+  CssSourceMapData,
 } from "@style-this/core/compiler";
+import { generateCssSourceMap } from "@style-this/core/cssSourceMap";
 import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
@@ -70,6 +72,12 @@ const vitePlugin = (options: Options = {}) => {
     global.__styleThis_cssCache = new Map<string, CssCachEntry>();
   }
   const cssCache = global.__styleThis_cssCache;
+
+  // Store source map metadata alongside CSS cache
+  const cssSourceMapMetadata = new Map<
+    string,
+    { sourcemapData: CssSourceMapData; originalSource: string }
+  >();
 
   if (!global.__styleThis_valueCache) {
     global.__styleThis_valueCache = {};
@@ -177,6 +185,7 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async load(fullId) {
+      console.log(`[style-this load hook] Called with: ${fullId}`);
       if (fullId.startsWith(resolvedVirtualModulePrefix)) {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
@@ -195,8 +204,8 @@ const vitePlugin = (options: Options = {}) => {
 
         // tell Vite that this virtual CSS module depends on the source file
         // remove the css extension to get the original source file path
-        const sourceFilepath = filepath.endsWith(cssExtension)
-          ? filepath.slice(0, -cssExtension.length)
+        const sourceFilepath = filepath.endsWith(`.${cssExtension}`)
+          ? filepath.slice(0, -(cssExtension.length + 1))
           : filepath;
         this.addWatchFile(sourceFilepath);
 
@@ -213,7 +222,48 @@ const vitePlugin = (options: Options = {}) => {
             if (resolved instanceof Error)
               handleTransformError(id, entry.code, resolved);
 
-            return resolved;
+            // Ensure resolved is a string
+            if (typeof resolved !== "string") {
+              throw new Error(`Unexpected CSS resolution type: ${typeof resolved}`);
+            }
+
+            // Generate source map if we have metadata
+            const metadata = cssSourceMapMetadata.get(filepath);
+            console.log(`[style-this] Loading CSS for ${filepath}, has metadata: ${!!metadata}`);
+            console.log(`[style-this] sourceFilepath: ${sourceFilepath}`);
+            if (metadata) {
+              console.log(`[style-this] Generating source map with ${metadata.sourcemapData.length} entries`);
+              const sourcemap = generateCssSourceMap(
+                resolved,
+                metadata.sourcemapData,
+                sourceFilepath,
+                metadata.originalSource,
+                filepath, // Generated file path for the 'file' property
+              );
+
+              console.log(`[style-this] Source map structure:`, {
+                version: sourcemap.version,
+                file: sourcemap.file,
+                sources: sourcemap.sources,
+                hasSourcesContent: !!sourcemap.sourcesContent?.length,
+                mappingsLength: sourcemap.mappings.length,
+              });
+              
+              console.log(`[style-this] CSS (first 200 chars):`);
+              console.log(resolved.substring(0, 200));
+
+              // Return the CSS without embedding the source map
+              // Vite will handle source map chaining
+              return {
+                code: resolved,
+                map: sourcemap,
+              };
+            }
+
+            // Return without source map if no metadata
+            return {
+              code: resolved,
+            };
           } catch (error) {
             if (error == TIMEOUT) {
               time += TIMEOUT_DURATION;
@@ -235,6 +285,7 @@ const vitePlugin = (options: Options = {}) => {
       valueCache[ctx.file] = {};
       const cssFilepath = `${ctx.file}.${cssExtension}`;
       cssCache.delete(cssFilepath);
+      cssSourceMapMetadata.delete(cssFilepath);
 
       // invalidate all modules that import this one
       const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
@@ -278,7 +329,25 @@ const vitePlugin = (options: Options = {}) => {
         if (!skipCssEval) {
           let resolve: CssCachEntry["resolve"] | undefined;
           const entry = new Promise((_resolve, _reject) => {
-            resolve = _resolve;
+            resolve = (
+              css: string | Error,
+              sourcemapData?: CssSourceMapData,
+              filepath?: string,
+            ) => {
+              // Store source map metadata if provided
+              if (
+                !(css instanceof Error) &&
+                sourcemapData &&
+                filepath
+              ) {
+                console.log(`[style-this] Storing source map metadata for ${filepath}, entries: ${sourcemapData.length}`);
+                cssSourceMapMetadata.set(filepath, {
+                  sourcemapData,
+                  originalSource: code,
+                });
+              }
+              _resolve(css);
+            };
           }) as CssCachEntry;
           entry.resolve = resolve!;
           entry.code = code;

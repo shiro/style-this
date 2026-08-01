@@ -4,7 +4,8 @@
   "description": "CSS-in-JS library for the modern web - core module",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src/cssSourceMap.ts"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -16,6 +17,11 @@
       "types": "./dist/compiler.d.cts",
       "import": "./dist/compiler.cjs",
       "default": "./dist/compiler.cjs"
+    },
+    "./cssSourceMap": {
+      "types": "./src/cssSourceMap.ts",
+      "import": "./src/cssSourceMap.ts",
+      "default": "./src/cssSourceMap.ts"
     },
     "./package.json": "./package.json"
   },

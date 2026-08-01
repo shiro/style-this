@@ -72,6 +72,35 @@ impl<'alloc> VirtualProgramInsert<'alloc> {
     }
 }
 
+/// Represents a CSS variable identifier with its associated metadata
+#[derive(Debug, Clone)]
+pub struct CssVariableIdentifier {
+    /// The variable name (e.g., "_styleThis_expression_0")
+    pub variable_name: String,
+    /// The generated CSS class name (e.g., "myClass-abc123")
+    pub class_name: String,
+    /// Extra classes from extraClass() calls
+    pub extra_classes: Vec<String>,
+    /// Source span of the original css`...` block
+    pub span: Span,
+}
+
+impl CssVariableIdentifier {
+    pub fn new(
+        variable_name: String,
+        class_name: String,
+        extra_classes: Vec<String>,
+        span: Span,
+    ) -> Self {
+        Self {
+            variable_name,
+            class_name,
+            extra_classes,
+            span,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(PartialEq)]
 pub enum EvaluateProgramReturnStatus {

@@ -1,6 +1,6 @@
 use super::cache::CSS_CLASSNAME_CACHE;
 use super::error::TransformError;
-use super::types::VirtualProgramInsert;
+use super::types::{CssVariableIdentifier, VirtualProgramInsert};
 use crate::ast;
 use crate::error_mapping::get_pos_from_offset;
 use crate::utils::{
@@ -36,7 +36,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
 
     store: String,
     referenced_idents: Vec<HashSet<String>>,
-    css_variable_identifiers: Vec<(String, String, Vec<String>)>,
+    css_variable_identifiers: Vec<CssVariableIdentifier>,
     style_variable_identifiers: HashSet<String>,
     exported_idents: HashSet<String>,
     scope_depth: u32,
@@ -114,7 +114,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     pub fn finish(
         mut self,
     ) -> (
-        Vec<(String, String, Vec<String>)>,
+        Vec<CssVariableIdentifier>,
         HashSet<String>,
         HashMap<String, HashSet<String>>,
         HashSet<String>,
@@ -430,8 +430,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     ) {
         let span = it.span;
 
-        self.css_variable_identifiers
-            .push((variable_name.to_string(), class_name.to_string(), extra_classes));
+        self.css_variable_identifiers.push(CssVariableIdentifier::new(
+            variable_name.to_string(),
+            class_name.to_string(),
+            extra_classes,
+            span,
+        ));
 
         // Filter out extraClass calls from expressions and adjust quasis accordingly
         let mut new_quasis = oxc_allocator::Vec::new_in(self.allocator);

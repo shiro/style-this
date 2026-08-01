@@ -18,8 +18,18 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
   >;
 }
 
+export type CssSourceMapData = Array<{
+  className: string;
+  start: number;
+  end: number;
+}>;
+
 export type CssCachEntry = Promise<string | Error> & {
-  resolve: (value: string | Error) => void;
+  resolve: (
+    value: string | Error,
+    sourcemapData?: CssSourceMapData,
+    filepath?: string,
+  ) => void;
   code: string;
 };
 
