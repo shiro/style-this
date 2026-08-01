@@ -1,6 +1,9 @@
 import { type RawLoaderDefinitionFunction } from "webpack";
 import { readFile } from "fs/promises";
+import { createRequire } from "node:module";
 import path from "path";
+
+const require = createRequire(import.meta.url);
 
 type LoaderCtx = ThisParameterType<RawLoaderDefinitionFunction>;
 

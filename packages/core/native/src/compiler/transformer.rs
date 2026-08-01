@@ -13,6 +13,7 @@ pub struct Transformer {
     pub(crate) load_file: js_sys::Function,
     pub(crate) css_file_store_ref: String,
     pub(crate) value_cache_ref: String,
+    pub(crate) require_ref: Option<String>,
     pub(crate) css_extension: String,
     pub(crate) wrap_selectors_with_global: bool,
 
@@ -89,6 +90,18 @@ impl Transformer {
             .as_bool()
             .unwrap_or_default();
 
+        let create_require = js_sys::Reflect::get(&opts, &JsValue::from_str("createRequire"))
+            .ok()
+            .and_then(|v| v.dyn_into::<js_sys::Function>().ok());
+
+        let require_ref = create_require.map(|create_require_fn| {
+            let require_suffix = crate::utils::generate_random_id(8);
+            let require_ref = format!("{PREFIX}_require_{require_suffix}");
+            
+            js_sys::Reflect::set(&global, &JsValue::from_str(&require_ref), &create_require_fn).unwrap();
+            require_ref
+        });
+
         Self {
             cwd,
             ignored_imports,
@@ -96,6 +109,7 @@ impl Transformer {
             load_file,
             css_file_store_ref,
             value_cache_ref,
+            require_ref,
             css_extension,
             wrap_selectors_with_global,
 

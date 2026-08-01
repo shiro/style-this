@@ -29,6 +29,7 @@ export const Transformer = _Transformer as any as new (opts: {
   ignoredImports: Record<string, string[]>;
 
   loadFile: (filepath: string, importer: string) => Promise<[string, string]>;
+  createRequire?: (filename: string) => NodeRequire;
 
   cssCache: Map<string, CssCachEntry>;
   valueCache: Record<string, Record<string, any>>;

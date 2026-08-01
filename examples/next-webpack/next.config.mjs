@@ -1,12 +1,12 @@
-// import { withStyleThis } from '@style-this/next';
+import { withStyleThis } from '@style-this/next';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Disable static export to avoid SSG issues with error pages
+  output: undefined,
   webpack: (config) => {
     return config;
   },
 };
 
-// Temporarily disable style-this due to transformer issues
-// export default withStyleThis(nextConfig);
-export default nextConfig;
+export default withStyleThis(nextConfig);

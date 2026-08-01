@@ -642,7 +642,7 @@ pub async fn evaluate_program<'alloc>(
 
         eval_program_js.push_str(&formatdoc!(
             "
-            {css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'));
+            global.{css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'));
             ",
         ));
     }
@@ -671,20 +671,41 @@ pub async fn evaluate_program<'alloc>(
     }
 
     // wrap into promise
-    let eval_program_js = formatdoc!(
-        "
-        const global = {{
-            {css_file_store_ref},
-            {value_cache_ref},
-        }};
+    let eval_program_js = if let Some(require_ref) = &transformer.require_ref {
+        formatdoc!(
+            "
+            const _global = {{
+                {css_file_store_ref}: globalThis.{css_file_store_ref},
+                {value_cache_ref}: globalThis.{value_cache_ref},
+            }};
+            
+            const _require = (typeof globalThis !== 'undefined' && globalThis.{require_ref}) 
+                || (typeof global !== 'undefined' && global.{require_ref})
+                || (function() {{ throw new Error('require not found in globalThis or global'); }})();
 
-        (async () => {{
-            \"use strict\";
-            // start
-{eval_program_js}
-        }})()
-        "
-    );
+            (async (require) => {{
+                const global = _global;
+                // start
+    {eval_program_js}
+            }})(_require)
+            "
+        )
+    } else {
+        formatdoc!(
+            "
+            const _global = {{
+                {css_file_store_ref},
+                {value_cache_ref},
+            }};
+
+            (async () => {{
+                const global = _global;
+                // start
+    {eval_program_js}
+            }})()
+            "
+        )
+    };
 
     let evaluated =
         match js_sys::eval(&eval_program_js).map_err(|cause| TransformError::EvaluationFailed {
