@@ -26,6 +26,15 @@ use std::rc::Rc;
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
+/// Helper to get the local name from any import specifier type
+fn get_import_local_name<'a>(specifier: &'a ImportDeclarationSpecifier<'a>) -> &'a str {
+    match specifier {
+        ImportDeclarationSpecifier::ImportSpecifier(import) => import.local.name.as_str(),
+        ImportDeclarationSpecifier::ImportDefaultSpecifier(import) => import.local.name.as_str(),
+        ImportDeclarationSpecifier::ImportNamespaceSpecifier(import) => import.local.name.as_str(),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn evaluate_program<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
@@ -231,17 +240,7 @@ pub async fn evaluate_program<'alloc>(
             .unwrap_or_default();
 
         let any_ident_referenced = specifiers.iter().any(|specifier| {
-            let local_name = match specifier {
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(import) => {
-                    import.local.name.as_str()
-                }
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportDefaultSpecifier(import) => {
-                    import.local.name.as_str()
-                }
-                oxc_ast::ast::ImportDeclarationSpecifier::ImportNamespaceSpecifier(import) => {
-                    import.local.name.as_str()
-                }
-            };
+            let local_name = get_import_local_name(specifier);
 
             // if inside of ignored_imports, skip this import
             if let Some(ignored_list) = transformer.ignored_imports.get(&remote_module_id)

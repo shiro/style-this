@@ -162,18 +162,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 .flat_map(|stmt| utils::statement_get_references(stmt))
                 .collect::<Vec<_>>();
 
-            for ident in &right_references {
-                if self.get_dynamic_variable(ident) {
-                    let (row, column) =
-                        get_pos_from_offset(self.program_code, body.span().start as usize);
-                    self.error = Some(TransformError::AccessDynamicVariableError {
-                        variable: ident.to_string(),
-                        filepath: self.program_filepath.to_string(),
-                        row,
-                        column,
-                    });
-                    return;
-                }
+            if self.check_dynamic_variable_access(&right_references, body.span().start) {
+                return;
             }
 
             // transform
@@ -218,43 +208,43 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
     /// creates a class name or gets it from cache
     fn create_virtual_css_template(&mut self, variable_name: &str) -> String {
-        // get class name from cache or compute
         let unique_number = self.css_unique_number();
-        self.entrypoint
-            .then(|| {
-                CSS_CLASSNAME_CACHE.with(|cache| {
-                    cache
-                        .borrow()
-                        .get(self.program_filepath)
-                        .and_then(|file_cache| file_cache.get(&unique_number))
-                        .cloned()
-                })
-            })
-            .flatten()
-            .unwrap_or_else(|| {
-                let relative_program_filepath = self
-                    .program_filepath
-                    .strip_prefix(self.cwd)
-                    .unwrap_or(self.program_filepath);
+        
+        // Try to get from cache if entrypoint
+        if self.entrypoint {
+            if let Some(cached) = CSS_CLASSNAME_CACHE.with(|cache| {
+                cache
+                    .borrow()
+                    .get(self.program_filepath)
+                    .and_then(|file_cache| file_cache.get(&unique_number))
+                    .cloned()
+            }) {
+                return cached;
+            }
+        }
 
-                let random_suffix = self
-                    .random
-                    .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
+        // Generate new class name
+        let relative_program_filepath = self
+            .program_filepath
+            .strip_prefix(self.cwd)
+            .unwrap_or(self.program_filepath);
 
-                let class_name = format!("{variable_name}-{random_suffix}");
+        let random_suffix = self
+            .random
+            .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
 
-                CSS_CLASSNAME_CACHE.with(|cache| {
-                    cache
-                        .borrow_mut()
-                        .entry(self.program_filepath.to_string())
-                        .or_default()
-                        .entry(unique_number)
-                        .or_insert_with(|| class_name.clone())
-                        .clone()
-                });
+        let class_name = format!("{variable_name}-{random_suffix}");
 
-                class_name
-            })
+        // Cache it
+        CSS_CLASSNAME_CACHE.with(|cache| {
+            cache
+                .borrow_mut()
+                .entry(self.program_filepath.to_string())
+                .or_default()
+                .insert(unique_number, class_name.clone());
+        });
+
+        class_name
     }
 
     fn get_alias(&self, name: &str) -> Option<&str> {
@@ -278,28 +268,31 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         self.referenced_idents.first_mut().unwrap().insert(name);
     }
 
-    fn is_variable_referenced(&mut self, name: &str) -> bool {
-        for referenced_set in self.referenced_idents.iter() {
-            if referenced_set.contains(name) {
-                return true;
-            }
-        }
-        false
+    fn is_variable_referenced(&self, name: &str) -> bool {
+        self.referenced_idents.iter().any(|set| set.contains(name))
     }
 
     /// checks if the variable exits in the current scope or any scope above it
-    fn variable_exists(&mut self, name: &str) -> bool {
-        for aliases in self.aliases.iter() {
-            if aliases.contains_key(name) {
-                return true;
-            }
-        }
-        false
+    fn variable_exists(&self, name: &str) -> bool {
+        self.aliases.iter().any(|aliases| aliases.contains_key(name))
     }
 
     fn get_dynamic_variable(&self, name: &str) -> bool {
-        for dynamic_vars in self.dynamic_variable_names.iter().rev() {
-            if dynamic_vars.contains(name) {
+        self.dynamic_variable_names.iter().rev().any(|vars| vars.contains(name))
+    }
+
+    /// Checks if any references are dynamic variables and sets error if found
+    /// Returns true if error was set (meaning there was a dynamic variable access)
+    fn check_dynamic_variable_access(&mut self, references: &[String], span_start: u32) -> bool {
+        for ident in references {
+            if self.get_dynamic_variable(ident) {
+                let (row, column) = get_pos_from_offset(self.program_code, span_start as usize);
+                self.error = Some(TransformError::AccessDynamicVariableError {
+                    variable: ident.to_string(),
+                    filepath: self.program_filepath.to_string(),
+                    row,
+                    column,
+                });
                 return true;
             }
         }
@@ -623,18 +616,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             let right_references = utils::tagged_template_expression_get_references(template);
 
-            for ident in &right_references {
-                if self.get_dynamic_variable(ident) {
-                    let (row, column) =
-                        get_pos_from_offset(self.program_code, template.span().start as usize);
-                    self.error = Some(TransformError::AccessDynamicVariableError {
-                        variable: ident.to_string(),
-                        filepath: self.program_filepath.to_string(),
-                        row,
-                        column,
-                    });
-                    return;
-                }
+            if self.check_dynamic_variable_access(&right_references, template.span().start) {
+                return;
             }
 
             self.reference_variable(variable_name.to_string());
@@ -759,18 +742,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             let right_references = utils::tagged_template_expression_get_references(template);
 
-            for ident in &right_references {
-                if self.get_dynamic_variable(ident) {
-                    let (row, column) =
-                        get_pos_from_offset(self.program_code, template.span().start as usize);
-                    self.error = Some(TransformError::AccessDynamicVariableError {
-                        variable: ident.to_string(),
-                        filepath: self.program_filepath.to_string(),
-                        row,
-                        column,
-                    });
-                    return;
-                }
+            if self.check_dynamic_variable_access(&right_references, template.span().start) {
+                return;
             }
 
             self.reference_variable(variable_name.to_string());
@@ -875,18 +848,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         let span = it.span;
         let right_references = utils::expression_get_references(init);
 
-        for ident in &right_references {
-            if self.get_dynamic_variable(ident) {
-                let (row, column) =
-                    get_pos_from_offset(self.program_code, init.span().start as usize);
-                self.error = Some(TransformError::AccessDynamicVariableError {
-                    variable: ident.to_string(),
-                    filepath: self.program_filepath.to_string(),
-                    row,
-                    column,
-                });
-                return;
-            }
+        if self.check_dynamic_variable_access(&right_references, init.span().start) {
+            return;
         }
 
         for ident in right_references {
