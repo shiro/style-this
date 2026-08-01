@@ -1,5 +1,8 @@
 import path from "path";
+import { fileURLToPath } from "url";
 import { WithLinariaConfig } from "./types";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function addTurbopackConfig(config: WithLinariaConfig) {
   config.turbopack ??= {};
@@ -19,14 +22,8 @@ export function addTurbopackConfig(config: WithLinariaConfig) {
     loaders: [loader],
   };
 
-  config.turbopack.rules["*.css"] = {
-    loaders: [
-      {
-        loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"),
-        options: {},
-      },
-    ],
-  };
+  // Don't add cssLoader for turbopack - it causes issues with regular CSS files
+  // The transform loader handles injecting the virtual CSS imports
 
   return config;
 }

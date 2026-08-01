@@ -27,9 +27,11 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
     if (!styleThis) {
       await initializeStyleThis();
       styleThis = new Transformer({
+        cwd: process.cwd(),
+        ignoredImports: {},
         loadFile,
-        cssFileStore: cssFiles,
-        exportCache,
+        cssCache: cssFiles,
+        valueCache: exportCache,
         cssExtension,
         wrapSelectorsWithGlobal: true,
       });
@@ -52,6 +54,7 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
     const transformedResult = await styleThis.transform(
       code.toString(),
       filepath,
+      false,
       importSource,
     );
 

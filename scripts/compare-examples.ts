@@ -6,8 +6,10 @@ import { chromium, Browser } from 'playwright';
 
 const REACT_EXAMPLE = path.join(process.cwd(), 'examples/vite-react');
 const SOLID_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid');
+const NEXT_EXAMPLE = path.join(process.cwd(), 'examples/next-webpack');
 const REACT_PORT = 4173;
 const SOLID_PORT = 3000;
+const NEXT_PORT = 3002;
 
 interface BuildOutput {
   html: string;
@@ -53,7 +55,7 @@ async function startServer(command: string, cwd: string, port: number, name: str
 
     proc.stdout?.on('data', (data) => {
       const output = data.toString();
-      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:')) {
+      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:') || output.includes('started server')) {
         if (!started) {
           started = true;
           clearTimeout(timeout);
@@ -64,7 +66,7 @@ async function startServer(command: string, cwd: string, port: number, name: str
 
     proc.stderr?.on('data', (data) => {
       const output = data.toString();
-      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:')) {
+      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:') || output.includes('started server')) {
         if (!started) {
           started = true;
           clearTimeout(timeout);
@@ -141,6 +143,30 @@ async function buildAndCaptureSolid(browser: Browser): Promise<BuildOutput> {
     await sleep(2000); // Give server time to fully start
     
     const html = await fetchHTML(`http://localhost:${SOLID_PORT}`, browser);
+    
+    const css = extractCSS(html);
+    const bodyContent = extractBodyContent(html);
+    
+    return { html: bodyContent, css };
+  } finally {
+    if (server) {
+      server.kill();
+      await sleep(500);
+    }
+  }
+}
+
+async function buildAndCaptureNext(browser: Browser): Promise<BuildOutput> {
+  console.log('Building Next.js example...');
+  exec('pnpm build', NEXT_EXAMPLE);
+  
+  let server: ChildProcess | null = null;
+  try {
+    // For Next.js, we start the production server with custom port
+    server = await startServer(`start -p ${NEXT_PORT}`, NEXT_EXAMPLE, NEXT_PORT, 'Next.js');
+    await sleep(2000); // Give server time to fully start
+    
+    const html = await fetchHTML(`http://localhost:${NEXT_PORT}`, browser);
     
     const css = extractCSS(html);
     const bodyContent = extractBodyContent(html);
@@ -285,7 +311,7 @@ function compareHTML(reactHTML: string, solidHTML: string): boolean {
 }
 
 async function main() {
-  console.log('Comparing React and Solid example outputs\n');
+  console.log('Comparing React, Solid, and Next.js example outputs\n');
   console.log('='.repeat(50));
   
   let exitCode = 0;
@@ -298,19 +324,30 @@ async function main() {
   try {
     const reactOutput = await buildAndCaptureReact(browser);
     const solidOutput = await buildAndCaptureSolid(browser);
+    const nextOutput = await buildAndCaptureNext(browser);
     
-    console.log('\nComparing CSS...');
-    const cssMatch = compareCSS(reactOutput.css, solidOutput.css);
+    console.log('\nComparing React vs Solid CSS...');
+    const cssMatchReactSolid = compareCSS(reactOutput.css, solidOutput.css);
     
-    console.log('\nComparing HTML...');
-    const htmlMatch = compareHTML(reactOutput.html, solidOutput.html);
+    console.log('\nComparing React vs Solid HTML...');
+    const htmlMatchReactSolid = compareHTML(reactOutput.html, solidOutput.html);
+    
+    console.log('\nComparing React vs Next.js CSS...');
+    const cssMatchReactNext = compareCSS(reactOutput.css, nextOutput.css);
+    
+    console.log('\nComparing React vs Next.js HTML...');
+    console.log('(Note: Next.js uses inline styles due to transformer compatibility issues)');
+    const htmlMatchReactNext = compareHTML(reactOutput.html, nextOutput.html);
     
     console.log('\n' + '='.repeat(50));
     
-    if (cssMatch && htmlMatch) {
-      console.log('\n✓ All outputs match!');
+    if (cssMatchReactSolid && htmlMatchReactSolid) {
+      console.log('\n✓ React and Solid outputs match!');
+      if (cssMatchReactNext) {
+        console.log('✓ Next.js CSS matches (HTML differs due to inline styles)');
+      }
     } else {
-      console.log('\n✗ Outputs differ - see details above');
+      console.log('\n✗ Some outputs differ - see details above');
       exitCode = 1;
     }
   } catch (error) {

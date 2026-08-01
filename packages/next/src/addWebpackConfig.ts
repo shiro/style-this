@@ -1,10 +1,13 @@
 import type { NextConfig } from "next";
 import path from "path";
+import { fileURLToPath } from "url";
 import type * as NextServer from "next/dist/server/config-shared";
 import type * as Webpack from "webpack";
 
 import { regexLinariaCSS, regexLinariaCSSQuery } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Modify the css loader config to support linaria global css and prevent
