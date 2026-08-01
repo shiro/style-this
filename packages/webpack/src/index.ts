@@ -13,7 +13,14 @@ type Loader = RawLoaderDefinitionFunction<LoaderOptions>;
 
 // const cache = new TransformCacheCollection();
 
-const cssLoader = require.resolve("./cssLoader.mjs");
+let cssLoader: string;
+try {
+  // Try to resolve from dist (when built)
+  cssLoader = require.resolve("../dist/cssLoader.mjs");
+} catch {
+  // Fall back to src (for development, though this won't work at runtime)
+  cssLoader = require.resolve("./cssLoader");
+}
 
 export const NextCSSLoader = cssLoader;
 

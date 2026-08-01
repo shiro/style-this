@@ -1,4 +1,4 @@
-import vitePlugin from "../vite";
+import vitePlugin from "../src/index";
 import { describe, test, expect } from "vitest";
 
 describe("vite simple", () => {
