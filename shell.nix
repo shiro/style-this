@@ -8,12 +8,13 @@ let
         targets = [ "wasm32-unknown-unknown" ];
     };
 in
-pkgs.mkShell {
+pkgs.mkShell ({
     buildInputs = [
       rust
     ] ++ (with pkgs; [
       nodejs_26
       pnpm
+      chromium
     ]);
     nativeBuildInputs = with pkgs; [];
     packages = with pkgs; [
@@ -22,4 +23,9 @@ pkgs.mkShell {
     ];
 
     RUST_BACKTRACE = 1;
-}
+    NODE_OPTIONS = "--no-deprecation";
+} // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+    PLAYWRIGHT_BROWSERS_PATH = "0";
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
+})

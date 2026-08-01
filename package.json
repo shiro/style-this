@@ -11,6 +11,7 @@
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "test": "vitest run",
+    "test:compare-examples": "tsx scripts/compare-examples.ts",
     "change:new": "pnpm changeset",
     "change:save": "pnpm changeset version && pnpm install",
     "test:watch": "vitest"
@@ -20,7 +21,9 @@
     "@eslint/js": "10.0.1",
     "@vitest/eslint-plugin": "1.6.20",
     "eslint": "10.5.0",
+    "playwright": "^1.49.1",
     "tsdown": "0.16.1",
+    "tsx": "^4.19.2",
     "typescript-eslint": "8.61.1",
     "vitest": "4.1.9"
   },
