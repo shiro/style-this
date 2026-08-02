@@ -26,13 +26,18 @@ export default defineConfig({
   vite(options) {
     return {
       // css: { postcss: "./postcss.config.js" },
+      css: {
+        transformer: 'lightningcss',
+        devSourcemap: true,
+      },
       server: {
         port: 3000,
         warmup: { clientFiles: ["./src/app.tsx"] },
       },
-      build: { 
+      build: {
         sourcemap: true,
         cssMinify: "lightningcss",
+        cssMinify: false,
       },
       resolve: {
         alias: Object.fromEntries(
@@ -42,7 +47,7 @@ export default defineConfig({
           ]),
         ),
       },
-      css: { 
+      css: {
         // Disable Lightning CSS transformer to test sourcemaps
         // transformer: "lightningcss",
         devSourcemap: true,

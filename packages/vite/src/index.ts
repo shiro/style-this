@@ -12,7 +12,6 @@ import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
 
-console.log("[VITE-PLUGIN-LOADED] @style-this/vite plugin loaded");
 const solidMock = `
 export const template = () => () => {};
 export const spread = () => {};
@@ -35,7 +34,7 @@ interface Options {
   debug?: boolean;
 }
 
-interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> {}
+interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> { }
 
 export interface ExtraFields {
   cssExtension: string;
@@ -151,7 +150,7 @@ const vitePlugin = (options: Options = {}) => {
           try {
             const raw = await readFile(filepath, "utf-8");
             return [filepath, raw];
-          } catch (err) {}
+          } catch (err) { }
         }
 
         // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
@@ -186,7 +185,7 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async load(fullId) {
-      console.log(`[NEW-load] Called with: ${fullId}`);
+      // console.log(`[NEW-load] Called with: ${fullId}`);
       if (fullId.startsWith(resolvedVirtualModulePrefix)) {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
@@ -230,13 +229,13 @@ const vitePlugin = (options: Options = {}) => {
 
             // Generate source map if we have metadata
             const metadata = cssSourceMapMetadata.get(filepath);
-            console.log(`[load] Has metadata for ${filepath}:`, !!metadata);
+            // console.log(`[load] Has metadata for ${filepath}:`, !!metadata);
             if (metadata) {
               // Ensure source filepath is absolute for proper browser resolution
               const absoluteSourcePath = sourceFilepath.startsWith('/')
                 ? sourceFilepath
                 : `/${sourceFilepath}`;
-              
+
               const sourcemap = generateCssSourceMap(
                 resolved,
                 metadata.sourcemapData,
@@ -248,13 +247,15 @@ const vitePlugin = (options: Options = {}) => {
               // Inline the sourcemap as a base64 comment
               // Lightning CSS will then preserve this in its output
               const base64Map = Buffer.from(JSON.stringify(sourcemap)).toString('base64');
-              const cssWithSourceMap = `${resolved}\n/*# sourceMappingURL=data:application/json;base64,${base64Map}*/`;
+              const cssWithSourceMap = `${resolved}\n/*foobar*/\n/*# sourceMappingURL=data:application/json;base64,${base64Map}*/`;
 
-              console.log(`[load] Returning CSS with inline sourcemap, length: ${cssWithSourceMap.length}`);
-              console.log(`[load] Sourcemap points to:`, sourcemap.sources);
+              console.log(`[debug] Returning CSS with inline sourcemap, length: ${cssWithSourceMap.length}`);
+              console.log(`[debug] Sourcemap:`, base64Map);
+              console.log(`[debug] Sourcemap points to:`, sourcemap.sources);
 
               return {
                 code: cssWithSourceMap,
+                map: sourcemap,
               };
             }
 
@@ -301,6 +302,10 @@ const vitePlugin = (options: Options = {}) => {
           if (!id) return;
           return (await this.resolve(id, importer))?.id;
         };
+      }
+
+      if (filepath && filepath.endsWith(".css")) {
+        console.log(`[debug] hit filepath ${filepath}`);
       }
 
       if (
@@ -363,7 +368,7 @@ const vitePlugin = (options: Options = {}) => {
         totalTransformTime += transformTime;
 
         // console.log(
-        //   `Transform took ${transformTime.toFixed(2)}ms for ${filepath} (total: ${totalTransformTime.toFixed(2)}ms)`,
+        //   `Transform took ${ transformTime.toFixed(2) }ms for ${ filepath }(total: ${ totalTransformTime.toFixed(2) }ms)`,
         // );
 
         if (!transformedResult) {
