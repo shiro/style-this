@@ -185,7 +185,6 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async load(fullId) {
-      // console.log(`[NEW-load] Called with: ${fullId}`);
       if (fullId.startsWith(resolvedVirtualModulePrefix)) {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
@@ -229,7 +228,6 @@ const vitePlugin = (options: Options = {}) => {
 
             // Generate source map if we have metadata
             const metadata = cssSourceMapMetadata.get(filepath);
-            // console.log(`[load] Has metadata for ${filepath}:`, !!metadata);
             if (metadata) {
               // Ensure source filepath is absolute for proper browser resolution
               const absoluteSourcePath = sourceFilepath.startsWith('/')
@@ -244,17 +242,8 @@ const vitePlugin = (options: Options = {}) => {
                 filepath,
               );
 
-              // Inline the sourcemap as a base64 comment
-              // Lightning CSS will then preserve this in its output
-              const base64Map = Buffer.from(JSON.stringify(sourcemap)).toString('base64');
-              const cssWithSourceMap = `${resolved}\n/*foobar*/\n/*# sourceMappingURL=data:application/json;base64,${base64Map}*/`;
-
-              console.log(`[debug] Returning CSS with inline sourcemap, length: ${cssWithSourceMap.length}`);
-              console.log(`[debug] Sourcemap:`, base64Map);
-              console.log(`[debug] Sourcemap points to:`, sourcemap.sources);
-
               return {
-                code: cssWithSourceMap,
+                code: resolved,
                 map: sourcemap,
               };
             }
@@ -266,9 +255,7 @@ const vitePlugin = (options: Options = {}) => {
           } catch (error) {
             if (error == TIMEOUT) {
               time += TIMEOUT_DURATION;
-              console.warn(
-                `CSS entry '${filepath}' loading for over ${time}sec, might be a deadlock`,
-              );
+              console.warn(`CSS entry '${filepath}' loading for over ${time}sec, might be a deadlock`);
             } else {
               throw error;
             }
@@ -302,10 +289,6 @@ const vitePlugin = (options: Options = {}) => {
           if (!id) return;
           return (await this.resolve(id, importer))?.id;
         };
-      }
-
-      if (filepath && filepath.endsWith(".css")) {
-        console.log(`[debug] hit filepath ${filepath}`);
       }
 
       if (
