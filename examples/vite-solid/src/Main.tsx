@@ -8,7 +8,6 @@ const colorStyle = css`
 `;
 
 const Main: Component = () => {
-  // const color = "blue";
   return (
     <div class={`${ContainerStyle} Global__Main`}>
       <Counter />

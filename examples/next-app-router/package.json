@@ -1,0 +1,31 @@
+{
+  "name": "example/next",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "dev:webpack": "TURBOPACK=0 next dev",
+    "dev:turbopack": "TURBOPACK=1 next dev",
+    "build": "next build",
+    "build:webpack": "TURBOPACK=0 next build",
+    "build:turbopack": "TURBOPACK=1 next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@style-this/core": "workspace:",
+    "@style-this/next": "workspace:",
+    "@style-this/react": "workspace:",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "next": "^16.2.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "~6.0.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

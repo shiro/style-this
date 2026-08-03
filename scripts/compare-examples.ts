@@ -7,11 +7,13 @@ import { chromium, Browser } from 'playwright';
 const REACT_EXAMPLE = path.join(process.cwd(), 'examples/vite-react');
 const SOLID_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid');
 const SOLID_START_2_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid-start-2');
-const NEXT_EXAMPLE = path.join(process.cwd(), 'examples/next');
+const NEXT_PAGES_ROUTER_EXAMPLE = path.join(process.cwd(), 'examples/next-pages-router');
+const NEXT_APP_ROUTER_EXAMPLE = path.join(process.cwd(), 'examples/next-app-router');
 const REACT_PORT = 4173;
 const SOLID_PORT = 3000;
 const SOLID_START_2_PORT = 3010;
-const NEXT_PORT = 3002;
+const NEXT_PAGES_ROUTER_PORT = 3002;
+const NEXT_APP_ROUTER_PORT = 3003;
 
 interface BuildOutput {
   html: string;
@@ -190,51 +192,14 @@ async function buildAndCaptureSolidStart2(browser: Browser): Promise<BuildOutput
   }
 }
 
-async function buildAndCaptureNextSimple(browser: Browser): Promise<BuildOutput> {
-  console.log('Building Next example...');
-  exec('pnpm build', NEXT_EXAMPLE);
+async function buildAndCaptureNext(browser: Browser, examplePath: string, port: number, name: string): Promise<BuildOutput> {
+  console.log(`Building ${name} example...`);
+  exec('pnpm build', examplePath);
   
   let server: ChildProcess | null = null;
   try {
     // For Next.js, we start the production server
-    server = await startServer('pnpm start', NEXT_EXAMPLE, NEXT_PORT, 'Next', { PORT: String(NEXT_PORT) });
-    await sleep(2000); // Give server time to fully start
-    
-    const html = await fetchHTML(`http://localhost:${NEXT_PORT}`, browser);
-    
-    const css = extractCSS(html);
-    const bodyContent = extractBodyContent(html);
-    
-    return { html: bodyContent, css };
-  } finally {
-    if (server) {
-      server.kill();
-      await sleep(500);
-    }
-  }
-}
-
-async function buildAndCaptureNext(browser: Browser, mode: 'webpack' | 'turbopack'): Promise<BuildOutput | null> {
-  console.log(`Building Next.js example (${mode})...`);
-  try {
-    exec(`pnpm build:${mode}`, NEXT_EXAMPLE);
-  } catch (error) {
-    // Build may fail during static generation but compilation might have succeeded
-    console.warn(`Next.js (${mode}) build failed, but checking if compilation succeeded...`);
-    const buildOutput = error instanceof Error ? error.message : String(error);
-    if (buildOutput.includes('✓ Compiled successfully')) {
-      console.log(`✓ Next.js (${mode}) compilation succeeded (SSG failed)`);
-      // Return null to indicate we can't test the runtime output
-      return null;
-    }
-    throw error;
-  }
-  
-  let server: ChildProcess | null = null;
-  try {
-    // For Next.js, we start the production server with custom port
-    const port = mode === 'webpack' ? NEXT_PORT : NEXT_PORT + 1;
-    server = await startServer(`start -p ${port}`, NEXT_EXAMPLE, port, `Next.js (${mode})`);
+    server = await startServer('pnpm start', examplePath, port, name, { PORT: String(port) });
     await sleep(2000); // Give server time to fully start
     
     const html = await fetchHTML(`http://localhost:${port}`, browser);
@@ -251,6 +216,9 @@ async function buildAndCaptureNext(browser: Browser, mode: 'webpack' | 'turbopac
   }
 }
 
+
+
+
 function normalizeCSS(css: string): string {
   return css
     .replace(/\/\*.*?\*\//gs, '') // Remove comments
@@ -262,6 +230,8 @@ function normalizeHTML(html: string): string {
   return html
     .replace(/<!--.*?-->/gs, '') // Remove HTML comments (including Solid hydration markers)
     .replace(/\sdata-hk="[^"]*"/g, '') // Remove Solid hydration keys
+    .replace(/<div\s+hidden=""\s*><\/div>/g, '') // Remove empty hidden div (App Router)
+    .replace(/<next-route-announcer[^>]*>[\s\S]*?<\/next-route-announcer>/s, '') // Remove next-route-announcer (App Router)
     .replace(/<div\s+id="__next">([\s\S]*?)<\/div>\s*<next-route-announcer>[\s\S]*?<\/next-route-announcer>/s, '$1') // Remove Next.js wrapper and route announcer
     .replace(/<next-route-announcer>[\s\S]*?<\/next-route-announcer>/s, '') // Remove next-route-announcer if not already removed
     // More robust removal of __next wrapper by looking for the matching closing tag
@@ -270,7 +240,7 @@ function normalizeHTML(html: string): string {
     .replace(/\bstyle="([^"]*)"/g, (match, styleContent) => {
       // Normalize CSS variable names by removing the hash suffix and whitespace
       const normalized = styleContent
-        .replace(/--var\d+-[a-z0-9]+/g, (varMatch) => {
+        .replace(/--var\d+-[a-z0-9]+/g, (varMatch: string) => {
           return varMatch.replace(/-[a-z0-9]+$/, '-HASH');
         })
         .replace(/\s*:\s*/g, ':') // Remove whitespace around colons
@@ -411,31 +381,49 @@ async function main() {
       console.warn('\n⚠ Solid capture failed:', err instanceof Error ? err.message : err);
     }
     
-    // Capture Next
-    console.log('\nCapturing Next example...');
-    const nextOutput = await buildAndCaptureNextSimple(browser);
+    // Capture Next examples
+    console.log('\nCapturing Next Pages Router example...');
+    const nextPagesRouterOutput = await buildAndCaptureNext(browser, NEXT_PAGES_ROUTER_EXAMPLE, NEXT_PAGES_ROUTER_PORT, 'Next Pages Router');
+    
+    console.log('\nCapturing Next App Router example...');
+    const nextAppRouterOutput = await buildAndCaptureNext(browser, NEXT_APP_ROUTER_EXAMPLE, NEXT_APP_ROUTER_PORT, 'Next App Router');
+    
+    let cssMatchSolid = true;
+    let htmlMatchSolid = true;
     
     if (solidOutput) {
       console.log('\nComparing Solid Start 2 vs Solid CSS...');
-      const cssMatchSolid = compareCSS(solidStart2Output.css, solidOutput.css);
+      cssMatchSolid = compareCSS(solidStart2Output.css, solidOutput.css);
       
       console.log('\nComparing Solid Start 2 vs Solid HTML...');
-      const htmlMatchSolid = compareHTML(solidStart2Output.html, solidOutput.html);
+      htmlMatchSolid = compareHTML(solidStart2Output.html, solidOutput.html);
       
       if (!cssMatchSolid || !htmlMatchSolid) {
         exitCode = 1;
       }
     }
     
-    console.log('\nComparing Solid Start 2 vs Next CSS...');
-    const cssMatchNext = compareCSS(solidStart2Output.css, nextOutput.css);
+    console.log('\nComparing Solid Start 2 vs Next Pages Router CSS...');
+    const cssMatchNextPages = compareCSS(solidStart2Output.css, nextPagesRouterOutput.css);
     
-    console.log('\nComparing Solid Start 2 vs Next HTML...');
-    const htmlMatchNext = compareHTML(solidStart2Output.html, nextOutput.html);
+    console.log('\nComparing Solid Start 2 vs Next Pages Router HTML...');
+    const htmlMatchNextPages = compareHTML(solidStart2Output.html, nextPagesRouterOutput.html);
+    
+    console.log('\nComparing Solid Start 2 vs Next App Router CSS...');
+    const cssMatchNextApp = compareCSS(solidStart2Output.css, nextAppRouterOutput.css);
+    
+    console.log('\nComparing Solid Start 2 vs Next App Router HTML...');
+    const htmlMatchNextApp = compareHTML(solidStart2Output.html, nextAppRouterOutput.html);
+    
+    console.log('\nComparing Next Pages Router vs Next App Router CSS...');
+    const cssMatchNextBoth = compareCSS(nextPagesRouterOutput.css, nextAppRouterOutput.css);
+    
+    console.log('\nComparing Next Pages Router vs Next App Router HTML...');
+    const htmlMatchNextBoth = compareHTML(nextPagesRouterOutput.html, nextAppRouterOutput.html);
     
     console.log('\n' + '='.repeat(50));
     
-    if (cssMatchNext && htmlMatchNext && (!solidOutput || (cssMatchNext && htmlMatchNext))) {
+    if (cssMatchNextPages && htmlMatchNextPages && cssMatchNextApp && htmlMatchNextApp && cssMatchNextBoth && htmlMatchNextBoth && (!solidOutput || (cssMatchSolid && htmlMatchSolid))) {
       console.log('\n✓ All examples match Solid Start 2 (source of truth)!');
     } else {
       console.log('\n✗ Some outputs differ from Solid Start 2 - see details above');
