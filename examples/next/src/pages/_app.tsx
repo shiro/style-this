@@ -1,4 +1,12 @@
 import type { AppProps } from 'next/app';
+import { css } from '@style-this/core';
+
+// Define global styles that apply to all pages
+const _GlobalMain = css`
+  .Global__Main {
+    background: red;
+  }
+`;
 
 export default function App({ Component, pageProps }: AppProps) {
   return (

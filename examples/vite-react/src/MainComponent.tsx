@@ -5,7 +5,7 @@ const color: string = "coral";
 
 const Main = () => {
   return (
-    <div className={ContainerStyle}>
+    <div className={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
       <span
@@ -22,6 +22,12 @@ const Main = () => {
 const ContainerStyle = css`
   display: flex;
   flex-direction: column;
+`;
+
+const _GlobalMain = css`
+  .Global__Main {
+    background: coral;
+  }
 `;
 
 export default Main;

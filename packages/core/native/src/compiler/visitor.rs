@@ -227,16 +227,21 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         }
 
         // Generate new class name
-        let relative_program_filepath = self
-            .program_filepath
-            .strip_prefix(self.cwd)
-            .unwrap_or(self.program_filepath);
+        // For _Global prefixed variables, use the variable name as-is without random suffix
+        let class_name = if variable_name.starts_with("_Global") {
+            variable_name.to_string()
+        } else {
+            let relative_program_filepath = self
+                .program_filepath
+                .strip_prefix(self.cwd)
+                .unwrap_or(self.program_filepath);
 
-        let random_suffix = self
-            .random
-            .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
+            let random_suffix = self
+                .random
+                .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
 
-        let class_name = format!("{variable_name}-{random_suffix}");
+            format!("{variable_name}-{random_suffix}")
+        };
 
         // Cache it
         CSS_CLASSNAME_CACHE.with(|cache| {

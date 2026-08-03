@@ -6,7 +6,7 @@ const color: string = "coral";
 const Main: Component = () => {
   // const color = "blue";
   return (
-    <div class={ContainerStyle}>
+    <div class={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
       <span
@@ -24,5 +24,11 @@ const ContainerStyle = css`
   display: flex;
   flex-direction: column;
 `;
+
+const _GlobalMain = css`
+  .Global__Main {
+    background: coral;
+  }
+`
 
 export default Main;

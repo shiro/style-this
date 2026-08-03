@@ -1,5 +1,6 @@
 import { css } from '@style-this/core';
 import Counter from './Counter';
+import s from "./foo.css"
 
 const ContainerStyle = css`
   display: flex;
@@ -20,11 +21,5 @@ const MainComponent = () => {
   );
 };
 
-// export to avoid tree-shake
-export const _GlobalMain = css`
-  .Global__Main {
-    background: coral;
-  }
-`;
 
 export default MainComponent;

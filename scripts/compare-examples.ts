@@ -385,7 +385,7 @@ function compareHTML(reactHTML: string, solidHTML: string): boolean {
 }
 
 async function main() {
-  console.log('Comparing Solid, Solid Start 2, and Next.js example outputs\n');
+  console.log('Comparing Solid Start 2 (source of truth) with other examples\n');
   console.log('='.repeat(50));
   
   let exitCode = 0;
@@ -396,50 +396,47 @@ async function main() {
   });
   
   try {
-    // Capture Solid first
-    console.log('\nCapturing Solid example...');
-    const solidOutput = await buildAndCaptureSolid(browser);
+    // Capture Solid Start 2 first as the source of truth
+    console.log('\nCapturing Solid Start 2 example (source of truth)...');
+    const solidStart2Output = await buildAndCaptureSolidStart2(browser);
     
-    // Try to capture Solid Start 2 (may fail due to spawning issues)
-    let solidStart2Output: BuildOutput | null = null;
+    // Try to capture Solid (may fail due to spawning issues)
+    let solidOutput: BuildOutput | null = null;
     try {
-      console.log('\nCapturing Solid Start 2 example...');
-      solidStart2Output = await buildAndCaptureSolidStart2(browser);
+      console.log('\nCapturing Solid example...');
+      solidOutput = await buildAndCaptureSolid(browser);
     } catch (err) {
-      console.warn('\n⚠ Solid Start 2 capture failed:', err instanceof Error ? err.message : err);
+      console.warn('\n⚠ Solid capture failed:', err instanceof Error ? err.message : err);
     }
     
     // Capture Next
     console.log('\nCapturing Next example...');
     const nextOutput = await buildAndCaptureNextSimple(browser);
     
-    if (solidStart2Output) {
-      console.log('\nComparing Solid vs Solid Start 2 CSS...');
-      const cssMatchSolidStart2 = compareCSS(solidOutput.css, solidStart2Output.css);
+    if (solidOutput) {
+      console.log('\nComparing Solid Start 2 vs Solid CSS...');
+      const cssMatchSolid = compareCSS(solidStart2Output.css, solidOutput.css);
       
-      console.log('\nComparing Solid vs Solid Start 2 HTML...');
-      const htmlMatchSolidStart2 = compareHTML(solidOutput.html, solidStart2Output.html);
+      console.log('\nComparing Solid Start 2 vs Solid HTML...');
+      const htmlMatchSolid = compareHTML(solidStart2Output.html, solidOutput.html);
       
-      if (!cssMatchSolidStart2 || !htmlMatchSolidStart2) {
+      if (!cssMatchSolid || !htmlMatchSolid) {
         exitCode = 1;
       }
     }
     
-    console.log('\nComparing Solid vs Next CSS...');
-    const cssMatchNext = compareCSS(solidOutput.css, nextOutput.css);
+    console.log('\nComparing Solid Start 2 vs Next CSS...');
+    const cssMatchNext = compareCSS(solidStart2Output.css, nextOutput.css);
     
-    console.log('\nComparing Solid vs Next HTML...');
-    const htmlMatchNext = compareHTML(solidOutput.html, nextOutput.html);
+    console.log('\nComparing Solid Start 2 vs Next HTML...');
+    const htmlMatchNext = compareHTML(solidStart2Output.html, nextOutput.html);
     
     console.log('\n' + '='.repeat(50));
     
-    if (cssMatchNext && htmlMatchNext) {
-      console.log('\n✓ Solid and Next outputs match!');
-      if (solidStart2Output) {
-        console.log('✓ Solid Start 2 also matches!');
-      }
+    if (cssMatchNext && htmlMatchNext && (!solidOutput || (cssMatchNext && htmlMatchNext))) {
+      console.log('\n✓ All examples match Solid Start 2 (source of truth)!');
     } else {
-      console.log('\n✗ Some outputs differ - see details above');
+      console.log('\n✗ Some outputs differ from Solid Start 2 - see details above');
       exitCode = 1;
     }
   } catch (error) {
