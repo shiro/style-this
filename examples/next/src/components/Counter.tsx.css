@@ -1,0 +1,25 @@
+:global(.CounterStyle-ezk5qn) {
+display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  margin: 16px;
+  border: 1px solid blue;
+  border-radius: 8px;
+  background: white;
+}
+:global(.FancyButton-diz892) {
+background: none;
+  border: 1px solid blue;
+  border-radius: 2px;
+  padding: var(--var1-c5unkh);
+}
+:global(.FancyButton2-r4dezo) {
+margin: var(--var1-0dizsx);
+  min-height: var(--var2-mjolqz);
+  cursor: pointer;
+
+  background: var(--var3-od27ox);
+  color: white;
+  font-weight: bold;
+}
