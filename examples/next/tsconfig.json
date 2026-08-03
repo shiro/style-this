@@ -24,15 +24,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@style-this/core": [
-        "../../packages/core/dist/index.mjs"
-      ],
-      "@style-this/react": [
-        "../../packages/react/dist/index.mjs"
-      ],
-      "@style-this/next": [
-        "../../packages/next/dist/index.mjs"
       ]
     },
     "target": "ES2017"

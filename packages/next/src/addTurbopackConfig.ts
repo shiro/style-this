@@ -8,13 +8,16 @@ export function addTurbopackConfig(config: WithLinariaConfig) {
   config.turbopack ??= {};
   config.turbopack.rules ??= {};
 
+  const transformLoaderPath = path.resolve(__dirname, "./loaders/turbopackTransformLoader.mjs");
+  const cssLoaderPath = path.resolve(__dirname, "./loaders/cssLoader.mjs");
+
   const transformLoader = {
-    loader: path.resolve(__dirname, "./loaders/turbopackTransformLoader.mjs"),
+    loader: transformLoaderPath,
     options: {},
   };
 
   const cssLoader = {
-    loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"),
+    loader: cssLoaderPath,
     options: {},
   };
 

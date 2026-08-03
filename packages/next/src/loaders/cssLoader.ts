@@ -19,7 +19,9 @@ const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
   // this.addDependency(filepath);
 
   if (!css) {
-    callback(new Error(`failed to load virtual CSS file '${filepath}'`));
+    // If CSS is not in cache yet, return empty string
+    // The CSS will be injected during runtime
+    callback(null, "");
     return;
   }
 

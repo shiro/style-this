@@ -4,6 +4,11 @@ import { cssFiles } from "../shared";
 import { Transformer } from "@style-this/core/compiler";
 import { createRequire } from "node:module";
 import { makeLoadFile } from "./shared";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 type LoaderType = RawLoaderDefinitionFunction<{}>;
 
@@ -39,13 +44,19 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
 
     const filepath = this.resourcePath;
     const qualifier = filepath.endsWith("pages/_app.tsx") ? "global" : "module";
-    const cssFilepathForImport = `${filepath}.${qualifier}.${cssExtension}`;
-
-    const importSourceRequest = `${cssFilepathForImport}!=!${filepath}?${cssFilepathForImport}`;
-    const importSource = this.utils.contextify(
-      this.context || this.rootContext,
-      importSourceRequest,
+    
+    // Use the noop CSS file that exists on disk
+    const noopFilepath = path.resolve(
+      __dirname,
+      `../../style-this.${qualifier}.css`,
     );
+    const noopFilepathRelative = path.relative(
+      path.dirname(filepath),
+      noopFilepath,
+    );
+
+    // Import the noop CSS file with a query parameter pointing to the original source
+    const importSource = `${noopFilepathRelative}?filepath=${filepath}&time=${+new Date()}`;
     
     // Create CSS cache entry for this file
     // Note: The cache key should NOT include the qualifier, only the css extension

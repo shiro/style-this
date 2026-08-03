@@ -10,7 +10,11 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": {
+      "types": "./dist/index.d.cts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

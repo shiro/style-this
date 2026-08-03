@@ -51,9 +51,7 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
     config: Webpack.Configuration,
     options: NextServer.WebpackConfigContext,
   ) => {
-    console.log("style-this webpack config - config.module exists:", !!config.module, "config.plugins exists:", !!config.plugins);
     if (config.module?.rules && config.plugins) {
-      console.log("style-this webpack config - adding loaders");
       modifyCssLoaderConfig(config.module.rules as Webpack.RuleSetRule[]);
 
       config.module.rules.push({
@@ -69,9 +67,6 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
         options: {},
         exclude: /node_modules/,
       });
-      console.log("style-this webpack config - loaders added, total rules:", config.module.rules.length);
-    } else {
-      console.log("style-this webpack config - skipping loaders due to missing config");
     }
 
     if (typeof nextConfig.webpack === "function") {
