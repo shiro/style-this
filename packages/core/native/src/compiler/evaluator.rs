@@ -173,6 +173,7 @@ pub async fn evaluate_program<'alloc>(
         css_function_name,
         style_function_name,
         extra_class_function_name,
+        transformer.atomic,
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
@@ -188,6 +189,53 @@ pub async fn evaluate_program<'alloc>(
         exported_idents,
         tmp_program,
     ) = css_transformer.finish();
+
+    // In atomic mode, add import for .style-this.js module if there are CSS variables
+    // This needs to happen BEFORE codegen for entrypoints
+    if transformer.atomic && !css_variable_identifiers.is_empty() {
+        if let Some(import_source) = &import_source {
+            // Remove the .css extension and add .style-this.js
+            let base_import = if let Some(stripped) = import_source.strip_suffix(&format!(".{}", transformer.css_extension)) {
+                stripped
+            } else {
+                import_source.as_str()
+            };
+            let style_this_import_source = format!("{}.style-this.js", base_import);
+            
+            // Create: import * as _styleThisClasses from "virtual:style-this:file.style-this.js"
+            use oxc_ast::ast::ImportNamespaceSpecifier;
+            
+            let namespace_specifier = ast_builder.alloc(ImportNamespaceSpecifier {
+                span: program.span,
+                local: ast_builder.binding_identifier(
+                    program.span,
+                    ast_builder.atom("_styleThisClasses")
+                ),
+            });
+            
+            let specifiers = ast_builder.vec1(ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace_specifier));
+            
+            let style_this_import = ast_builder
+                .alloc_import_declaration(
+                    program.span,
+                    Some(specifiers),
+                    ast_builder.string_literal(program.span, ast_builder.atom(&style_this_import_source), None),
+                    None,
+                    None::<oxc_allocator::Box<WithClause>>,
+                    ImportOrExportKind::Value,
+                );
+
+            let insert_pos = program
+                .body
+                .iter()
+                .position(|stmt| !matches!(stmt, Statement::ImportDeclaration(_)))
+                .unwrap_or(0);
+
+            program
+                .body
+                .insert(insert_pos, Statement::ImportDeclaration(style_this_import));
+        }
+    }
 
     // new entrypoint handling
     if entrypoint {
@@ -608,6 +656,25 @@ pub async fn evaluate_program<'alloc>(
         .build(&eval_program.borrow())
         .code;
 
+    // For atomic mode, prepend variable initializations so .css properties can be assigned
+    if transformer.atomic && !css_variable_identifiers.is_empty() {
+        let (_, atomic_vars): (Vec<_>, Vec<_>) = css_variable_identifiers
+            .iter()
+            .partition(|css_var| css_var.class_name.starts_with("global-"));
+        
+        let var_initializations = atomic_vars
+            .iter()
+            .map(|css_var| {
+                format!("const {} = {{}};", css_var.variable_name)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        
+        if !var_initializations.is_empty() {
+            eval_program_js = format!("{}\n{}", var_initializations, eval_program_js);
+        }
+    }
+
     // js_sys::eval(&format!("console.log('program', '{program_path}')",)).unwrap();
 
     // we append all exported idents we evaluated to the cache
@@ -625,43 +692,163 @@ pub async fn evaluate_program<'alloc>(
     let has_css = !css_variable_identifiers.is_empty();
 
     if entrypoint && has_css {
-        // Build source map metadata for JavaScript
-        let sourcemap_data = css_variable_identifiers
-            .iter()
-            .map(|css_var| {
-                let line = css_var.span.start;
-                let end_line = css_var.span.end;
-                format!(
-                    "{{className:'{}',start:{},end:{}}}",
-                    css_var.class_name.replace('\'', "\\'"),
-                    line,
-                    end_line
+        if transformer.atomic {
+            // Atomic mode: parse CSS into atomic classes
+            // Build source map metadata for JavaScript
+            let sourcemap_data = css_variable_identifiers
+                .iter()
+                .map(|css_var| {
+                    let line = css_var.span.start;
+                    let end_line = css_var.span.end;
+                    format!(
+                        "{{className:'{}',start:{},end:{}}}",
+                        css_var.class_name.replace('\'', "\\'"),
+                        line,
+                        end_line
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+
+            // Separate global styles from atomic-eligible styles
+            let (global_vars, atomic_vars): (Vec<_>, Vec<_>) = css_variable_identifiers
+                .iter()
+                .partition(|css_var| css_var.class_name.starts_with("_Global"));
+
+            // For atomic mode, we need to:
+            // 1. Variables are initialized as objects (done above before eval_program_js)
+            // 2. The virtual program assigns variable_name.css = template_literal (in eval_program_js)
+            // 3. Register all atomic classes by calling cssToAtomicClassList
+            // 4. Generate the .style-this.js module with those lists
+            
+            // Register all atomic classes (this happens after eval_program_js runs)
+            let css_transformations = atomic_vars
+                .iter()
+                .map(|css_var| {
+                    // The virtual program evaluates and sets variable_name.css = template_literal
+                    // We pass the evaluated CSS to cssToAtomicClassList
+                    // Add error handling for undefined CSS
+                    format!(
+                        "if (!{}.css) {{ console.error('[atomic] {}.css is undefined'); {}.css = ''; }}\nconst _{}_atomic = cssToAtomicClassList({}.css);",
+                        css_var.variable_name,
+                        css_var.variable_name,
+                        css_var.variable_name,
+                        css_var.variable_name,
+                        css_var.variable_name
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            // Build the .style-this.js module content
+            let style_this_exports = atomic_vars
+                .iter()
+                .map(|css_var| {
+                    // Strip __styleThis_ prefix if it exists to match the visitor's naming
+                    let base_name = css_var.variable_name.strip_prefix(&format!("{}_", PREFIX))
+                        .unwrap_or(&css_var.variable_name);
+                    let export_name = format!("_styleThis_{}", base_name);
+                    
+                    format!(
+                        "'export const {} = \"' + _{}_atomic + '\";'",
+                        export_name,
+                        css_var.variable_name
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" + '\\n' + ");
+
+            // Global styles keep their original format
+            let global_css = global_vars
+                .iter()
+                .map(|css_var| {
+                    format!("`${{{}.css}}\n`", css_var.variable_name)
+                })
+                .collect::<Vec<_>>()
+                .join(",\n");
+
+            let css_output = if global_css.is_empty() {
+                "atomicCss".to_string()
+            } else {
+                format!("[{global_css}, atomicCss].join('\\n')")
+            };
+
+            let style_this_module_code = if !style_this_exports.is_empty() {
+                format!("const styleThisModule = {};\nglobal.{}.get('{}.style-this.js').resolve(styleThisModule);",
+                    style_this_exports,
+                    css_file_store_ref,
+                    program_filepath.replace('\\', "\\\\").replace('\'', "\\'")
                 )
-            })
-            .collect::<Vec<_>>()
-            .join(",");
+            } else {
+                // Even if empty, resolve it to avoid hanging
+                format!("global.{}.get('{}.style-this.js').resolve('');",
+                    css_file_store_ref,
+                    program_filepath.replace('\\', "\\\\").replace('\'', "\\'")
+                )
+            };
 
-        let css = css_variable_identifiers
-            .into_iter()
-            .map(|css_var| {
-                if css_var.class_name.starts_with("_Global") {
-                    return format!("`${{{}.css}}\n`", css_var.variable_name);
-                }
-                if transformer.wrap_selectors_with_global {
-                    return format!("`:global(.{}) {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name);
-                }
+            eval_program_js.push_str(&formatdoc!(
+                "
+                // Import atomic CSS helper from wasm
+                const cssToAtomicClassList = global.__styleThis_cssToAtomicClassList;
+                if (!cssToAtomicClassList) {{
+                    throw new Error('cssToAtomicClassList not found on global. Available: ' + Object.keys(global).filter(k => k.includes('styleThis')).join(', '));
+                }}
+                
+                // Convert CSS to atomic class lists
+                {css_transformations}
+                
+                const cssSourcemapData = [{sourcemap_data}];
+                
+                // Get all atomic CSS generated so far
+                const atomicCss = global.__styleThis_getAtomicCss();
+                
+                global.{css_file_store_ref}.get({css_filepath}).resolve({css_output}, cssSourcemapData, {css_filepath});
+                
+                // Generate and resolve the .style-this.js module
+                {style_this_module_code}
+                ",
+            ));
+        } else {
+            // Non-atomic mode: existing behavior
+            // Build source map metadata for JavaScript
+            let sourcemap_data = css_variable_identifiers
+                .iter()
+                .map(|css_var| {
+                    let line = css_var.span.start;
+                    let end_line = css_var.span.end;
+                    format!(
+                        "{{className:'{}',start:{},end:{}}}",
+                        css_var.class_name.replace('\'', "\\'"),
+                        line,
+                        end_line
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
 
-                format!("`.{} {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name)
-            })
-            .collect::<Vec<_>>()
-            .join(",\n");
+            let css = css_variable_identifiers
+                .into_iter()
+                .map(|css_var| {
+                    if css_var.class_name.starts_with("_Global") {
+                        return format!("`${{{}.css}}\n`", css_var.variable_name);
+                    }
+                    if transformer.wrap_selectors_with_global {
+                        return format!("`:global(.{}) {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name);
+                    }
 
-        eval_program_js.push_str(&formatdoc!(
-            "
-            const cssSourcemapData = [{sourcemap_data}];
-            global.{css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'), cssSourcemapData, {css_filepath});
-            ",
-        ));
+                    format!("`.{} {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name)
+                })
+                .collect::<Vec<_>>()
+                .join(",\n");
+
+            eval_program_js.push_str(&formatdoc!(
+                "
+                const cssSourcemapData = [{sourcemap_data}];
+                global.{css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'), cssSourcemapData, {css_filepath});
+                ",
+            ));
+        }
     }
 
     if transformer.debug {
@@ -689,11 +876,18 @@ pub async fn evaluate_program<'alloc>(
 
     // wrap into promise
     let eval_program_js = if let Some(require_ref) = &transformer.require_ref {
+        let atomic_funcs = if transformer.atomic {
+            format!("__styleThis_cssToAtomicClassList: globalThis.__styleThis_cssToAtomicClassList,\n                __styleThis_getAtomicCss: globalThis.__styleThis_getAtomicCss,")
+        } else {
+            String::new()
+        };
+        
         formatdoc!(
             "
             const _global = {{
                 {css_file_store_ref}: globalThis.{css_file_store_ref},
                 {value_cache_ref}: globalThis.{value_cache_ref},
+                {atomic_funcs}
             }};
             
             const _require = (typeof globalThis !== 'undefined' && globalThis.{require_ref}) 
@@ -708,11 +902,18 @@ pub async fn evaluate_program<'alloc>(
             "
         )
     } else {
+        let atomic_funcs = if transformer.atomic {
+            format!("__styleThis_cssToAtomicClassList,\n                __styleThis_getAtomicCss,")
+        } else {
+            String::new()
+        };
+        
         formatdoc!(
             "
             const _global = {{
                 {css_file_store_ref},
                 {value_cache_ref},
+                {atomic_funcs}
             }};
 
             (async () => {{

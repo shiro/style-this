@@ -39,6 +39,7 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
         cssCache: cssFiles,
         valueCache: exportCache,
         cssExtension,
+        atomic: process.env.ATOMIC === '1',
       });
     }
 

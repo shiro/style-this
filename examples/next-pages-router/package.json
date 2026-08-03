@@ -6,6 +6,8 @@
     "dev": "next dev",
     "dev:webpack": "TURBOPACK=0 next dev",
     "dev:turbopack": "TURBOPACK=1 next dev",
+    "dev:atomic": "ATOMIC=1 next dev",
+    "dev:turbopack:atomic": "TURBOPACK=1 ATOMIC=1 next dev",
     "build": "next build",
     "build:webpack": "TURBOPACK=0 next build",
     "build:turbopack": "TURBOPACK=1 next build",

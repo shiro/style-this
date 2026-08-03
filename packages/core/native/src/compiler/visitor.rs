@@ -54,6 +54,8 @@ pub struct VisitorTransformer<'a, 'alloc> {
     tmp_program: Program<'alloc>,
     tmp_program_statement_buffer: Vec<Vec<Statement<'alloc>>>,
 
+    atomic: bool,
+
     pub error: Option<TransformError>,
 }
 
@@ -72,6 +74,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         css_function_name: Option<String>,
         style_function_name: Option<String>,
         extra_class_function_name: Option<String>,
+        atomic: bool,
     ) -> Self {
         Self {
             ast_builder,
@@ -105,6 +108,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             random: Default::default(),
             tmp_program: utils::build_new_ast(allocator).program,
             tmp_program_statement_buffer: Default::default(),
+
+            atomic,
 
             error: None,
         }
@@ -435,13 +440,6 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     ) {
         let span = it.span;
 
-        self.css_variable_identifiers.push(CssVariableIdentifier::new(
-            variable_name.to_string(),
-            class_name.to_string(),
-            extra_classes,
-            span,
-        ));
-
         // Filter out extraClass calls from expressions and adjust quasis accordingly
         let mut new_quasis = oxc_allocator::Vec::new_in(self.allocator);
         let mut new_expressions = oxc_allocator::Vec::new_in(self.allocator);
@@ -520,6 +518,14 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
             self.get_alias(name).map(|v| v.to_string())
         });
+
+        // Store the CSS variable identifier for the evaluator
+        self.css_variable_identifiers.push(CssVariableIdentifier::new(
+            variable_name.to_string(),
+            class_name.to_string(),
+            extra_classes,
+            span,
+        ));
 
         let stmt = Statement::ExpressionStatement(self.ast_builder.alloc_expression_statement(
             span,
@@ -742,39 +748,90 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     let class_name = self.create_virtual_css_template(variable_name);
                     let extra_classes = self.extract_extra_classes(template);
                     
-                    // Build the full class list including generated class and extra classes
-                    let mut full_class_list = vec![class_name.clone()];
-                    full_class_list.extend(extra_classes.clone());
-                    let full_class_string = full_class_list.join(" ");
-
                     self.insert_into_virtual_program_css(
                         template,
                         &resolved_variable_name,
                         &class_name,
-                        extra_classes,
+                        extra_classes.clone(),
                     );
 
-                    let variable_declarator = ast::build_variable_declarator(
-                        self.ast_builder,
-                        span,
-                        &resolved_variable_name,
-                        ast::build_decorated_string(self.ast_builder, span, &full_class_string),
-                    );
+                    if self.atomic {
+                        // Atomic mode: Reference the imported atomic class from .style-this.js module
+                        // DON'T insert variable declarator into virtual program - that happens in main program
+                        // The virtual program only needs to evaluate CSS templates
 
-                    self.insert_into_virtual_program(
-                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                        None,
-                    );
-
-                    self.replacement_points.insert(
-                        span,
-                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                        self.replacement_points.insert(
                             span,
-                            self.ast_builder.atom(&resolved_variable_name),
-                        )),
-                    );
+                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                                span,
+                                self.ast_builder.atom(&resolved_variable_name),
+                            )),
+                        );
 
-                    *it = ast::build_string(self.ast_builder, span, &full_class_string);
+                        // Replace with identifier reference (evaluated later from .style-this.js)
+                        let base_name = resolved_variable_name.strip_prefix(&format!("{}_", crate::PREFIX))
+                            .unwrap_or(&resolved_variable_name);
+                        let import_ref_name = format!("_styleThis_{}", base_name);
+                        
+                        // Build expression: _styleThisClasses._styleThis_xxx
+                        let member_expr = Expression::StaticMemberExpression(
+                            self.ast_builder.alloc_static_member_expression(
+                                span,
+                                Expression::Identifier(
+                                    self.ast_builder.alloc_identifier_reference(
+                                        span,
+                                        self.ast_builder.atom("_styleThisClasses")
+                                    )
+                                ),
+                                self.ast_builder.identifier_name(span, self.ast_builder.atom(&import_ref_name)),
+                                false,
+                            )
+                        );
+                        
+                        // Handle extra classes - concatenate with space if present
+                        *it = if !extra_classes.is_empty() {
+                            let extra_class_string = extra_classes.join(" ");
+                            let space_and_extra = format!(" {}", extra_class_string);
+                            Expression::BinaryExpression(
+                                self.ast_builder.alloc_binary_expression(
+                                    span,
+                                    member_expr,
+                                    oxc_ast::ast::BinaryOperator::Addition,
+                                    ast::build_string(self.ast_builder, span, &space_and_extra),
+                                )
+                            )
+                        } else {
+                            member_expr
+                        };
+                    } else {
+                        // Non-atomic mode: inline the class name string
+                        // Build the full class list including generated class and extra classes
+                        let mut full_class_list = vec![class_name.clone()];
+                        full_class_list.extend(extra_classes);
+                        let full_class_string = full_class_list.join(" ");
+
+                        let variable_declarator = ast::build_variable_declarator(
+                            self.ast_builder,
+                            span,
+                            &resolved_variable_name,
+                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
+                        );
+
+                        self.insert_into_virtual_program(
+                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                            None,
+                        );
+
+                        self.replacement_points.insert(
+                            span,
+                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                                span,
+                                self.ast_builder.atom(&resolved_variable_name),
+                            )),
+                        );
+
+                        *it = ast::build_string(self.ast_builder, span, &full_class_string);
+                    }
                 }
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
@@ -874,40 +931,89 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 tag if Some(tag) == self.css_function_name.as_deref() => {
                     let class_name = self.create_virtual_css_template(variable_name);
                     let extra_classes = self.extract_extra_classes(template);
-                    
-                    // Build the full class list including generated class and extra classes
-                    let mut full_class_list = vec![class_name.clone()];
-                    full_class_list.extend(extra_classes.clone());
-                    let full_class_string = full_class_list.join(" ");
-
-                    let variable_declarator = ast::build_variable_declarator(
-                        self.ast_builder,
-                        span,
-                        &resolved_variable_name,
-                        ast::build_decorated_string(self.ast_builder, span, &full_class_string),
-                    );
 
                     self.insert_into_virtual_program_css(
                         template,
                         &resolved_variable_name,
                         &class_name,
-                        extra_classes,
+                        extra_classes.clone(),
                     );
 
-                    self.insert_into_virtual_program(
-                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                        None,
-                    );
+                    if self.atomic {
+                        // Atomic mode: Reference the imported atomic class from .style-this.js module
+                        // DON'T insert variable declarator into virtual program - the virtual program
+                        // only evaluates CSS templates, the actual variable is imported in main program
 
-                    self.replacement_points.insert(
-                        span,
-                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                        let base_name = resolved_variable_name.strip_prefix(&format!("{}_", crate::PREFIX))
+                            .unwrap_or(&resolved_variable_name);
+                        let import_ref_name = format!("_styleThis_{}", base_name);
+                        
+                        // Build expression: _styleThisClasses._styleThis_xxx
+                        let member_expr = Expression::StaticMemberExpression(
+                            self.ast_builder.alloc_static_member_expression(
+                                span,
+                                Expression::Identifier(
+                                    self.ast_builder.alloc_identifier_reference(
+                                        span,
+                                        self.ast_builder.atom("_styleThisClasses")
+                                    )
+                                ),
+                                self.ast_builder.identifier_name(span, self.ast_builder.atom(&import_ref_name)),
+                                false,
+                            )
+                        );
+                        
+                        // Handle extra classes - concatenate with space if present
+                        *init = if !extra_classes.is_empty() {
+                            let extra_class_string = extra_classes.join(" ");
+                            let space_and_extra = format!(" {}", extra_class_string);
+                            Expression::BinaryExpression(
+                                self.ast_builder.alloc_binary_expression(
+                                    span,
+                                    member_expr,
+                                    oxc_ast::ast::BinaryOperator::Addition,
+                                    ast::build_string(self.ast_builder, span, &space_and_extra),
+                                )
+                            )
+                        } else {
+                            member_expr
+                        };
+
+                        self.replacement_points.insert(
                             span,
-                            self.ast_builder.atom(&resolved_variable_name),
-                        )),
-                    );
+                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                                span,
+                                self.ast_builder.atom(&resolved_variable_name),
+                            )),
+                        );
+                    } else {
+                        // Non-atomic mode: inline the class name string
+                        let mut full_class_list = vec![class_name.clone()];
+                        full_class_list.extend(extra_classes.clone());
+                        let full_class_string = full_class_list.join(" ");
 
-                    *init = ast::build_string(self.ast_builder, span, &full_class_string);
+                        let variable_declarator = ast::build_variable_declarator(
+                            self.ast_builder,
+                            span,
+                            &resolved_variable_name,
+                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
+                        );
+
+                        self.insert_into_virtual_program(
+                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                            None,
+                        );
+
+                        self.replacement_points.insert(
+                            span,
+                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                                span,
+                                self.ast_builder.atom(&resolved_variable_name),
+                            )),
+                        );
+
+                        *init = ast::build_string(self.ast_builder, span, &full_class_string);
+                    }
                 }
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);

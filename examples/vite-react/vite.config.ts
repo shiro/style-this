@@ -6,12 +6,17 @@ import styleThisVitePlugin from '@style-this/vite'
 export default defineConfig({
   plugins: [
     react(),
-    styleThisVitePlugin({ filter: /.*\.tsx/ })
+    styleThisVitePlugin({ 
+      filter: /.*\.tsx/,
+      atomic: process.env.ATOMIC === '1',
+      debug: false
+    })
   ],
   server: {
     port: 3000,
   },
   build: {
     sourcemap: true,
+    cssMinify: false,  // Disable CSS minification to debug
   },
 })

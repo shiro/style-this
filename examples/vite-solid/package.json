@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm vinxi dev",
+    "dev:atomic": "ATOMIC=1 pnpm vinxi dev",
     "build": "vinxi build",
     "build:dev": "pnpm build"
   },

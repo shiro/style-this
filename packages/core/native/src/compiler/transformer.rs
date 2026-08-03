@@ -19,6 +19,7 @@ pub struct Transformer {
 
     pub(crate) use_require: bool,
     pub(crate) debug: bool,
+    pub(crate) atomic: bool,
 }
 
 #[wasm_bindgen]
@@ -90,6 +91,11 @@ impl Transformer {
             .as_bool()
             .unwrap_or_default();
 
+        let atomic = js_sys::Reflect::get(&opts, &JsValue::from_str("atomic"))
+            .unwrap()
+            .as_bool()
+            .unwrap_or_default();
+
         let create_require = js_sys::Reflect::get(&opts, &JsValue::from_str("createRequire"))
             .ok()
             .and_then(|v| v.dyn_into::<js_sys::Function>().ok());
@@ -115,6 +121,7 @@ impl Transformer {
 
             use_require,
             debug,
+            atomic,
         }
     }
 

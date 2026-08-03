@@ -52,7 +52,10 @@ export default defineConfig({
         // transformer: "lightningcss",
         devSourcemap: true,
       },
-      plugins: [styleThisVitePlugin({ filter: /.*\.tsx/ })],
+      plugins: [styleThisVitePlugin({ 
+        filter: /.*\.tsx/,
+        atomic: process.env.ATOMIC === '1'
+      })],
     };
   },
 });

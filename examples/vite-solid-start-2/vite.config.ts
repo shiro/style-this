@@ -6,7 +6,10 @@ import styleThisVitePlugin from "@style-this/vite";
 
 export default defineConfig({
   plugins: [
-    styleThisVitePlugin({ filter: /.*\.tsx/ }),
+    styleThisVitePlugin({ 
+      filter: /.*\.tsx/,
+      atomic: process.env.ATOMIC === '1'
+    }),
     solidStart(),
     nitro(),
   ],

@@ -32,6 +32,7 @@ interface Options {
   filter?: Filter | Filter[];
   ignoredImports?: Record<string, true | (string | typeof DefaultImport)[]>;
   debug?: boolean;
+  atomic?: boolean;
 }
 
 interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> { }
@@ -43,7 +44,7 @@ export interface ExtraFields {
 }
 
 const vitePlugin = (options: Options = {}) => {
-  let { cssExtension = "css", filter = [], debug } = options;
+  let { cssExtension = "css", filter = [], debug, atomic = false } = options;
 
   if (!Array.isArray(filter)) filter = [filter];
 
@@ -173,7 +174,23 @@ const vitePlugin = (options: Options = {}) => {
 
         useRequire: (options as any).useRequire,
         debug,
+        atomic,
       });
+      
+      // In atomic mode, set up global helper functions
+      if (atomic) {
+        const { css_to_atomic_class_list, get_atomic_css } = await import("@style-this/core/compiler");
+        (globalThis as any).__styleThis_cssToAtomicClassList = css_to_atomic_class_list;
+        (globalThis as any).__styleThis_getAtomicCss = get_atomic_css;
+        // Also set on global for compatibility
+        (global as any).__styleThis_cssToAtomicClassList = css_to_atomic_class_list;
+        (global as any).__styleThis_getAtomicCss = get_atomic_css;
+        
+        console.log('[atomic] Set up global functions:', {
+          cssToAtomicClassList: typeof (global as any).__styleThis_cssToAtomicClassList,
+          getAtomicCss: typeof (global as any).__styleThis_getAtomicCss,
+        });
+      }
     },
 
     resolveId(id) {
@@ -201,11 +218,16 @@ const vitePlugin = (options: Options = {}) => {
             `virtual CSS file '${filepath}' from id '${id}' not yet ready`,
           );
 
-        // tell Vite that this virtual CSS module depends on the source file
-        // remove the css extension to get the original source file path
-        const sourceFilepath = filepath.endsWith(`.${cssExtension}`)
-          ? filepath.slice(0, -(cssExtension.length + 1))
-          : filepath;
+        // tell Vite that this virtual module depends on the source file
+        // remove the extension to get the original source file path
+        let sourceFilepath: string;
+        if (filepath.endsWith(`.${cssExtension}`)) {
+          sourceFilepath = filepath.slice(0, -(cssExtension.length + 1));
+        } else if (filepath.endsWith('.style-this.js')) {
+          sourceFilepath = filepath.slice(0, -'.style-this.js'.length);
+        } else {
+          sourceFilepath = filepath;
+        }
         this.addWatchFile(sourceFilepath);
 
         let time = 0;
@@ -270,8 +292,17 @@ const vitePlugin = (options: Options = {}) => {
       // remove from cache
       valueCache[ctx.file] = {};
       const cssFilepath = `${ctx.file}.${cssExtension}`;
+      const styleThisFilepath = `${ctx.file}.style-this.js`;
+      
       cssCache.delete(cssFilepath);
       cssSourceMapMetadata.delete(cssFilepath);
+      
+      // In atomic mode, also clear .style-this.js cache and atomic CSS cache
+      if (atomic) {
+        cssCache.delete(styleThisFilepath);
+        const { clear_atomic_css_cache } = await import("@style-this/core/compiler");
+        clear_atomic_css_cache();
+      }
 
       // invalidate all modules that import this one
       const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
@@ -307,12 +338,14 @@ const vitePlugin = (options: Options = {}) => {
 
       const importSource = `${virtualModulePrefix}${filepath}.${cssExtension}`;
       const cssFilepath = `${filepath}.${cssExtension}`;
+      const styleThisFilepath = `${filepath}.style-this.js`;
       const skipCssEval = cssCache.has(cssFilepath);
 
       try {
         const startTime = performance.now();
 
         if (!skipCssEval) {
+          // Create cache entry for CSS file
           let resolve: CssCachEntry["resolve"] | undefined;
           const entry = new Promise((_resolve, _reject) => {
             resolve = (
@@ -338,6 +371,20 @@ const vitePlugin = (options: Options = {}) => {
           entry.code = code;
 
           cssCache.set(cssFilepath, entry);
+          
+          // In atomic mode, also create cache entry for .style-this.js file
+          if (atomic) {
+            let styleThisResolve: CssCachEntry["resolve"] | undefined;
+            const styleThisEntry = new Promise((_resolve, _reject) => {
+              styleThisResolve = (css: string | Error) => {
+                _resolve(css);
+              };
+            }) as CssCachEntry;
+            styleThisEntry.resolve = styleThisResolve!;
+            styleThisEntry.code = code;
+            
+            cssCache.set(styleThisFilepath, styleThisEntry);
+          }
         }
 
         const transformedResult = await styleThis.transform(
@@ -365,6 +412,13 @@ const vitePlugin = (options: Options = {}) => {
           const virtualModuleId = resolvedVirtualModulePrefix + cssFilepath;
           const module = server.moduleGraph.getModuleById(virtualModuleId);
           if (module) server.reloadModule(module);
+          
+          // In atomic mode, also invalidate the .style-this.js module
+          if (atomic) {
+            const styleThisModuleId = resolvedVirtualModulePrefix + styleThisFilepath;
+            const styleThisModule = server.moduleGraph.getModuleById(styleThisModuleId);
+            if (styleThisModule) server.reloadModule(styleThisModule);
+          }
         }
 
         return {

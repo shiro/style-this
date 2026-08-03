@@ -6,6 +6,7 @@ mod evaluator;
 mod transformer;
 mod types;
 mod visitor;
+pub mod atomic;
 
 // Re-exports for public API
 pub use error::TransformError;

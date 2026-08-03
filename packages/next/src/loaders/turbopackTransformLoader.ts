@@ -39,6 +39,7 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
         cssExtension,
         wrapSelectorsWithGlobal: true,
         useRequire: true,
+        atomic: process.env.ATOMIC === '1',
       });
     }
 
