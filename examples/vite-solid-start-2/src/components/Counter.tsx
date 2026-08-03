@@ -1,4 +1,4 @@
-import { css } from "@style-this/core";
+import { css, extraClass } from "@style-this/core";
 import { styled } from "@style-this/solid";
 import { createSignal } from "solid-js";
 
@@ -13,6 +13,7 @@ export const CounterStyle = css`
   border: 1px solid blue;
   border-radius: ${spacing / 2}px;
   background: white;
+  ${extraClass("something")}
 `;
 
 export const FancyButton = styled.button<{ a: number }>`
@@ -33,13 +34,13 @@ export default function Counter() {
   const [count, setCount] = createSignal(0);
   return (
     <div class={CounterStyle}>
-      <span>Count: {count()}</span>
+      {count()}
       <FancyButton2
         styleProps={{ a: 8, b: 16 }}
         onClick={() => setCount(count() + 1)}
         disabled={count() >= 3}
       >
-        Increment
+        count me
       </FancyButton2>
     </div>
   );

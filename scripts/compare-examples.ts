@@ -6,9 +6,11 @@ import { chromium, Browser } from 'playwright';
 
 const REACT_EXAMPLE = path.join(process.cwd(), 'examples/vite-react');
 const SOLID_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid');
+const SOLID_START_2_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid-start-2');
 const NEXT_EXAMPLE = path.join(process.cwd(), 'examples/next-webpack');
 const REACT_PORT = 4173;
 const SOLID_PORT = 3000;
+const SOLID_START_2_PORT = 3010;
 const NEXT_PORT = 3002;
 
 interface BuildOutput {
@@ -36,13 +38,21 @@ function getChromiumPath(): string | undefined {
   }
 }
 
-async function startServer(command: string, cwd: string, port: number, name: string): Promise<ChildProcess> {
+async function startServer(command: string, cwd: string, port: number, name: string, env?: Record<string, string>): Promise<ChildProcess> {
   return new Promise((resolve, reject) => {
     console.log(`Starting ${name} server on port ${port}...`);
-    const proc = spawn('pnpm', command.split(' '), {
+    
+    // Check if command starts with 'node'
+    const isNodeCommand = command.startsWith('node');
+    const [cmd, ...args] = isNodeCommand ? command.split(' ') : ['pnpm', ...command.split(' ')];
+    
+    const serverEnv = { ...process.env, ...env };
+    
+    const proc = spawn(cmd, args, {
       cwd,
       stdio: 'pipe',
       shell: true,
+      env: serverEnv,
     });
 
     let started = false;
@@ -55,7 +65,7 @@ async function startServer(command: string, cwd: string, port: number, name: str
 
     proc.stdout?.on('data', (data) => {
       const output = data.toString();
-      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:') || output.includes('started server')) {
+      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:') || output.includes('started server') || output.includes('Listening on')) {
         if (!started) {
           started = true;
           clearTimeout(timeout);
@@ -66,7 +76,7 @@ async function startServer(command: string, cwd: string, port: number, name: str
 
     proc.stderr?.on('data', (data) => {
       const output = data.toString();
-      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:') || output.includes('started server')) {
+      if (output.includes(`${port}`) || output.includes('ready') || output.includes('Local:') || output.includes('started server') || output.includes('Listening on')) {
         if (!started) {
           started = true;
           clearTimeout(timeout);
@@ -143,6 +153,30 @@ async function buildAndCaptureSolid(browser: Browser): Promise<BuildOutput> {
     await sleep(2000); // Give server time to fully start
     
     const html = await fetchHTML(`http://localhost:${SOLID_PORT}`, browser);
+    
+    const css = extractCSS(html);
+    const bodyContent = extractBodyContent(html);
+    
+    return { html: bodyContent, css };
+  } finally {
+    if (server) {
+      server.kill();
+      await sleep(500);
+    }
+  }
+}
+
+async function buildAndCaptureSolidStart2(browser: Browser): Promise<BuildOutput> {
+  console.log('Building Solid Start 2 example...');
+  exec('pnpm build', SOLID_START_2_EXAMPLE);
+  
+  let server: ChildProcess | null = null;
+  try {
+    // For Solid Start 2, use the output directory and set PORT env var
+    server = await startServer('node .output/server/index.mjs', SOLID_START_2_EXAMPLE, SOLID_START_2_PORT, 'Solid Start 2', { PORT: String(SOLID_START_2_PORT) });
+    await sleep(2000); // Give server time to fully start
+    
+    const html = await fetchHTML(`http://localhost:${SOLID_START_2_PORT}`, browser);
     
     const css = extractCSS(html);
     const bodyContent = extractBodyContent(html);
@@ -324,7 +358,7 @@ function compareHTML(reactHTML: string, solidHTML: string): boolean {
 }
 
 async function main() {
-  console.log('Comparing React, Solid, and Next.js example outputs\n');
+  console.log('Comparing Solid vs Solid Start 2 example outputs\n');
   console.log('='.repeat(50));
   
   let exitCode = 0;
@@ -335,65 +369,19 @@ async function main() {
   });
   
   try {
-    const reactOutput = await buildAndCaptureReact(browser);
     const solidOutput = await buildAndCaptureSolid(browser);
-    const nextWebpackOutput = await buildAndCaptureNext(browser, 'webpack');
-    const nextTurbopackOutput = await buildAndCaptureNext(browser, 'turbopack');
+    const solidStart2Output = await buildAndCaptureSolidStart2(browser);
     
-    console.log('\nComparing React vs Solid CSS...');
-    const cssMatchReactSolid = compareCSS(reactOutput.css, solidOutput.css);
+    console.log('\nComparing Solid vs Solid Start 2 CSS...');
+    const cssMatch = compareCSS(solidOutput.css, solidStart2Output.css);
     
-    console.log('\nComparing React vs Solid HTML...');
-    const htmlMatchReactSolid = compareHTML(reactOutput.html, solidOutput.html);
-    
-    let cssMatchReactNextWebpack = false;
-    let htmlMatchReactNextWebpack = false;
-    let cssMatchReactNextTurbopack = false;
-    let htmlMatchReactNextTurbopack = false;
-    let cssMatchNextModes = false;
-    let htmlMatchNextModes = false;
-    
-    if (nextWebpackOutput) {
-      console.log('\nComparing React vs Next.js (webpack) CSS...');
-      cssMatchReactNextWebpack = compareCSS(reactOutput.css, nextWebpackOutput.css);
-      
-      console.log('\nComparing React vs Next.js (webpack) HTML...');
-      console.log('(Note: Next.js uses inline styles due to transformer compatibility issues)');
-      htmlMatchReactNextWebpack = compareHTML(reactOutput.html, nextWebpackOutput.html);
-    } else {
-      console.log('\n⚠ Next.js (webpack) runtime output unavailable (compilation succeeded)');
-    }
-    
-    if (nextTurbopackOutput) {
-      console.log('\nComparing React vs Next.js (turbopack) CSS...');
-      cssMatchReactNextTurbopack = compareCSS(reactOutput.css, nextTurbopackOutput.css);
-      
-      console.log('\nComparing React vs Next.js (turbopack) HTML...');
-      htmlMatchReactNextTurbopack = compareHTML(reactOutput.html, nextTurbopackOutput.html);
-    } else {
-      console.log('\n⚠ Next.js (turbopack) runtime output unavailable (compilation succeeded)');
-    }
-    
-    if (nextWebpackOutput && nextTurbopackOutput) {
-      console.log('\nComparing Next.js webpack vs turbopack CSS...');
-      cssMatchNextModes = compareCSS(nextWebpackOutput.css, nextTurbopackOutput.css);
-      
-      console.log('\nComparing Next.js webpack vs turbopack HTML...');
-      htmlMatchNextModes = compareHTML(nextWebpackOutput.html, nextTurbopackOutput.html);
-    }
+    console.log('\nComparing Solid vs Solid Start 2 HTML...');
+    const htmlMatch = compareHTML(solidOutput.html, solidStart2Output.html);
     
     console.log('\n' + '='.repeat(50));
     
-    if (cssMatchReactSolid && htmlMatchReactSolid) {
-      console.log('\n✓ React and Solid outputs match!');
-      if (nextWebpackOutput && nextTurbopackOutput) {
-        if (cssMatchReactNextWebpack && cssMatchReactNextTurbopack) {
-          console.log('✓ Next.js (both webpack and turbopack) CSS matches');
-        }
-        if (cssMatchNextModes && htmlMatchNextModes) {
-          console.log('✓ Next.js webpack and turbopack outputs match!');
-        }
-      }
+    if (cssMatch && htmlMatch) {
+      console.log('\n✓ Solid and Solid Start 2 outputs match!');
     } else {
       console.log('\n✗ Some outputs differ - see details above');
       exitCode = 1;
