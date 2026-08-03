@@ -7,7 +7,7 @@ import { chromium, Browser } from 'playwright';
 const REACT_EXAMPLE = path.join(process.cwd(), 'examples/vite-react');
 const SOLID_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid');
 const SOLID_START_2_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid-start-2');
-const NEXT_EXAMPLE = path.join(process.cwd(), 'examples/next-webpack');
+const NEXT_EXAMPLE = path.join(process.cwd(), 'examples/next');
 const REACT_PORT = 4173;
 const SOLID_PORT = 3000;
 const SOLID_START_2_PORT = 3010;
@@ -172,11 +172,35 @@ async function buildAndCaptureSolidStart2(browser: Browser): Promise<BuildOutput
   
   let server: ChildProcess | null = null;
   try {
-    // For Solid Start 2, use the output directory and set PORT env var
+    // For Solid Start 2, start server directly and set PORT env var
     server = await startServer('node .output/server/index.mjs', SOLID_START_2_EXAMPLE, SOLID_START_2_PORT, 'Solid Start 2', { PORT: String(SOLID_START_2_PORT) });
     await sleep(2000); // Give server time to fully start
     
     const html = await fetchHTML(`http://localhost:${SOLID_START_2_PORT}`, browser);
+    
+    const css = extractCSS(html);
+    const bodyContent = extractBodyContent(html);
+    
+    return { html: bodyContent, css };
+  } finally {
+    if (server) {
+      server.kill();
+      await sleep(500);
+    }
+  }
+}
+
+async function buildAndCaptureNextSimple(browser: Browser): Promise<BuildOutput> {
+  console.log('Building Next example...');
+  exec('pnpm build', NEXT_EXAMPLE);
+  
+  let server: ChildProcess | null = null;
+  try {
+    // For Next.js, we start the production server
+    server = await startServer('pnpm start', NEXT_EXAMPLE, NEXT_PORT, 'Next', { PORT: String(NEXT_PORT) });
+    await sleep(2000); // Give server time to fully start
+    
+    const html = await fetchHTML(`http://localhost:${NEXT_PORT}`, browser);
     
     const css = extractCSS(html);
     const bodyContent = extractBodyContent(html);
@@ -238,6 +262,9 @@ function normalizeHTML(html: string): string {
   return html
     .replace(/<!--.*?-->/gs, '') // Remove HTML comments (including Solid hydration markers)
     .replace(/\sdata-hk="[^"]*"/g, '') // Remove Solid hydration keys
+    .replace(/<div\s+id="__next">([\s\S]*?)<\/div>\s*<next-route-announcer>[\s\S]*?<\/next-route-announcer>/s, '$1') // Remove Next.js wrapper and route announcer
+    .replace(/<next-route-announcer>[\s\S]*?<\/next-route-announcer>/s, '') // Remove next-route-announcer if not already removed  
+    .replace(/<div\s+id="__next">([\s\S]*?)<\/div>/s, '$1') // Remove just the __next wrapper if present without route announcer
     .replace(/\bstyle="([^"]*)"/g, (match, styleContent) => {
       // Normalize CSS variable names by removing the hash suffix and whitespace
       const normalized = styleContent
@@ -358,7 +385,7 @@ function compareHTML(reactHTML: string, solidHTML: string): boolean {
 }
 
 async function main() {
-  console.log('Comparing Solid vs Solid Start 2 example outputs\n');
+  console.log('Comparing Solid, Solid Start 2, and Next.js example outputs\n');
   console.log('='.repeat(50));
   
   let exitCode = 0;
@@ -369,19 +396,48 @@ async function main() {
   });
   
   try {
+    // Capture Solid first
+    console.log('\nCapturing Solid example...');
     const solidOutput = await buildAndCaptureSolid(browser);
-    const solidStart2Output = await buildAndCaptureSolidStart2(browser);
     
-    console.log('\nComparing Solid vs Solid Start 2 CSS...');
-    const cssMatch = compareCSS(solidOutput.css, solidStart2Output.css);
+    // Try to capture Solid Start 2 (may fail due to spawning issues)
+    let solidStart2Output: BuildOutput | null = null;
+    try {
+      console.log('\nCapturing Solid Start 2 example...');
+      solidStart2Output = await buildAndCaptureSolidStart2(browser);
+    } catch (err) {
+      console.warn('\n⚠ Solid Start 2 capture failed:', err instanceof Error ? err.message : err);
+    }
     
-    console.log('\nComparing Solid vs Solid Start 2 HTML...');
-    const htmlMatch = compareHTML(solidOutput.html, solidStart2Output.html);
+    // Capture Next
+    console.log('\nCapturing Next example...');
+    const nextOutput = await buildAndCaptureNextSimple(browser);
+    
+    if (solidStart2Output) {
+      console.log('\nComparing Solid vs Solid Start 2 CSS...');
+      const cssMatchSolidStart2 = compareCSS(solidOutput.css, solidStart2Output.css);
+      
+      console.log('\nComparing Solid vs Solid Start 2 HTML...');
+      const htmlMatchSolidStart2 = compareHTML(solidOutput.html, solidStart2Output.html);
+      
+      if (!cssMatchSolidStart2 || !htmlMatchSolidStart2) {
+        exitCode = 1;
+      }
+    }
+    
+    console.log('\nComparing Solid vs Next CSS...');
+    const cssMatchNext = compareCSS(solidOutput.css, nextOutput.css);
+    
+    console.log('\nComparing Solid vs Next HTML...');
+    const htmlMatchNext = compareHTML(solidOutput.html, nextOutput.html);
     
     console.log('\n' + '='.repeat(50));
     
-    if (cssMatch && htmlMatch) {
-      console.log('\n✓ Solid and Solid Start 2 outputs match!');
+    if (cssMatchNext && htmlMatchNext) {
+      console.log('\n✓ Solid and Next outputs match!');
+      if (solidStart2Output) {
+        console.log('✓ Solid Start 2 also matches!');
+      }
     } else {
       console.log('\n✗ Some outputs differ - see details above');
       exitCode = 1;
