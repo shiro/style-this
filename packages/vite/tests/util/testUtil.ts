@@ -46,9 +46,29 @@ export const evaluateProgram = async (
   expect(id).toBeDefined();
 
   const cssRaw = await plugin.load(id);
-  await expect(cssRaw).toMatchFileSnapshot(
+  
+  // Handle both string and object responses (with source maps)
+  let cssCode: string;
+  let cssMap: string | undefined;
+  
+  if (typeof cssRaw === 'string') {
+    cssCode = cssRaw;
+  } else if (cssRaw && typeof cssRaw === 'object') {
+    cssCode = cssRaw.code || '';
+    cssMap = cssRaw.map ? JSON.stringify(cssRaw.map, null, 2) : undefined;
+  } else {
+    cssCode = String(cssRaw || '');
+  }
+  
+  await expect(cssCode).toMatchFileSnapshot(
     `${testDir}/out/${entry}.${plugin.cssExtension}`,
   );
+  
+  if (cssMap) {
+    await expect(cssMap).toMatchFileSnapshot(
+      `${testDir}/out/${entry}.${plugin.cssExtension}.map`,
+    );
+  }
 
   const temporaryPrograms = Object.entries(plugin.__getTemporaryPrograms())
     .sort(([a], [b]) => a.localeCompare(b))
