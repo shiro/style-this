@@ -1,6 +1,6 @@
 import path from "path";
 import { initializeStyleThis } from "@style-this/core/compiler";
-import { cssFiles, storeCSSOutput } from "../shared";
+import { cssFiles } from "../shared";
 import { dependencyStore } from "../shared";
 import { Transformer } from "@style-this/core/compiler";
 import type { RawLoaderDefinitionFunction } from "webpack";
@@ -8,7 +8,6 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { makeLoadFile } from "./shared";
-import { writeFileSync, mkdirSync } from "fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -54,7 +53,7 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
       noopFilepath,
     );
 
-    // we explicitly cache-bust here
+    // Use noop workaround - reference the noop CSS file without writing virtual modules
     const importSource = `${noopFilepathRelative}?filepath=${filepath}&time=${+new Date()}`;
     
     // Create CSS cache entry for this file
@@ -65,18 +64,6 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
       let resolve: import("@style-this/core/compiler").CssCachEntry["resolve"] | undefined;
       const entry = new Promise((_resolve, _reject) => {
         resolve = (_css: string | Error, _sourcemapData?: any, _filepath?: string) => {
-          // Store and write CSS immediately
-          if (typeof _css === 'string') {
-            storeCSSOutput(cssFilepath, _css);
-            // Write the CSS file immediately so it's available for the bundler
-            try {
-              const dir = path.dirname(cssFilepath);
-              mkdirSync(dir, { recursive: true });
-              writeFileSync(cssFilepath, _css, 'utf-8');
-            } catch (error) {
-              console.warn(`Failed to write CSS file ${cssFilepath}:`, error);
-            }
-          }
           _resolve(_css);
         };
       }) as import("@style-this/core/compiler").CssCachEntry;
