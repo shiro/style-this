@@ -12,12 +12,19 @@ const colorStyle = css`
 
 const MainComponent = () => {
   return (
-    <div className={ContainerStyle}>
+    <div className={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
       <span className={colorStyle}>world</span>
     </div>
   );
 };
+
+// export to avoid tree-shake
+export const _GlobalMain = css`
+  .Global__Main {
+    background: coral;
+  }
+`;
 
 export default MainComponent;

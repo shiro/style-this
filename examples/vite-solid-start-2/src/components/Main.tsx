@@ -8,7 +8,7 @@ const ContainerStyle = css`
 
 export default function Main() {
   return (
-    <div class={ContainerStyle}>
+    <div class={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
       <span
@@ -21,3 +21,9 @@ export default function Main() {
     </div>
   );
 }
+
+const _GlobalMain = css`
+  .Global__Main {
+    background: coral;
+  }
+`
