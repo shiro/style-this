@@ -6,16 +6,16 @@ const ContainerStyle = css`
   flex-direction: column;
 `;
 
+const colorStyle = css`
+  color: coral;
+`;
+
 export default function Main() {
   return (
     <div class={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
-      <span
-        class={css`
-          color: coral;
-        `}
-      >
+      <span class={colorStyle}>
         world
       </span>
     </div>

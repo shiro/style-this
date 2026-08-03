@@ -1,6 +1,7 @@
 // @refresh reload
 import { createHandler, StartServer } from "@solidjs/start/server";
 import { config } from "~/config";
+import { css } from "@style-this/core";
 
 const _warn = console.warn;
 console.warn = function (message?: any, ...optionalParams: any[]) {
@@ -13,6 +14,12 @@ const filterAssets = (input: any): any => {
   if (input.t.startsWith("<style")) return null;
   return input;
 };
+
+const AppWrapper = css`
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+`;
 
 export default createHandler(() => {
   return (
@@ -30,7 +37,7 @@ export default createHandler(() => {
             {/* {assets} */}
           </head>
           <body>
-            <div id="app" class="flex min-h-[100vh] flex-col">
+            <div id="app" class={AppWrapper}>
               {children}
             </div>
             {scripts}

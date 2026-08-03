@@ -8,9 +8,15 @@ const _GlobalMain = css`
   }
 `;
 
+const AppWrapper = css`
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+`;
+
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <div id="app" style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column' }}>
+    <div id="app" className={AppWrapper}>
       <div className="content-container">
         <Component {...pageProps} />
       </div>

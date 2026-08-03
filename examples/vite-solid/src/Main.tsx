@@ -3,17 +3,17 @@ import { css } from "@style-this/core";
 
 const color: string = "coral";
 
+const colorStyle = css`
+  color: ${color};
+`;
+
 const Main: Component = () => {
   // const color = "blue";
   return (
     <div class={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
-      <span
-        class={css`
-          color: ${color};
-        `}
-      >
+      <span class={colorStyle}>
         world
       </span>
     </div>

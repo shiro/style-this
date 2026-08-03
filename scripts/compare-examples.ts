@@ -263,8 +263,10 @@ function normalizeHTML(html: string): string {
     .replace(/<!--.*?-->/gs, '') // Remove HTML comments (including Solid hydration markers)
     .replace(/\sdata-hk="[^"]*"/g, '') // Remove Solid hydration keys
     .replace(/<div\s+id="__next">([\s\S]*?)<\/div>\s*<next-route-announcer>[\s\S]*?<\/next-route-announcer>/s, '$1') // Remove Next.js wrapper and route announcer
-    .replace(/<next-route-announcer>[\s\S]*?<\/next-route-announcer>/s, '') // Remove next-route-announcer if not already removed  
-    .replace(/<div\s+id="__next">([\s\S]*?)<\/div>/s, '$1') // Remove just the __next wrapper if present without route announcer
+    .replace(/<next-route-announcer>[\s\S]*?<\/next-route-announcer>/s, '') // Remove next-route-announcer if not already removed
+    // More robust removal of __next wrapper by looking for the matching closing tag
+    .replace(/<div\s+id="__next">/, '') // Remove opening __next tag
+    .replace(/<\/div>\s*(?=<script id="__NEXT_DATA__")/s, '') // Remove closing __next tag that comes before __NEXT_DATA__ script
     .replace(/\bstyle="([^"]*)"/g, (match, styleContent) => {
       // Normalize CSS variable names by removing the hash suffix and whitespace
       const normalized = styleContent
