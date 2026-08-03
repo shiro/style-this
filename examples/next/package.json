@@ -17,7 +17,7 @@
     "@style-this/react": "workspace:",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "next": "^15.1.6"
+    "next": "^16.2.12"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

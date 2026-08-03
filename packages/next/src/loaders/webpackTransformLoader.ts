@@ -52,6 +52,7 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
     const cssFilepath = `${filepath}.${cssExtension}`;
     const skipCssEval = cssFiles.has(cssFilepath);
     
+    let cssPromiseResolve: ((css: string) => void) | undefined;
     if (!skipCssEval) {
       let resolve: import("@style-this/core/compiler").CssCachEntry["resolve"] | undefined;
       const entry = new Promise((_resolve, _reject) => {
@@ -60,9 +61,16 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       entry.resolve = resolve!;
       entry.code = code.toString();
       
+      // Store the resolve function so we can call it after transform
+      cssPromiseResolve = (css: string) => {
+        entry.resolve(css);
+      };
+      
       cssFiles.set(cssFilepath, entry);
+      console.log("WebpackTransformLoader - created CSS cache entry for:", cssFilepath);
     }
 
+    console.log("WebpackTransformLoader - transforming:", filepath);
     const transformedResult = await styleThis.transform(
       code.toString(),
       filepath,
@@ -70,12 +78,20 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       importSource,
     );
 
+    console.log("WebpackTransformLoader - transform result:", !!transformedResult, "has code:", !!transformedResult?.code);
     if (!transformedResult) {
+      console.log("WebpackTransformLoader - no transform result, returning original code");
       filesContainingStyledTemplates.delete(filepath);
       this.callback(null, code, inputSourceMap);
       return;
     }
     filesContainingStyledTemplates.add(filepath);
+
+    // If we have CSS from the transform result, resolve the CSS promise
+    if (cssPromiseResolve && transformedResult.css) {
+      console.log("WebpackTransformLoader - resolving CSS:", transformedResult.css?.substring?.(0, 100));
+      cssPromiseResolve(transformedResult.css);
+    }
 
     this.callback(
       null,
@@ -86,3 +102,4 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
 };
 
 export default webpackTransformLoader;
+

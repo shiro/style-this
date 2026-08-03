@@ -3,7 +3,7 @@ import { cssFiles, dependencyStore } from "../shared";
 type Loader = RawLoaderDefinitionFunction;
 
 const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
-  // this.async();
+  const callback = this.async();
   // TODO remove this when done
   this.cacheable(false);
 
@@ -18,14 +18,26 @@ const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
   // this.clearDependencies();
   // this.addDependency(filepath);
 
-  // console.log("CSS", filepath, this.getDependencies());
+  console.log("CSS Loader - filepath:", filepath, "has CSS:", !!css, "cssFiles keys:", Array.from(cssFiles.keys()));
 
   if (!css) {
     console.log(cssFiles);
-    throw new Error(`failed to load virtual CSS file '${filepath}'`);
+    callback(new Error(`failed to load virtual CSS file '${filepath}'`));
+    return;
   }
 
-  return css;
+  // Handle the promise-based CSS entry
+  Promise.resolve(css).then(
+    (resolvedCss) => {
+      console.log("CSS Loader - resolved CSS:", resolvedCss?.substring?.(0, 100));
+      callback(null, resolvedCss);
+    },
+    (error) => {
+      console.log("CSS Loader - error:", error);
+      callback(error);
+    }
+  );
 };
 
 export default cssLoader;
+
