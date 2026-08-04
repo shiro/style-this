@@ -4,7 +4,7 @@ import { css } from "@style-this/core";
 import "virtual:style-this:/entry.tsx.css";
 export const FancyButton = (() => {
 	let FancyButton = "FancyButton-3slijs";
-	let comp = (props) => <button {...props} class={FancyButton + (" " + (props.class ?? ""))} style={{
+	let comp = (props) => <button {...props} class={props.class ? FancyButton + (" " + props.class) : FancyButton} style={{
 		"--var1-c5iro5": (({ a }) => a)({
 			...props.styleProps,
 			"props": props

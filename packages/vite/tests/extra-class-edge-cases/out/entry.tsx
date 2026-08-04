@@ -13,14 +13,14 @@ const test4 = "test4-cxebwl first second third fourth";
 // Child styled component extends parent, both have extraClass
 const ParentStyled = (() => {
 	let ParentStyled = "ParentStyled-difgta parent-class";
-	let comp = (props) => <div {...props} className={ParentStyled + (" " + (props.className ?? ""))} />;
+	let comp = (props) => <div {...props} className={props.className ? ParentStyled + (" " + props.className) : ParentStyled} />;
 	comp.css = ParentStyled.css;
 	comp.toString = () => ParentStyled;
 	return comp;
 })();
 const ChildStyled = (() => {
 	let ChildStyled = "ChildStyled-hyrg5m child-class";
-	let comp = (props) => <ParentStyled {...props} className={ChildStyled + (" " + (props.className ?? ""))} />;
+	let comp = (props) => <ParentStyled {...props} className={props.className ? ChildStyled + (" " + props.className) : ChildStyled} />;
 	comp.css = ChildStyled.css;
 	comp.toString = () => ChildStyled;
 	return comp;

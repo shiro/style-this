@@ -278,52 +278,74 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                 ),
                 Some(self.ast_builder.jsx_attribute_value_expression_container(
                     span,
-                    JSXExpression::BinaryExpression(self.ast_builder.alloc_binary_expression(
-                        span,
-                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                    JSXExpression::ConditionalExpression(
+                        self.ast_builder.alloc_conditional_expression(
                             span,
-                            self.ast_builder.atom(&class_variable_name),
-                        )),
-                        oxc_ast::ast::BinaryOperator::Addition,
-                        Expression::BinaryExpression(self.ast_builder.alloc_binary_expression(
-                            span,
-                            Expression::StringLiteral(self.ast_builder.alloc_string_literal(
-                                span,
-                                self.ast_builder.atom(" "),
-                                None,
-                            )),
-                            oxc_ast::ast::BinaryOperator::Addition,
-                            Expression::LogicalExpression(
-                                self.ast_builder.alloc_logical_expression(
+                            Expression::StaticMemberExpression(
+                                self.ast_builder.alloc_static_member_expression(
                                     span,
-                                    Expression::StaticMemberExpression(
-                                        self.ast_builder.alloc_static_member_expression(
+                                    Expression::Identifier(
+                                        self.ast_builder.alloc_identifier_reference(
                                             span,
-                                            Expression::Identifier(
-                                                self.ast_builder.alloc_identifier_reference(
-                                                    span,
-                                                    self.ast_builder.atom("props"),
-                                                ),
-                                            ),
-                                            self.ast_builder.identifier_name(
-                                                span,
-                                                self.ast_builder.atom(self.class_prop_name),
-                                            ),
-                                            false,
+                                            self.ast_builder.atom("props"),
                                         ),
                                     ),
-                                    oxc_ast::ast::LogicalOperator::Coalesce,
-                                    Expression::StringLiteral(
-                                        self.ast_builder.alloc_string_literal(
+                                    self.ast_builder.identifier_name(
+                                        span,
+                                        self.ast_builder.atom(self.class_prop_name),
+                                    ),
+                                    false,
+                                ),
+                            ),
+                            Expression::BinaryExpression(
+                                self.ast_builder.alloc_binary_expression(
+                                    span,
+                                    Expression::Identifier(
+                                        self.ast_builder.alloc_identifier_reference(
                                             span,
-                                            self.ast_builder.atom(""),
-                                            None,
+                                            self.ast_builder.atom(&class_variable_name),
+                                        ),
+                                    ),
+                                    oxc_ast::ast::BinaryOperator::Addition,
+                                    Expression::BinaryExpression(
+                                        self.ast_builder.alloc_binary_expression(
+                                            span,
+                                            Expression::StringLiteral(
+                                                self.ast_builder.alloc_string_literal(
+                                                    span,
+                                                    self.ast_builder.atom(" "),
+                                                    None,
+                                                ),
+                                            ),
+                                            oxc_ast::ast::BinaryOperator::Addition,
+                                            Expression::StaticMemberExpression(
+                                                self.ast_builder.alloc_static_member_expression(
+                                                    span,
+                                                    Expression::Identifier(
+                                                        self.ast_builder.alloc_identifier_reference(
+                                                            span,
+                                                            self.ast_builder.atom("props"),
+                                                        ),
+                                                    ),
+                                                    self.ast_builder.identifier_name(
+                                                        span,
+                                                        self.ast_builder.atom(self.class_prop_name),
+                                                    ),
+                                                    false,
+                                                ),
+                                            ),
                                         ),
                                     ),
                                 ),
                             ),
-                        )),
-                    )),
+                            Expression::Identifier(
+                                self.ast_builder.alloc_identifier_reference(
+                                    span,
+                                    self.ast_builder.atom(&class_variable_name),
+                                ),
+                            ),
+                        ),
+                    ),
                 )),
             ),
         ];
