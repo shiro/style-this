@@ -25,3 +25,12 @@ describe("basic", () => {
     );
   });
 });
+
+describe("atomic with media queries", () => {
+  test("atomic-media-query-1", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+    const plugin = await setupPlugin(resolver, { atomic: true });
+    await evaluateProgram(testDir, "entry.tsx", plugin);
+  });
+});

@@ -7,7 +7,7 @@ import { expect } from "vitest";
 
 const MONOREPO_ROOT_DIR = resolve(join(__dirname, "../../../.."));
 
-export const getResolver = async (testDir: string) => {
+export const getResolver = async (testDir: string, options?: Record<string, any>) => {
   const resolver = (await readdir(testDir, { withFileTypes: true }))
     .filter((dirent) => dirent.isFile())
     .reduce(
@@ -70,6 +70,29 @@ export const evaluateProgram = async (
     );
   }
 
+  // Try to load atomic CSS if it exists (for atomic mode)
+  const atomicCssId = plugin.resolveId(
+    `virtual:style-this:${entryFilepath}.atomic.css`,
+  );
+  if (atomicCssId) {
+    const atomicCssRaw = await plugin.load(atomicCssId);
+    
+    let atomicCssCode: string;
+    if (typeof atomicCssRaw === 'string') {
+      atomicCssCode = atomicCssRaw;
+    } else if (atomicCssRaw && typeof atomicCssRaw === 'object') {
+      atomicCssCode = atomicCssRaw.code || '';
+    } else {
+      atomicCssCode = String(atomicCssRaw || '');
+    }
+    
+    if (atomicCssCode) {
+      await expect(atomicCssCode).toMatchFileSnapshot(
+        `${testDir}/out/${entry}.atomic.css`,
+      );
+    }
+  }
+
   const temporaryPrograms = Object.entries(plugin.__getTemporaryPrograms())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `// ${key}\n${value}`)
@@ -102,7 +125,7 @@ export const resetRandom = (() => {
 
 export const tsx = (raw: TemplateStringsArray) => raw.join("");
 
-export const setupPlugin = async (resolver: Record<string, string>) => {
+export const setupPlugin = async (resolver: Record<string, string>, options?: Record<string, any>) => {
   const ctx = {
     async resolve(id: string) {
       if (resolver[id] == undefined) return undefined;
@@ -115,7 +138,8 @@ export const setupPlugin = async (resolver: Record<string, string>) => {
     addWatchFile: vi.fn(),
   } as any;
 
-  const plugin = vitePlugin({ debug: true, useRequire: true } as any);
+  const pluginOptions = { debug: true, useRequire: true, ...(options || {}) };
+  const plugin = vitePlugin(pluginOptions as any);
 
   const config = plugin.config.bind(ctx);
   await config({});

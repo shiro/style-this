@@ -1,10 +1,10 @@
-import initWasm, { initialize, css_to_atomic_class_list, get_atomic_css, clear_atomic_css_cache } from "../native/pkg/style_this.js";
+import initWasm, { initialize, css_to_atomic_class_list, get_atomic_css, clear_atomic_css_cache, extract_non_atomic_css_js } from "../native/pkg/style_this.js";
 import wasm from "../native/pkg/style_this_bg.wasm";
 
 import { Transformer as _Transformer } from "../native/pkg/style_this.js";
 
 // Re-export atomic CSS functions
-export { css_to_atomic_class_list, get_atomic_css, clear_atomic_css_cache };
+export { css_to_atomic_class_list, get_atomic_css, clear_atomic_css_cache, extract_non_atomic_css_js };
 
 export interface Transformer extends Omit<_Transformer, "transform"> {
   transform(

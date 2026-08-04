@@ -691,12 +691,13 @@ pub async fn evaluate_program<'alloc>(
     if transformer.atomic && !css_variable_identifiers.is_empty() {
         let (_, atomic_vars): (Vec<_>, Vec<_>) = css_variable_identifiers
             .iter()
-            .partition(|css_var| css_var.class_name.starts_with("global-"));
+            .partition(|css_var| css_var.class_name.starts_with("_Global"));
         
         let var_initializations = atomic_vars
             .iter()
             .map(|css_var| {
-                format!("const {} = {{}};", css_var.variable_name)
+                // Use new String() with the class name so it coerces to the class name in template literals
+                format!("const {} = new String('{}');", css_var.variable_name, css_var.class_name)
             })
             .collect::<Vec<_>>()
             .join("\n");
@@ -800,11 +801,16 @@ pub async fn evaluate_program<'alloc>(
                 .collect::<Vec<_>>()
                 .join(",\n");
 
-            // Generate marker classes for sourcemaps (empty blocks with comments)
-            let marker_css_blocks = atomic_vars
+            // Generate CSS blocks with full content (same as non-atomic mode)
+            // This preserves media queries, nested selectors, etc.
+            let atomic_css_blocks = atomic_vars
                 .iter()
                 .map(|css_var| {
-                    format!("`.{} {{ /* atomic */ }}`", css_var.class_name)
+                    if transformer.wrap_selectors_with_global {
+                        format!("`:global(.{}) {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name)
+                    } else {
+                        format!("`.{} {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name)
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join(",\n");
@@ -818,15 +824,15 @@ pub async fn evaluate_program<'alloc>(
                 .collect::<Vec<_>>()
                 .join(",\n");
 
-            // Combine marker classes and global styles for the per-file CSS module
-            let per_file_css = if global_css_blocks.is_empty() && marker_css_blocks.is_empty() {
+            // Combine atomic CSS blocks and global styles for the per-file CSS module
+            let per_file_css = if global_css_blocks.is_empty() && atomic_css_blocks.is_empty() {
                 "''".to_string()
             } else if global_css_blocks.is_empty() {
-                format!("[{marker_css_blocks}].join('\\n')")
-            } else if marker_css_blocks.is_empty() {
+                format!("[{atomic_css_blocks}].join('\\n')")
+            } else if atomic_css_blocks.is_empty() {
                 format!("[{global_css_blocks}].join('\\n')")
             } else {
-                format!("[{global_css_blocks}, {marker_css_blocks}].join('\\n')")
+                format!("[{global_css_blocks}, {atomic_css_blocks}].join('\\n')")
             };
 
             let style_this_module_code = if !style_this_exports.is_empty() {
