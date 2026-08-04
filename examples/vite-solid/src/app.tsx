@@ -1,28 +1,23 @@
-import { Meta, MetaProvider, Title } from "@solidjs/meta";
+import { MetaProvider, Title } from "@solidjs/meta";
 import { Router } from "@solidjs/router";
+import { FileRoutes } from "@solidjs/start/router";
 import { Suspense } from "solid-js";
-import { config } from "~/config";
-import { routes } from "~/routes";
+import "./app.css";
+import "@style-this/core/atomic"
 
 export default function App() {
   return (
-    <MetaProvider>
-      <Router
-        base={config.base}
-        root={(props) => {
-          return (
-            <>
-              <Title>Example</Title>
-              <Meta name="description" content="test app" />
-              <div class="content-container">
-                <Suspense>{props.children}</Suspense>
-              </div>
-            </>
-          );
-        }}
-      >
-        {routes}
-      </Router>
-    </MetaProvider>
+    <Router
+      root={props => (
+        <MetaProvider>
+          <Title>Example</Title>
+          <div class="content-container">
+            <Suspense>{props.children}</Suspense>
+          </div>
+        </MetaProvider>
+      )}
+    >
+      <FileRoutes />
+    </Router>
   );
 }

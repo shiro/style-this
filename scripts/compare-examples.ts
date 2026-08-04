@@ -237,6 +237,7 @@ function normalizeHTML(html: string): string {
     // More robust removal of __next wrapper by looking for the matching closing tag
     .replace(/<div\s+id="__next">/, '') // Remove opening __next tag
     .replace(/<\/div>\s*(?=<script id="__NEXT_DATA__")/s, '') // Remove closing __next tag that comes before __NEXT_DATA__ script
+    .replace(/<link[^>]*rel="stylesheet"[^>]*>/g, '') // Remove stylesheet link tags
     .replace(/\bstyle="([^"]*)"/g, (match, styleContent) => {
       // Normalize CSS variable names by removing the hash suffix and whitespace
       const normalized = styleContent

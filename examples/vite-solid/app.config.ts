@@ -25,9 +25,7 @@ export default defineConfig({
 
   vite(options) {
     return {
-      // css: { postcss: "./postcss.config.js" },
       css: {
-        transformer: 'lightningcss',
         devSourcemap: true,
       },
       server: {
@@ -36,7 +34,6 @@ export default defineConfig({
       },
       build: {
         sourcemap: true,
-        cssMinify: "lightningcss",
         cssMinify: false,
       },
       resolve: {
@@ -46,11 +43,6 @@ export default defineConfig({
             path.join(process.cwd(), value[0].replace(/\/\*$/, "")),
           ]),
         ),
-      },
-      css: {
-        // Disable Lightning CSS transformer to test sourcemaps
-        // transformer: "lightningcss",
-        devSourcemap: true,
       },
       plugins: [styleThisVitePlugin({ 
         filter: /.*\.tsx/,

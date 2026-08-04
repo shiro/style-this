@@ -1,13 +1,16 @@
-import Counter from "./Counter";
 import { css } from "@style-this/core";
+import Counter from "./Counter";
 
-const color: string = "coral";
-
-const colorStyle = css`
-  color: ${color};
+const ContainerStyle = css`
+  display: flex;
+  flex-direction: column;
 `;
 
-const Main: Component = () => {
+const colorStyle = css`
+  color: coral;
+`;
+
+export default function Main() {
   return (
     <div class={`${ContainerStyle} Global__Main`}>
       <Counter />
@@ -17,17 +20,10 @@ const Main: Component = () => {
       </span>
     </div>
   );
-};
-
-const ContainerStyle = css`
-  display: flex;
-  flex-direction: column;
-`;
+}
 
 const _GlobalMain = css`
   .Global__Main {
     background: coral;
   }
 `
-
-export default Main;
