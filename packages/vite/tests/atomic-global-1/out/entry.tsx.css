@@ -1,0 +1,14 @@
+.Global__Main {
+    background: coral;
+    margin: 10px;
+  }
+  
+  @media (max-width: 600px) {
+    .Global__Main {
+      background: blue;
+    }
+  }
+
+.mainStyle-74hqzc {
+/* atomized */
+}

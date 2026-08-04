@@ -689,11 +689,11 @@ pub async fn evaluate_program<'alloc>(
 
     // For atomic mode, prepend variable initializations so .css properties can be assigned
     if transformer.atomic && !css_variable_identifiers.is_empty() {
-        let (_, atomic_vars): (Vec<_>, Vec<_>) = css_variable_identifiers
+        let (global_vars, atomic_vars): (Vec<_>, Vec<_>) = css_variable_identifiers
             .iter()
             .partition(|css_var| css_var.class_name.starts_with("_Global"));
         
-        let var_initializations = atomic_vars
+        let var_initializations = css_variable_identifiers
             .iter()
             .map(|css_var| {
                 // Use new String() with the class name so it coerces to the class name in template literals
@@ -759,6 +759,7 @@ pub async fn evaluate_program<'alloc>(
                 .map(|css_var| {
                     // The virtual program evaluates and sets variable_name.css = template_literal
                     // We pass the evaluated CSS to cssToAtomicClassList
+                    // Also store the non-atomic CSS for the per-file CSS
                     // Add error handling for undefined CSS
                     format!(
                         "if (!{}.css) {{ console.error('[atomic] {}.css is undefined'); {}.css = ''; }}\nconst _{}_atomic = cssToAtomicClassList({}.css);",
@@ -773,7 +774,7 @@ pub async fn evaluate_program<'alloc>(
                 .join("\n");
 
             // Build the .style-this.js module content
-            let style_this_exports = atomic_vars
+            let atomic_exports = atomic_vars
                 .iter()
                 .map(|css_var| {
                     // Strip __styleThis_ prefix if it exists to match the visitor's naming
@@ -789,7 +790,27 @@ pub async fn evaluate_program<'alloc>(
                         css_var.variable_name
                     )
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+            
+            // Add global vars to exports (they don't have atomic classes, just the variable name)
+            let global_exports = global_vars
+                .iter()
+                .map(|css_var| {
+                    let base_name = css_var.variable_name.strip_prefix(&format!("{}_", PREFIX))
+                        .unwrap_or(&css_var.variable_name);
+                    let export_name = format!("_styleThis_{}", base_name);
+                    
+                    // Global vars just export their variable name (which is the class name)
+                    format!(
+                        "'export const {} = \"' + '{}' + '\";'",
+                        export_name,
+                        css_var.class_name
+                    )
+                })
+                .collect::<Vec<_>>();
+            
+            let style_this_exports = [atomic_exports, global_exports]
+                .concat()
                 .join(" + '\\n' + ");
 
             // Global styles keep their original format
@@ -806,10 +827,15 @@ pub async fn evaluate_program<'alloc>(
             let atomic_css_blocks = atomic_vars
                 .iter()
                 .map(|css_var| {
+                    // In atomic mode, extract only non-atomic CSS (media queries, nested selectors)
+                    // Simple top-level declarations are atomized and go into the .atomic.css file
+                    // Keep the marker class even if empty for sourcemap purposes, with a comment to prevent removal
+                    let css_content = format!("extractNonAtomicCss({}.css)", css_var.variable_name);
+                    let empty_comment = "/* atomized */";
                     if transformer.wrap_selectors_with_global {
-                        format!("`:global(.{}) {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name)
+                        format!("`:global(.{}) {{\\n${{{}||'{}'}}\\n}}`", css_var.class_name, css_content, empty_comment)
                     } else {
-                        format!("`.{} {{\n${{{}.css}}\n}}`", css_var.class_name, css_var.variable_name)
+                        format!("`.{} {{\\n${{{}||'{}'}}\\n}}`", css_var.class_name, css_content, empty_comment)
                     }
                 })
                 .collect::<Vec<_>>()
@@ -851,10 +877,14 @@ pub async fn evaluate_program<'alloc>(
 
             eval_program_js.push_str(&formatdoc!(
                 "
-                // Import atomic CSS helper from wasm
+                // Import atomic CSS helpers from wasm
                 const cssToAtomicClassList = global.__styleThis_cssToAtomicClassList;
+                const extractNonAtomicCss = global.__styleThis_extractNonAtomicCss;
                 if (!cssToAtomicClassList) {{
                     throw new Error('cssToAtomicClassList not found on global. Available: ' + Object.keys(global).filter(k => k.includes('styleThis')).join(', '));
+                }}
+                if (!extractNonAtomicCss) {{
+                    throw new Error('extractNonAtomicCss not found on global. Available: ' + Object.keys(global).filter(k => k.includes('styleThis')).join(', '));
                 }}
                 
                 // Convert CSS to atomic class lists
@@ -939,7 +969,7 @@ pub async fn evaluate_program<'alloc>(
     // wrap into promise
     let eval_program_js = if let Some(require_ref) = &transformer.require_ref {
         let atomic_funcs = if transformer.atomic {
-            format!("__styleThis_cssToAtomicClassList: globalThis.__styleThis_cssToAtomicClassList,\n                __styleThis_getAtomicCss: globalThis.__styleThis_getAtomicCss,")
+            format!("__styleThis_cssToAtomicClassList: globalThis.__styleThis_cssToAtomicClassList,\n                __styleThis_getAtomicCss: globalThis.__styleThis_getAtomicCss,\n                __styleThis_extractNonAtomicCss: globalThis.__styleThis_extractNonAtomicCss,")
         } else {
             String::new()
         };
@@ -965,7 +995,7 @@ pub async fn evaluate_program<'alloc>(
         )
     } else {
         let atomic_funcs = if transformer.atomic {
-            format!("__styleThis_cssToAtomicClassList,\n                __styleThis_getAtomicCss,")
+            format!("__styleThis_cssToAtomicClassList,\n                __styleThis_getAtomicCss,\n                __styleThis_extractNonAtomicCss,")
         } else {
             String::new()
         };

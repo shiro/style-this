@@ -34,3 +34,12 @@ describe("atomic with media queries", () => {
     await evaluateProgram(testDir, "entry.tsx", plugin);
   });
 });
+
+describe("atomic with global styles", () => {
+  test("atomic-global-1", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+    const plugin = await setupPlugin(resolver, { atomic: true });
+    await evaluateProgram(testDir, "entry.tsx", plugin);
+  });
+});

@@ -206,13 +206,11 @@ pub fn css_to_atomic_classes(css: &str) -> Vec<String> {
 }
 
 /// Extract the non-atomizable CSS (media queries, nested selectors, etc.)
-/// This preserves the CSS structure that cannot be converted to atomic classes
+/// This removes simple top-level declarations but preserves complex structures
 pub fn extract_non_atomic_css(css: &str) -> String {
-    let mut result = String::new();
+    let mut result = Vec::new();
+    let mut current_segment = String::new();
     let mut brace_depth = 0;
-    let mut in_block = false;
-    let mut current_block = String::new();
-    let mut block_selector = String::new();
     
     let chars: Vec<char> = css.chars().collect();
     let mut i = 0;
@@ -220,41 +218,35 @@ pub fn extract_non_atomic_css(css: &str) -> String {
     while i < chars.len() {
         let ch = chars[i];
         
-        match ch {
-            '{' => {
-                if brace_depth == 0 {
-                    // Start of a new block - save the selector
-                    in_block = true;
-                    block_selector = current_block.trim().to_string();
-                    current_block.clear();
+        if brace_depth == 0 {
+            // At top level - we need to distinguish between declarations and blocks
+            match ch {
+                '{' => {
+                    // Start of a nested block - this is a selector/media query/etc
+                    // Keep the selector and enter the block
+                    current_segment.push(ch);
+                    brace_depth += 1;
                 }
+                ';' => {
+                    // End of top-level declaration - discard it (it's atomizable)
+                    current_segment.clear();
+                }
+                _ => {
+                    // Building up either a selector or a declaration
+                    current_segment.push(ch);
+                }
+            }
+        } else {
+            // Inside a nested block - keep everything
+            current_segment.push(ch);
+            if ch == '{' {
                 brace_depth += 1;
-                current_block.push(ch);
-            }
-            '}' => {
+            } else if ch == '}' {
                 brace_depth -= 1;
-                current_block.push(ch);
-                
-                if brace_depth == 0 && in_block {
-                    // End of a block - check if it has non-top-level content
-                    let block_content = current_block.trim();
-                    if !block_content.is_empty() && !block_selector.is_empty() {
-                        // This is a nested block (media query, selector, etc.)
-                        // Include it as-is in the non-atomic CSS
-                        result.push_str(&block_selector);
-                        result.push_str(" ");
-                        result.push_str(block_content);
-                        result.push('\n');
-                    }
-                    current_block.clear();
-                    in_block = false;
-                }
-            }
-            _ => {
                 if brace_depth == 0 {
-                    current_block.push(ch);
-                } else {
-                    current_block.push(ch);
+                    // End of nested block - add it to results
+                    result.push(current_segment.trim().to_string());
+                    current_segment.clear();
                 }
             }
         }
@@ -262,7 +254,8 @@ pub fn extract_non_atomic_css(css: &str) -> String {
         i += 1;
     }
     
-    result.trim().to_string()
+    // Join all non-atomic segments
+    result.join("\n").trim().to_string()
 }
 
 /// Get all collected atomic CSS rules collected so far
@@ -416,5 +409,39 @@ mod tests {
         assert!(width_decls.iter().any(|d| d.value == "100%"));
         assert!(width_decls.iter().any(|d| d.value == "90%"));
         assert!(width_decls.iter().any(|d| d.value == "80%"));
+    }
+
+    #[test]
+    fn test_extract_non_atomic_css_simple() {
+        let css = "background: red; width: 100%;";
+        let non_atomic = extract_non_atomic_css(css);
+        assert_eq!(non_atomic, "", "Simple declarations should be removed");
+    }
+
+    #[test]
+    fn test_extract_non_atomic_css_media_query() {
+        let css = "background: red; @media (max-width: 500px) { background: blue; }";
+        let non_atomic = extract_non_atomic_css(css);
+        eprintln!("Input: {}", css);
+        eprintln!("Output: {}", non_atomic);
+        assert!(non_atomic.contains("@media"));
+        assert!(non_atomic.contains("background: blue"));
+        assert!(!non_atomic.contains("background: red"), "Top-level declaration should be removed");
+    }
+
+    #[test]
+    fn test_extract_non_atomic_css_mixed() {
+        let css = r#"
+            background: coral;
+            width: 100%;
+            @media (max-width: 500px) {
+                background: blue;
+            }
+        "#;
+        let non_atomic = extract_non_atomic_css(css);
+        assert!(non_atomic.contains("@media"));
+        assert!(non_atomic.contains("blue"));
+        assert!(!non_atomic.contains("coral"), "Top-level background should be removed");
+        assert!(!non_atomic.contains("width: 100%"), "Top-level width should be removed");
     }
 }

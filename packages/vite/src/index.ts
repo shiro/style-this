@@ -179,17 +179,14 @@ const vitePlugin = (options: Options = {}) => {
       
       // In atomic mode, set up global helper functions
       if (atomic) {
-        const { css_to_atomic_class_list, get_atomic_css } = await import("@style-this/core/compiler");
+        const { css_to_atomic_class_list, get_atomic_css, extract_non_atomic_css_js } = await import("@style-this/core/compiler");
         (globalThis as any).__styleThis_cssToAtomicClassList = css_to_atomic_class_list;
         (globalThis as any).__styleThis_getAtomicCss = get_atomic_css;
+        (globalThis as any).__styleThis_extractNonAtomicCss = extract_non_atomic_css_js;
         // Also set on global for compatibility
         (global as any).__styleThis_cssToAtomicClassList = css_to_atomic_class_list;
         (global as any).__styleThis_getAtomicCss = get_atomic_css;
-        
-        console.log('[atomic] Set up global functions:', {
-          cssToAtomicClassList: typeof (global as any).__styleThis_cssToAtomicClassList,
-          getAtomicCss: typeof (global as any).__styleThis_getAtomicCss,
-        });
+        (global as any).__styleThis_extractNonAtomicCss = extract_non_atomic_css_js;
       }
     },
 

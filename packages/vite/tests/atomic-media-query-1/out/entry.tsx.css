@@ -1,13 +1,11 @@
 .innerStyle-oty7sd {
-background: red;
-  padding: 10px;
+/* atomized */
 }
 .outerStyle-mvwhqz {
-width: 100%;
-  .innerStyle-oty7sd {
+.innerStyle-oty7sd {
     background: coral;
   }
-  @media (max-width: 500px) {
+@media (max-width: 500px) {
     .innerStyle-oty7sd {
       background: blue;
     }

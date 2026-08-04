@@ -144,6 +144,11 @@ export const setupPlugin = async (resolver: Record<string, string>, options?: Re
   const config = plugin.config.bind(ctx);
   await config({});
 
+  // Call buildStart to initialize atomic mode globals
+  if (plugin.buildStart) {
+    await plugin.buildStart.call(ctx, {});
+  }
+
   return {
     cssExtension: "css",
     config,
