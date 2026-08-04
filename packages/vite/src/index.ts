@@ -350,10 +350,9 @@ const vitePlugin = (options: Options = {}) => {
       if (
         !filepath ||
         filepath.includes("/node_modules/") ||
-        (!filepath.endsWith(".ts") &&
-          !filepath.endsWith(".tsx") &&
-          !filepath.endsWith(".js") &&
-          !filepath.endsWith(".jsx"))
+        filepath.includes("?") ||
+        filepath.endsWith(".css") ||
+        filepath.endsWith(".atomic.css")
       )
         return;
 
@@ -361,9 +360,29 @@ const vitePlugin = (options: Options = {}) => {
         return;
       }
 
-      const importSource = `${virtualModulePrefix}${filepath}.${cssExtension}`;
-      const cssFilepath = `${filepath}.${cssExtension}`;
-      const styleThisFilepath = `${filepath}.style-this.js`;
+      // Extract script block from Svelte files
+      let codeToTransform = code;
+      let isSvelte = false;
+      let filepathForRust = filepath;
+      if (filepath.endsWith(".svelte")) {
+        isSvelte = true;
+        const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/);
+        if (scriptMatch) {
+          codeToTransform = scriptMatch[1];
+          // Use a .ts extension for the Rust compiler
+          filepathForRust = filepath.replace(/\.svelte$/, '.ts');
+        } else {
+          // No script block, nothing to transform
+          return;
+        }
+      }
+
+      // For Svelte files, use the modified filepath for the import source so it matches what Rust generates
+      const importSourceFilepath = isSvelte ? filepathForRust : filepath;
+      const importSource = `${virtualModulePrefix}${importSourceFilepath}.${cssExtension}`;
+      // But always use the original filepath for cache keys
+      const cssFilepath = `${importSourceFilepath}.${cssExtension}`;
+      const styleThisFilepath = `${importSourceFilepath}.style-this.js`;
       const skipCssEval = cssCache.has(cssFilepath);
 
       try {
@@ -413,8 +432,8 @@ const vitePlugin = (options: Options = {}) => {
         }
 
         const transformedResult = await styleThis.transform(
-          code,
-          filepath,
+          codeToTransform,
+          filepathForRust,
           skipCssEval,
           importSource,
         );
@@ -454,7 +473,12 @@ const vitePlugin = (options: Options = {}) => {
         }
 
         return {
-          code: transformedResult.code,
+          code: isSvelte
+            ? code.replace(
+                /<script[^>]*>([\s\S]*?)<\/script>/,
+                `<script>${transformedResult.code}</script>`
+              )
+            : transformedResult.code,
           map: transformedResult.sourcemap,
         };
       } catch (err) {

@@ -9,11 +9,13 @@ const SOLID_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid');
 const SOLID_START_2_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid-start-2');
 const NEXT_PAGES_ROUTER_EXAMPLE = path.join(process.cwd(), 'examples/next-pages-router');
 const NEXT_APP_ROUTER_EXAMPLE = path.join(process.cwd(), 'examples/next-app-router');
+const SVELTEKIT_3_EXAMPLE = path.join(process.cwd(), 'examples/sveltekit-3');
 const REACT_PORT = 4173;
 const SOLID_PORT = 3000;
 const SOLID_START_2_PORT = 3010;
 const NEXT_PAGES_ROUTER_PORT = 3002;
 const NEXT_APP_ROUTER_PORT = 3003;
+const SVELTEKIT_3_PORT = 3004;
 
 interface BuildOutput {
   html: string;
@@ -203,6 +205,30 @@ async function buildAndCaptureNext(browser: Browser, examplePath: string, port: 
     await sleep(2000); // Give server time to fully start
     
     const html = await fetchHTML(`http://localhost:${port}`, browser);
+    
+    const css = extractCSS(html);
+    const bodyContent = extractBodyContent(html);
+    
+    return { html: bodyContent, css };
+  } finally {
+    if (server) {
+      server.kill();
+      await sleep(500);
+    }
+  }
+}
+
+async function buildAndCaptureSvelteKit(browser: Browser): Promise<BuildOutput> {
+  console.log('Building SvelteKit example...');
+  exec('pnpm build', SVELTEKIT_3_EXAMPLE);
+  
+  let server: ChildProcess | null = null;
+  try {
+    // For SvelteKit with node adapter, we run the built server directly
+    server = await startServer('node build/index.js', SVELTEKIT_3_EXAMPLE, SVELTEKIT_3_PORT, 'SvelteKit', { PORT: String(SVELTEKIT_3_PORT) });
+    await sleep(2000); // Give server time to fully start
+    
+    const html = await fetchHTML(`http://localhost:${SVELTEKIT_3_PORT}`, browser);
     
     const css = extractCSS(html);
     const bodyContent = extractBodyContent(html);
