@@ -749,9 +749,11 @@ pub async fn evaluate_program<'alloc>(
                         .unwrap_or(&css_var.variable_name);
                     let export_name = format!("_styleThis_{}", base_name);
                     
+                    // Combine named class with atomic classes
                     format!(
-                        "'export const {} = \"' + _{}_atomic + '\";'",
+                        "'export const {} = \"' + '{}' + ' ' + _{}_atomic + '\";'",
                         export_name,
+                        css_var.class_name,
                         css_var.variable_name
                     )
                 })
@@ -767,10 +769,24 @@ pub async fn evaluate_program<'alloc>(
                 .collect::<Vec<_>>()
                 .join(",\n");
 
-            let css_output = if global_css.is_empty() {
+            // Generate empty class blocks for named classes (same as non-atomic mode)
+            // Add a comment inside to make them valid CSS (empty selectors are invalid)
+            let named_class_blocks = atomic_vars
+                .iter()
+                .map(|css_var| {
+                    format!("`.{} {{ /* atomic */ }}`", css_var.class_name)
+                })
+                .collect::<Vec<_>>()
+                .join(",\n");
+
+            let css_output = if global_css.is_empty() && named_class_blocks.is_empty() {
                 "atomicCss".to_string()
-            } else {
+            } else if global_css.is_empty() {
+                format!("[{named_class_blocks}, atomicCss].join('\\n')")
+            } else if named_class_blocks.is_empty() {
                 format!("[{global_css}, atomicCss].join('\\n')")
+            } else {
+                format!("[{global_css}, {named_class_blocks}, atomicCss].join('\\n')")
             };
 
             let style_this_module_code = if !style_this_exports.is_empty() {

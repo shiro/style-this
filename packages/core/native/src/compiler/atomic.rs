@@ -27,11 +27,18 @@ pub fn generate_atomic_hash(property: &str, value: &str) -> String {
     let hash = hasher.finish();
     
     // Convert to base62 (alphanumeric) for shorter, URL-safe identifiers
+    // CSS class names cannot start with a digit, so we use different sets for first and rest
+    let first_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let mut result = String::new();
     let mut n = hash;
     
-    for _ in 0..5 {
+    // First character from letters only
+    result.push(first_chars.chars().nth((n % 52) as usize).unwrap());
+    n /= 52;
+    
+    // Remaining 4 characters from full set
+    for _ in 0..4 {
         result.push(chars.chars().nth((n % 62) as usize).unwrap());
         n /= 62;
     }
