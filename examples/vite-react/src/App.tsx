@@ -1,4 +1,5 @@
 import MainComponent from './MainComponent'
+import "@style-this/core/atomic"
 
 function App() {
   return (

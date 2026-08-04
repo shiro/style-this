@@ -7,7 +7,7 @@ use crate::error_mapping;
 use crate::react::react_prepass;
 use crate::solid_js::solid_js_prepass;
 use crate::utils::{self, transpile_ts_to_js};
-use crate::{LIBRARY_CORE_IMPORT_NAME, LIBRARY_REACT_IMPORT_NAME, LIBRARY_SOLID_JS_IMPORT_NAME, PREFIX};
+use crate::{LIBRARY_CORE_IMPORT_NAME, LIBRARY_CORE_ATOMIC_IMPORT_NAME, LIBRARY_REACT_IMPORT_NAME, LIBRARY_SOLID_JS_IMPORT_NAME, PREFIX};
 use futures::lock::Mutex as FutureMutex;
 use indoc::formatdoc;
 use oxc_allocator::{Allocator, CloneIn};
@@ -189,6 +189,37 @@ pub async fn evaluate_program<'alloc>(
         exported_idents,
         tmp_program,
     ) = css_transformer.finish();
+
+    // Transform @style-this/core/atomic imports into virtual module imports
+    if transformer.atomic {
+        let mut indices_to_replace = vec![];
+        for (idx, stmt) in program.body.iter().enumerate() {
+            let Statement::ImportDeclaration(import_decl) = stmt else {
+                break;
+            };
+            
+            if import_decl.source.value.as_str() == LIBRARY_CORE_ATOMIC_IMPORT_NAME {
+                indices_to_replace.push(idx);
+            }
+        }
+        
+        // Replace the imports
+        for idx in indices_to_replace.into_iter().rev() {
+            let atomic_css_path = format!("virtual:style-this:{}.atomic.css", program_filepath);
+            
+            // Create new import declaration with transformed source
+            let new_import = ast_builder.alloc_import_declaration(
+                program.span,
+                None, // side-effect import
+                ast_builder.string_literal(program.span, ast_builder.atom(&atomic_css_path), None),
+                None,
+                None::<oxc_allocator::Box<WithClause>>,
+                ImportOrExportKind::Value,
+            );
+            
+            program.body[idx] = Statement::ImportDeclaration(new_import);
+        }
+    }
 
     // In atomic mode, add import for .style-this.js module if there are CSS variables
     // This needs to happen BEFORE codegen for entrypoints
@@ -769,9 +800,8 @@ pub async fn evaluate_program<'alloc>(
                 .collect::<Vec<_>>()
                 .join(",\n");
 
-            // Generate empty class blocks for named classes (same as non-atomic mode)
-            // Add a comment inside to make them valid CSS (empty selectors are invalid)
-            let named_class_blocks = atomic_vars
+            // Generate marker classes for sourcemaps (empty blocks with comments)
+            let marker_css_blocks = atomic_vars
                 .iter()
                 .map(|css_var| {
                     format!("`.{} {{ /* atomic */ }}`", css_var.class_name)
@@ -779,14 +809,24 @@ pub async fn evaluate_program<'alloc>(
                 .collect::<Vec<_>>()
                 .join(",\n");
 
-            let css_output = if global_css.is_empty() && named_class_blocks.is_empty() {
-                "atomicCss".to_string()
-            } else if global_css.is_empty() {
-                format!("[{named_class_blocks}, atomicCss].join('\\n')")
-            } else if named_class_blocks.is_empty() {
-                format!("[{global_css}, atomicCss].join('\\n')")
+            // Include global styles in the per-file CSS
+            let global_css_blocks = global_vars
+                .iter()
+                .map(|css_var| {
+                    format!("`${{{}.css}}\n`", css_var.variable_name)
+                })
+                .collect::<Vec<_>>()
+                .join(",\n");
+
+            // Combine marker classes and global styles for the per-file CSS module
+            let per_file_css = if global_css_blocks.is_empty() && marker_css_blocks.is_empty() {
+                "''".to_string()
+            } else if global_css_blocks.is_empty() {
+                format!("[{marker_css_blocks}].join('\\n')")
+            } else if marker_css_blocks.is_empty() {
+                format!("[{global_css_blocks}].join('\\n')")
             } else {
-                format!("[{global_css}, {named_class_blocks}, atomicCss].join('\\n')")
+                format!("[{global_css_blocks}, {marker_css_blocks}].join('\\n')")
             };
 
             let style_this_module_code = if !style_this_exports.is_empty() {
@@ -816,10 +856,10 @@ pub async fn evaluate_program<'alloc>(
                 
                 const cssSourcemapData = [{sourcemap_data}];
                 
-                // Get all atomic CSS generated so far
-                const atomicCss = global.__styleThis_getAtomicCss();
-                
-                global.{css_file_store_ref}.get({css_filepath}).resolve({css_output}, cssSourcemapData, {css_filepath});
+                // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
+                // The actual atomic CSS goes into the .atomic.css file via explicit import
+                const perFileCss = {per_file_css};
+                global.{css_file_store_ref}.get({css_filepath}).resolve(perFileCss, cssSourcemapData, {css_filepath});
                 
                 // Generate and resolve the .style-this.js module
                 {style_this_module_code}

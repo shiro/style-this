@@ -12,6 +12,9 @@ export default defineConfig({
       debug: false
     })
   ],
+  css: {
+    devSourcemap: true,
+  },
   server: {
     port: 3000,
   },

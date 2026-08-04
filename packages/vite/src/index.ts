@@ -193,7 +193,14 @@ const vitePlugin = (options: Options = {}) => {
       }
     },
 
-    resolveId(id) {
+    resolveId(id, importer) {
+      // Handle @style-this/core/atomic imports
+      if (id === '@style-this/core/atomic' && importer) {
+        // Transform to virtual module based on the importer's path
+        const atomicPath = `${virtualModulePrefix}${importer}.atomic.css`;
+        return resolvedVirtualModulePrefix + atomicPath.slice(virtualModulePrefix.length);
+      }
+      
       if (id.startsWith(virtualModulePrefix)) {
         return (
           resolvedVirtualModulePrefix + id.slice(virtualModulePrefix.length)
@@ -205,6 +212,27 @@ const vitePlugin = (options: Options = {}) => {
       if (fullId.startsWith(resolvedVirtualModulePrefix)) {
         const [id, _query] = fullId.split("?", 2);
         const filepath = id.slice(resolvedVirtualModulePrefix.length);
+
+        // Handle .atomic.css files - return accumulated atomic CSS or empty in non-atomic mode
+        if (filepath.endsWith('.atomic.css')) {
+          // Tell Vite this depends on the source file for HMR
+          const sourceFilepath = filepath.slice(0, -'.atomic.css'.length);
+          this.addWatchFile(sourceFilepath);
+          
+          if (atomic) {
+            const { get_atomic_css } = await import("@style-this/core/compiler");
+            const atomicCss = get_atomic_css();
+            
+            return {
+              code: atomicCss,
+            };
+          } else {
+            // Non-atomic mode: no-op
+            return {
+              code: '/* @style-this/core/atomic is a no-op in non-atomic mode */',
+            };
+          }
+        }
 
         const entry = cssCache.get(filepath);
 
@@ -413,11 +441,18 @@ const vitePlugin = (options: Options = {}) => {
           const module = server.moduleGraph.getModuleById(virtualModuleId);
           if (module) server.reloadModule(module);
           
-          // In atomic mode, also invalidate the .style-this.js module
+          // In atomic mode, also invalidate the .style-this.js module and .atomic.css
           if (atomic) {
             const styleThisModuleId = resolvedVirtualModulePrefix + styleThisFilepath;
             const styleThisModule = server.moduleGraph.getModuleById(styleThisModuleId);
             if (styleThisModule) server.reloadModule(styleThisModule);
+            
+            // Invalidate all .atomic.css modules (there could be multiple files importing it)
+            for (const [id, mod] of server.moduleGraph.idToModuleMap) {
+              if (id.includes('.atomic.css')) {
+                server.reloadModule(mod);
+              }
+            }
           }
         }
 

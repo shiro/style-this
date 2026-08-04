@@ -39,6 +39,7 @@ mod styled_component_transformer;
 
 const PREFIX: &str = "__styleThis";
 const LIBRARY_CORE_IMPORT_NAME: &str = "@style-this/core";
+const LIBRARY_CORE_ATOMIC_IMPORT_NAME: &str = "@style-this/core/atomic";
 const LIBRARY_REACT_IMPORT_NAME: &str = "@style-this/react";
 const LIBRARY_SOLID_JS_IMPORT_NAME: &str = "@style-this/solid";
 

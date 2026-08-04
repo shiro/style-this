@@ -5,7 +5,8 @@
   "type": "module",
   "files": [
     "dist",
-    "src/cssSourceMap.ts"
+    "src/cssSourceMap.ts",
+    "src/atomic.ts"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -26,6 +27,11 @@
       "types": "./src/cssSourceMap.ts",
       "import": "./src/cssSourceMap.ts",
       "default": "./src/cssSourceMap.ts"
+    },
+    "./atomic": {
+      "types": "./src/atomic.ts",
+      "import": "./src/atomic.ts",
+      "default": "./src/atomic.ts"
     },
     "./package.json": "./package.json"
   },
