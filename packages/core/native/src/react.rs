@@ -19,7 +19,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         &mut self,
         expression: &mut Expression<'alloc>,
         jsx_tag: &'alloc str,
-        _is_extending_custom_component: bool, // React doesn't need this, kept for consistency
+        is_extending_custom_component: bool,
     ) {
         self.base.component_counter += 1;
         let class_variable_name = self.base.get_class_variable_name();
@@ -51,16 +51,111 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         let style_properties = self.base.build_style_properties(span, &captured_expressions);
         let style_attribute = self.base.build_style_attribute(span, style_properties, true);
 
-        // For React, we spread all props directly (no splitProps needed)
+        // For React, filter props only when extending an HTML element (not a custom component) and we have captured expressions
+        let should_filter_props = !is_extending_custom_component && !captured_expressions.is_empty();
+        let spread_identifier = if should_filter_props { "rest" } else { "props" };
+        
+        // Build destructuring statement: const { styleProps, style, ...rest } = props;
+        let destructure_statement = if should_filter_props {
+            Some(Statement::VariableDeclaration(
+                self.base.ast_builder.alloc_variable_declaration(
+                    span,
+                    VariableDeclarationKind::Const,
+                    self.base.ast_builder.vec1(self.base.ast_builder.variable_declarator(
+                        span,
+                        VariableDeclarationKind::Const,
+                        self.base.ast_builder.binding_pattern(
+                            BindingPatternKind::ObjectPattern(
+                                self.base.ast_builder.alloc_object_pattern(
+                                    span,
+                                    self.base.ast_builder.vec_from_iter([
+                                        // styleProps
+                                        self.base.ast_builder.binding_property(
+                                            span,
+                                            PropertyKey::StaticIdentifier(
+                                                self.base.ast_builder.alloc_identifier_name(
+                                                    span,
+                                                    self.base.ast_builder.atom("styleProps"),
+                                                ),
+                                            ),
+                                            self.base.ast_builder.binding_pattern(
+                                                BindingPatternKind::BindingIdentifier(
+                                                    self.base.ast_builder.alloc_binding_identifier(
+                                                        span,
+                                                        self.base.ast_builder.atom("_styleProps"),
+                                                    ),
+                                                ),
+                                                None as Option<oxc_allocator::Box<_>>,
+                                                false,
+                                            ),
+                                            false,
+                                            false,
+                                        ),
+                                        // style
+                                        self.base.ast_builder.binding_property(
+                                            span,
+                                            PropertyKey::StaticIdentifier(
+                                                self.base.ast_builder.alloc_identifier_name(
+                                                    span,
+                                                    self.base.ast_builder.atom("style"),
+                                                ),
+                                            ),
+                                            self.base.ast_builder.binding_pattern(
+                                                BindingPatternKind::BindingIdentifier(
+                                                    self.base.ast_builder.alloc_binding_identifier(
+                                                        span,
+                                                        self.base.ast_builder.atom("_style"),
+                                                    ),
+                                                ),
+                                                None as Option<oxc_allocator::Box<_>>,
+                                                false,
+                                            ),
+                                            false,
+                                            false,
+                                        ),
+                                    ]),
+                                    Some(self.base.ast_builder.binding_rest_element(
+                                        span,
+                                        self.base.ast_builder.binding_pattern(
+                                            BindingPatternKind::BindingIdentifier(
+                                                self.base.ast_builder.alloc_binding_identifier(
+                                                    span,
+                                                    self.base.ast_builder.atom("rest"),
+                                                ),
+                                            ),
+                                            None as Option<oxc_allocator::Box<_>>,
+                                            false,
+                                        ),
+                                    )),
+                                ),
+                            ),
+                            None as Option<oxc_allocator::Box<_>>,
+                            false,
+                        ),
+                        Some(Expression::Identifier(
+                            self.base.ast_builder.alloc_identifier_reference(
+                                span,
+                                self.base.ast_builder.atom("props"),
+                            ),
+                        )),
+                        false,
+                    )),
+                    false,
+                ),
+            ))
+        } else {
+            None
+        };
+
         let mut attributes = vec![
             self.base.ast_builder.jsx_attribute_item_spread_attribute(
                 span,
                 Expression::Identifier(
                     self.base.ast_builder
-                        .alloc_identifier_reference(span, self.base.ast_builder.atom("props")),
+                        .alloc_identifier_reference(span, self.base.ast_builder.atom(spread_identifier)),
                 ),
             ),
-            self.base.build_class_attribute(span, &class_variable_name, "props"),
+            self.base.build_class_attribute(span, &class_variable_name, spread_identifier),
         ];
 
         if let Some(style_attr) = style_attribute {
@@ -69,7 +164,28 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
 
         let jsx_element_expression = self.base.build_jsx_element(span, jsx_tag, attributes);
 
-        // For React, the component is an inline expression arrow function
+        // For React, the component has a block body when filtering props
+        let component_body_statements = if should_filter_props {
+            let mut statements = Vec::new();
+            if let Some(destructure) = destructure_statement {
+                statements.push(destructure);
+            }
+            statements.push(Statement::ReturnStatement(
+                self.base.ast_builder.alloc_return_statement(
+                    span,
+                    Some(jsx_element_expression),
+                ),
+            ));
+            statements
+        } else {
+            vec![Statement::ExpressionStatement(
+                self.base.ast_builder.alloc_expression_statement(
+                    span,
+                    jsx_element_expression,
+                ),
+            )]
+        };
+
         let define_jsx_element_statement = Statement::VariableDeclaration(
             self.base.ast_builder.alloc_variable_declaration(
                 span,
@@ -89,7 +205,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                         Some(Expression::ArrowFunctionExpression(
                             self.base.ast_builder.alloc_arrow_function_expression(
                                 span,
-                                true,  // expression = true for React (inline JSX)
+                                !should_filter_props,  // expression = true only when no filtering (inline JSX)
                                 false,
                                 None as Option<oxc_allocator::Box<_>>,
                                 self.base.ast_builder.alloc_formal_parameters(
@@ -118,12 +234,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                                 self.base.ast_builder.function_body(
                                     span,
                                     self.base.ast_builder.vec(),
-                                    self.base.ast_builder.vec1(Statement::ExpressionStatement(
-                                        self.base.ast_builder.alloc_expression_statement(
-                                            span,
-                                            jsx_element_expression,
-                                        ),
-                                    )),
+                                    self.base.ast_builder.vec_from_iter(component_body_statements),
                                 ),
                             ),
                         )),

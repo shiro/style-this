@@ -36,13 +36,12 @@ export const CounterStyle = css`
 `;
 
 export const FancyButton = styled.button<{ a: number }>`
-  background: none;
   border: 1px solid blue;
   border-radius: 2px;
   padding: ${({ a }) => `${a}px`};
 `;
 
-export const FancyButton2 = styled(FancyButton)<{ b: number }>`
+export const FancyButton2 = styled(FancyButton) <{ b: number }>`
   margin: ${({ b }) => `${b}px`};
   min-height: ${({ b }) => `${b}px`};
   cursor: pointer;

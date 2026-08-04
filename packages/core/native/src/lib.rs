@@ -15,6 +15,7 @@ use oxc_ast::ast::ClassBody;
 use oxc_ast::ast::ExportDefaultDeclarationKind;
 use oxc_ast::ast::Expression;
 use oxc_ast::ast::Program;
+use oxc_ast::ast::PropertyKey;
 use oxc_ast::ast::TaggedTemplateExpression;
 use oxc_ast::ast::TemplateElement;
 use oxc_ast::ast::VariableDeclarationKind;
