@@ -15,12 +15,21 @@
 		${extraClass("something")}
 	`;
 
+	const ButtonStyle = css`
+		border: 1px solid blue;
+		border-radius: 2px;
+		padding: 8px;
+		cursor: pointer;
+	`;
+
 	let count = $state(0);
 </script>
 
 <div class={CounterStyle}>
 	{count}
 	<button 
+		class={ButtonStyle}
+		style="background: {count >= 3 ? 'red' : 'green'}"
 		onclick={() => count++}
 		disabled={count >= 3}
 	>
