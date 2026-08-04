@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { css } from '@style-this/core';
+	import { css, extraClass } from '@style-this/core';
 
 	const spacing = 16;
 
-	const CounterStyle = css`
+	export const CounterStyle = css`
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -12,6 +12,7 @@
 		border: 1px solid blue;
 		border-radius: ${spacing / 2}px;
 		background: white;
+		${extraClass("something")}
 	`;
 
 	let count = $state(0);
