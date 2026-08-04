@@ -23,6 +23,90 @@ export const getResolver = async (testDir: string, options?: Record<string, any>
   return resolver;
 };
 
+const evaluateProgramWithMode = async (
+  testDir: string,
+  entry: string,
+  plugin: Awaited<ReturnType<typeof setupPlugin>>,
+  mode: "atomic" | "default",
+) => {
+  const outDir = `${testDir}/out/${mode}`;
+  const entryFilepath = `${testDir}/${entry}`;
+  const code = await readFile(entryFilepath, "utf-8");
+  let transformResult = await plugin.transform(code, entryFilepath);
+
+  if (transformResult) {
+    transformResult.code = transformResult.code.replace(testDir, "");
+  }
+
+  await expect(transformResult?.code).toMatchFileSnapshot(
+    `${outDir}/${entry}`,
+  );
+
+  const id = plugin.resolveId(
+    `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`,
+  )!;
+  expect(id).toBeDefined();
+
+  const cssRaw = await plugin.load(id);
+  
+  // Handle both string and object responses (with source maps)
+  let cssCode: string;
+  let cssMap: string | undefined;
+  
+  if (typeof cssRaw === 'string') {
+    cssCode = cssRaw;
+  } else if (cssRaw && typeof cssRaw === 'object') {
+    cssCode = cssRaw.code || '';
+    cssMap = cssRaw.map ? JSON.stringify(cssRaw.map, null, 2) : undefined;
+  } else {
+    cssCode = String(cssRaw || '');
+  }
+  
+  await expect(cssCode).toMatchFileSnapshot(
+    `${outDir}/${entry}.${plugin.cssExtension}`,
+  );
+  
+  if (cssMap) {
+    await expect(cssMap).toMatchFileSnapshot(
+      `${outDir}/${entry}.${plugin.cssExtension}.map`,
+    );
+  }
+
+  // Load atomic CSS (for atomic mode or check if it exists in default mode)
+  const atomicCssId = plugin.resolveId(
+    `virtual:style-this:${entryFilepath}.atomic.css`,
+  );
+  if (atomicCssId) {
+    const atomicCssRaw = await plugin.load(atomicCssId);
+    
+    let atomicCssCode: string;
+    if (typeof atomicCssRaw === 'string') {
+      atomicCssCode = atomicCssRaw;
+    } else if (atomicCssRaw && typeof atomicCssRaw === 'object') {
+      atomicCssCode = atomicCssRaw.code || '';
+    } else {
+      atomicCssCode = String(atomicCssRaw || '');
+    }
+    
+    // Always snapshot atomic CSS in atomic mode, or if it has content in default mode
+    if (mode === 'atomic' || atomicCssCode) {
+      await expect(atomicCssCode).toMatchFileSnapshot(
+        `${outDir}/${entry}.atomic.css`,
+      );
+    }
+  }
+
+  const temporaryPrograms = Object.entries(plugin.__getTemporaryPrograms())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `// ${key}\n${value}`)
+    .join("\n\n")
+    .replaceAll(MONOREPO_ROOT_DIR, "");
+
+  await expect(temporaryPrograms).toMatchFileSnapshot(
+    `${outDir}/compile_${entry}.js`,
+  );
+};
+
 export const evaluateProgram = async (
   testDir: string,
   entry: string,
@@ -102,6 +186,42 @@ export const evaluateProgram = async (
   await expect(temporaryPrograms).toMatchFileSnapshot(
     `${testDir}/out/compile_${entry}.js`,
   );
+};
+
+export const evaluateProgramBothModes = async (
+  testDir: string,
+  entry: string,
+  resolver: Record<string, string>,
+) => {
+  // Test with default mode
+  resetRandom();
+  const defaultPlugin = await setupPlugin(resolver, { atomic: false });
+  await evaluateProgramWithMode(testDir, entry, defaultPlugin, "default");
+
+  // Test with atomic mode
+  resetRandom();
+  const atomicPlugin = await setupPlugin(resolver, { atomic: true });
+  await evaluateProgramWithMode(testDir, entry, atomicPlugin, "atomic");
+};
+
+export const evaluateProgramBothModesMultiFile = async (
+  testDir: string,
+  entries: string[],
+  resolver: Record<string, string>,
+) => {
+  // Test with default mode
+  resetRandom();
+  const defaultPlugin = await setupPlugin(resolver, { atomic: false });
+  for (const entry of entries) {
+    await evaluateProgramWithMode(testDir, entry, defaultPlugin, "default");
+  }
+
+  // Test with atomic mode
+  resetRandom();
+  const atomicPlugin = await setupPlugin(resolver, { atomic: true });
+  for (const entry of entries) {
+    await evaluateProgramWithMode(testDir, entry, atomicPlugin, "atomic");
+  }
 };
 
 const originalRandom = Math.random;

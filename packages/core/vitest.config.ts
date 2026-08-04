@@ -1,7 +1,10 @@
 /// <reference types="vitest" />
-import mainConfig from "./tsdown.config";
+import { wasm } from "@rollup/plugin-wasm";
 import { defineConfig, Plugin } from "vitest/config";
 
 export default defineConfig({
-  plugins: mainConfig.plugins as Plugin[],
+  plugins: [wasm({ maxFileSize: 10000000 })] as Plugin[],
+  test: {
+    setupFiles: ['./vitest.setup.ts'],
+  },
 });

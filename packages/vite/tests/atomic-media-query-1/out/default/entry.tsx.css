@@ -1,0 +1,15 @@
+.innerStyle-oty7sd {
+background: red;
+  padding: 10px;
+}
+.outerStyle-mvwhqz {
+width: 100%;
+  .innerStyle-oty7sd {
+    background: coral;
+  }
+  @media (max-width: 500px) {
+    .innerStyle-oty7sd {
+      background: blue;
+    }
+  }
+}

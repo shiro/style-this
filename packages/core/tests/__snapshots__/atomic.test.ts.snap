@@ -1,0 +1,26 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Atomic CSS with complex contents > Snapshot tests > should generate consistent atomic CSS for complex component scenario 1`] = `
+{
+  "component1": {
+    "classes": "KSBUt SA9ql fXUi7 XVNih",
+    "cssCount": 6,
+  },
+  "component2": {
+    "classes": "PIOC5 AOJ8B",
+    "cssCount": 6,
+  },
+  "totalAtomicCss": ".AOJ8B { margin:5px }
+.KSBUt { background:red }
+.PIOC5 { background:coral }
+.SA9ql { padding:20px }
+.XVNih { padding:10px }
+.fXUi7 { background:blue }",
+}
+`;
+
+exports[`Atomic CSS with complex contents > Snapshot tests > should maintain atomic CSS output format 1`] = `
+".XiATV { margin:10px }
+.h5SHo { font-size:14px }
+.ptSDa { color:red }"
+`;
