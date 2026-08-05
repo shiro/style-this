@@ -192,9 +192,9 @@ const vitePlugin = (options: Options = {}) => {
 
     resolveId(id, importer) {
       // Handle @style-this/core/atomic imports
-      if (id === '@style-this/core/atomic' && importer) {
-        // Transform to virtual module based on the importer's path
-        const atomicPath = `${virtualModulePrefix}${importer}.atomic.css`;
+      if (id === '@style-this/core/atomic') {
+        // Use a global atomic CSS file, not per-importer
+        const atomicPath = `${virtualModulePrefix}__global__.atomic.css`;
         return resolvedVirtualModulePrefix + atomicPath.slice(virtualModulePrefix.length);
       }
       
@@ -311,6 +311,24 @@ const vitePlugin = (options: Options = {}) => {
       }
     },
 
+    async generateBundle(options, bundle) {
+      // In atomic mode, inject accumulated atomic CSS into the bundle
+      if (atomic) {
+        const { get_atomic_css } = await import("@style-this/core/compiler");
+        const atomicCss = get_atomic_css();
+        
+        if (atomicCss) {
+          // Find the main CSS file and append atomic CSS to it
+          for (const [fileName, output] of Object.entries(bundle)) {
+            if (output.type === 'asset' && fileName.endsWith('.css')) {
+              output.source = atomicCss + '\n' + output.source;
+              break; // Only inject into the first CSS file
+            }
+          }
+        }
+      }
+    },
+
     async handleHotUpdate(ctx) {
       if (!watchedFiles.has(ctx.file)) return;
 
@@ -383,7 +401,10 @@ const vitePlugin = (options: Options = {}) => {
       // But always use the original filepath for cache keys
       const cssFilepath = `${importSourceFilepath}.${cssExtension}`;
       const styleThisFilepath = `${importSourceFilepath}.style-this.js`;
-      const skipCssEval = cssCache.has(cssFilepath);
+      // In atomic mode, also check if .style-this.js is cached
+      const skipCssEval = atomic 
+        ? (cssCache.has(cssFilepath) && cssCache.has(styleThisFilepath))
+        : cssCache.has(cssFilepath);
 
       try {
         const startTime = performance.now();
@@ -417,6 +438,7 @@ const vitePlugin = (options: Options = {}) => {
           cssCache.set(cssFilepath, entry);
           
           // In atomic mode, also create cache entry for .style-this.js file
+          // This will be resolved during CSS evaluation by the rust code
           if (atomic) {
             let styleThisResolve: CssCachEntry["resolve"] | undefined;
             const styleThisEntry = new Promise((_resolve, _reject) => {

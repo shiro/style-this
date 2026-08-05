@@ -12,6 +12,38 @@ ${a.css}
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-1.tsx.css');
 
 
+// /packages/vite/tests/edge-cases-1/entry-1.tsx: {"num", "css", "a"}
+const a = new String('a-gxu385');
+"use strict";
+const num = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
+let { css } = require("/packages/core/dist/index.mjs");
+a.css = `margin: ${num}px;`;
+// Import atomic CSS helpers from wasm
+const cssToAtomicClassList = global.__styleThis_cssToAtomicClassList;
+const extractNonAtomicCss = global.__styleThis_extractNonAtomicCss;
+if (!cssToAtomicClassList) {
+    throw new Error('cssToAtomicClassList not found on global. Available: ' + Object.keys(global).filter(k => k.includes('styleThis')).join(', '));
+}
+if (!extractNonAtomicCss) {
+    throw new Error('extractNonAtomicCss not found on global. Available: ' + Object.keys(global).filter(k => k.includes('styleThis')).join(', '));
+}
+
+// Convert CSS to atomic class lists
+if (!a.css) { console.error('[atomic] a.css is undefined'); a.css = ''; }
+const _a_atomic = cssToAtomicClassList(a.css);
+
+const cssSourcemapData = [{className:'a-gxu385',start:83,end:109}];
+
+// In atomic mode, resolve per-file CSS with marker classes for sourcemaps
+// The actual atomic CSS goes into the .atomic.css file via explicit import
+const perFileCss = [`.a-gxu385 {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-1.tsx.css');
+
+// Generate and resolve the .style-this.js module
+const styleThisModule = 'export const _styleThis_a = "' + 'a-gxu385' + ' ' + _a_atomic + '";';
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.style-this.js').resolve(styleThisModule);
+
+
 // /packages/vite/tests/edge-cases-1/entry-2.tsx: {"b", "css", "num"}
 "use strict";
 const num = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
@@ -48,3 +80,36 @@ global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.ts
 ${shared.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/shared.tsx.css');
+
+
+// /packages/vite/tests/edge-cases-1/shared.tsx: {"shared", "num", "Math", "css"}
+const shared = new String('shared-ar0tez');
+"use strict";
+let { css } = require("/packages/core/dist/index.mjs");
+let num = global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]['num'];
+shared.css = `margin: ${num}px;`;
+
+global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};// Import atomic CSS helpers from wasm
+const cssToAtomicClassList = global.__styleThis_cssToAtomicClassList;
+const extractNonAtomicCss = global.__styleThis_extractNonAtomicCss;
+if (!cssToAtomicClassList) {
+    throw new Error('cssToAtomicClassList not found on global. Available: ' + Object.keys(global).filter(k => k.includes('styleThis')).join(', '));
+}
+if (!extractNonAtomicCss) {
+    throw new Error('extractNonAtomicCss not found on global. Available: ' + Object.keys(global).filter(k => k.includes('styleThis')).join(', '));
+}
+
+// Convert CSS to atomic class lists
+if (!shared.css) { console.error('[atomic] shared.css is undefined'); shared.css = ''; }
+const _shared_atomic = cssToAtomicClassList(shared.css);
+
+const cssSourcemapData = [{className:'shared-ar0tez',start:91,end:117}];
+
+// In atomic mode, resolve per-file CSS with marker classes for sourcemaps
+// The actual atomic CSS goes into the .atomic.css file via explicit import
+const perFileCss = [`.shared-ar0tez {\n${extractNonAtomicCss(shared.css)||'/* atomized */'}\n}`].join('\n');
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/edge-cases-1/shared.tsx.css');
+
+// Generate and resolve the .style-this.js module
+const styleThisModule = 'export const _styleThis_shared = "' + 'shared-ar0tez' + ' ' + _shared_atomic + '";';
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.style-this.js').resolve(styleThisModule);

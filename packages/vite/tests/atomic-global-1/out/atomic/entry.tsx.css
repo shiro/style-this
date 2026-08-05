@@ -1,7 +1,3 @@
-.mainStyle-74hqzc {
-background: red;
-  padding: 20px;
-}
 .Global__Main {
     background: coral;
     margin: 10px;
@@ -12,3 +8,7 @@ background: red;
       background: blue;
     }
   }
+
+.mainStyle-74hqzc {
+/* atomized */
+}
