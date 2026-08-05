@@ -52,12 +52,24 @@ const evaluateProgramWithMode = async (
   // Handle both string and object responses (with source maps)
   let cssCode: string;
   let cssMap: string | undefined;
+  let sourceContent: string | undefined;
   
   if (typeof cssRaw === 'string') {
     cssCode = cssRaw;
   } else if (cssRaw && typeof cssRaw === 'object') {
     cssCode = cssRaw.code || '';
-    cssMap = cssRaw.map ? JSON.stringify(cssRaw.map, null, 2) : undefined;
+    if (cssRaw.map) {
+      cssMap = JSON.stringify(cssRaw.map, null, 2);
+      // Extract source content from sourcemap
+      try {
+        const mapObj = cssRaw.map;
+        if (mapObj.sourcesContent && mapObj.sourcesContent.length > 0) {
+          sourceContent = mapObj.sourcesContent[0];
+        }
+      } catch (e) {
+        // Continue without source content
+      }
+    }
   } else {
     cssCode = String(cssRaw || '');
   }
@@ -66,9 +78,16 @@ const evaluateProgramWithMode = async (
     `${outDir}/${entry}.${plugin.cssExtension}`,
   );
   
-  if (cssMap) {
-    await expect(cssMap).toMatchFileSnapshot(
-      `${outDir}/${entry}.${plugin.cssExtension}.map`,
+  if (cssMap && sourceContent) {
+    // Embed sourcemap as JSON comments at the top of the source file
+    const sourceMapLines = cssMap.split('\n').map(line => `// ${line}`);
+    const sourceMapComment = sourceMapLines.join('\n');
+    const sourceWithSourceMap = `${sourceMapComment}\n\n${sourceContent}`;
+    
+    // Save as .sourcemap.{ext} file (using entry's extension)
+    const sourceMapFilename = `${entry}.sourcemap.${entry.split('.').pop()}`;
+    await expect(sourceWithSourceMap).toMatchFileSnapshot(
+      `${outDir}/${sourceMapFilename}`,
     );
   }
 
@@ -134,12 +153,24 @@ export const evaluateProgram = async (
   // Handle both string and object responses (with source maps)
   let cssCode: string;
   let cssMap: string | undefined;
+  let sourceContent: string | undefined;
   
   if (typeof cssRaw === 'string') {
     cssCode = cssRaw;
   } else if (cssRaw && typeof cssRaw === 'object') {
     cssCode = cssRaw.code || '';
-    cssMap = cssRaw.map ? JSON.stringify(cssRaw.map, null, 2) : undefined;
+    if (cssRaw.map) {
+      cssMap = JSON.stringify(cssRaw.map, null, 2);
+      // Extract source content from sourcemap
+      try {
+        const mapObj = cssRaw.map;
+        if (mapObj.sourcesContent && mapObj.sourcesContent.length > 0) {
+          sourceContent = mapObj.sourcesContent[0];
+        }
+      } catch (e) {
+        // Continue without source content
+      }
+    }
   } else {
     cssCode = String(cssRaw || '');
   }
@@ -148,9 +179,16 @@ export const evaluateProgram = async (
     `${testDir}/out/${entry}.${plugin.cssExtension}`,
   );
   
-  if (cssMap) {
-    await expect(cssMap).toMatchFileSnapshot(
-      `${testDir}/out/${entry}.${plugin.cssExtension}.map`,
+  if (cssMap && sourceContent) {
+    // Embed sourcemap as JSON comments at the top of the source file
+    const sourceMapLines = cssMap.split('\n').map(line => `// ${line}`);
+    const sourceMapComment = sourceMapLines.join('\n');
+    const sourceWithSourceMap = `${sourceMapComment}\n\n${sourceContent}`;
+    
+    // Save as .sourcemap.{ext} file (using entry's extension)
+    const sourceMapFilename = `${entry}.sourcemap.${entry.split('.').pop()}`;
+    await expect(sourceWithSourceMap).toMatchFileSnapshot(
+      `${testDir}/out/${sourceMapFilename}`,
     );
   }
 

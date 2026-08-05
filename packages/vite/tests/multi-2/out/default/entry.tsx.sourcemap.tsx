@@ -1,0 +1,19 @@
+// {
+//   "version": 3,
+//   "file": "/home/shiro/project/style-this/packages/vite/tests/multi-2/entry.tsx.css",
+//   "sources": [
+//     "/home/shiro/project/style-this/packages/vite/tests/multi-2/entry.tsx"
+//   ],
+//   "sourcesContent": [
+//     "import { css } from \"@style-this/core\";\nimport { color } from \"./b\";\n\nconst a = css`\n  background: ${color};\n`;\n"
+//   ],
+//   "names": [],
+//   "mappings": "AAGU"
+// }
+
+import { css } from "@style-this/core";
+import { color } from "./b";
+
+const a = css`
+  background: ${color};
+`;
