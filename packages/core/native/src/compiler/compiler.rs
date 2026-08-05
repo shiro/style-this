@@ -22,6 +22,13 @@ impl Transformer {
     ) -> Result<Option<JsValue>, TransformError> {
         let _self = self.clone();
         let (tx, rx) = futures::channel::oneshot::channel();
+        let filepath_clone = filepath.clone();
+
+        // Track this file transformation if in atomic mode
+        if _self.atomic {
+            use crate::compiler::atomic_sync::GLOBAL_SYNC;
+            GLOBAL_SYNC.add(filepath_clone.clone());
+        }
 
         spawn_local(async move {
             let allocator = Allocator::default();
@@ -29,6 +36,11 @@ impl Transformer {
             let temporary_programs = Rc::new(RefCell::new(Default::default()));
 
             let Ok(source_type) = SourceType::from_path(&filepath) else {
+                if _self.atomic {
+                    use crate::compiler::atomic_sync::GLOBAL_SYNC;
+                    GLOBAL_SYNC.remove(&filepath);
+                }
+                
                 let _ = tx.send(Err(TransformError::UknownExtension {
                     filepath: filepath.clone(),
                     row: 1,
@@ -45,6 +57,11 @@ impl Transformer {
                 .parse();
 
             if ast.panicked {
+                if _self.atomic {
+                    use crate::compiler::atomic_sync::GLOBAL_SYNC;
+                    GLOBAL_SYNC.remove(&filepath);
+                }
+                
                 let _ = tx.send(Err(TransformError::RawParseFailed {
                     filepath,
                     message: ast.errors.first().unwrap().message.to_string(),
@@ -70,6 +87,13 @@ impl Transformer {
                 skip_css_eval,
             )
             .await;
+            
+            // Remove the TypeScript file from tracking after evaluation completes
+            // The virtual CSS file will be removed separately after CSS evaluation
+            if _self.atomic {
+                use crate::compiler::atomic_sync::GLOBAL_SYNC;
+                GLOBAL_SYNC.remove(&filepath);
+            }
         });
 
         rx.await.unwrap()

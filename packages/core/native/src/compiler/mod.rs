@@ -7,6 +7,7 @@ mod transformer;
 mod types;
 mod visitor;
 pub mod atomic;
+pub mod atomic_sync;
 
 // Re-exports for public API
 pub use error::TransformError;

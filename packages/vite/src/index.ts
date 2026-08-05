@@ -198,17 +198,19 @@ const vitePlugin = (options: Options = {}) => {
         debug,
         atomic,
       });
-      
+
       // In atomic mode, set up global helper functions
       if (atomic) {
-        const { css_to_atomic_class_list, get_atomic_css, extract_non_atomic_css_js } = await import("@style-this/core/compiler");
+        const { css_to_atomic_class_list, get_atomic_css, extract_non_atomic_css_js, atomic_sync_remove_file } = await import("@style-this/core/compiler");
         (globalThis as any).__styleThis_cssToAtomicClassList = css_to_atomic_class_list;
         (globalThis as any).__styleThis_getAtomicCss = get_atomic_css;
         (globalThis as any).__styleThis_extractNonAtomicCss = extract_non_atomic_css_js;
+        (globalThis as any).__styleThis_atomicSyncRemoveFile = atomic_sync_remove_file;
         // Also set on global for compatibility
         (global as any).__styleThis_cssToAtomicClassList = css_to_atomic_class_list;
         (global as any).__styleThis_getAtomicCss = get_atomic_css;
         (global as any).__styleThis_extractNonAtomicCss = extract_non_atomic_css_js;
+        (global as any).__styleThis_atomicSyncRemoveFile = atomic_sync_remove_file;
       }
     },
 
@@ -219,7 +221,7 @@ const vitePlugin = (options: Options = {}) => {
         const atomicPath = `${virtualModulePrefix}__global__.atomic.css`;
         return resolvedVirtualModulePrefix + atomicPath.slice(virtualModulePrefix.length);
       }
-      
+
       if (id.startsWith(virtualModulePrefix)) {
         return (
           resolvedVirtualModulePrefix + id.slice(virtualModulePrefix.length)
@@ -237,11 +239,11 @@ const vitePlugin = (options: Options = {}) => {
           // Tell Vite this depends on the source file for HMR
           const sourceFilepath = filepath.slice(0, -'.atomic.css'.length);
           this.addWatchFile(sourceFilepath);
-          
+
           if (atomic) {
             const { get_atomic_css } = await import("@style-this/core/compiler");
-            const atomicCss = get_atomic_css();
-            
+            const atomicCss = await get_atomic_css();
+
             return {
               code: atomicCss,
             };
@@ -345,7 +347,7 @@ const vitePlugin = (options: Options = {}) => {
       if (atomic) {
         const { get_atomic_css } = await import("@style-this/core/compiler");
         const atomicCss = get_atomic_css();
-        
+
         if (atomicCss) {
           // Find the main CSS file and append atomic CSS to it
           for (const [fileName, output] of Object.entries(bundle)) {
@@ -365,10 +367,10 @@ const vitePlugin = (options: Options = {}) => {
       valueCache[ctx.file] = {};
       const cssFilepath = `${ctx.file}.${cssExtension}`;
       const styleThisFilepath = `${ctx.file}.style-this.js`;
-      
+
       cssCache.delete(cssFilepath);
       cssSourceMapMetadata.delete(cssFilepath);
-      
+
       // In atomic mode, also clear .style-this.js cache and atomic CSS cache
       if (atomic) {
         cssCache.delete(styleThisFilepath);
@@ -431,7 +433,7 @@ const vitePlugin = (options: Options = {}) => {
       const cssFilepath = `${importSourceFilepath}.${cssExtension}`;
       const styleThisFilepath = `${importSourceFilepath}.style-this.js`;
       // In atomic mode, also check if .style-this.js is cached
-      const skipCssEval = atomic 
+      const skipCssEval = atomic
         ? (cssCache.has(cssFilepath) && cssCache.has(styleThisFilepath))
         : cssCache.has(cssFilepath);
 
@@ -465,15 +467,15 @@ const vitePlugin = (options: Options = {}) => {
           entry.code = code;
 
           cssCache.set(cssFilepath, entry);
-          
+
           // In atomic mode, also create cache entry for .style-this.js file
           // This will be resolved during CSS evaluation by the rust code
           if (atomic) {
             // In atomic mode, create a resolvable cache entry for .style-this.js
-            // We resolve it immediately with empty string to prevent hang during transform
+            // We resolve it immediately with empty object to prevent hang during transform
             // The rust code will update styleThisActualContent map with real content during CSS evaluation
             let styleThisResolve: CssCachEntry["resolve"] | undefined;
-            
+
             const styleThisEntry = new Promise((_resolve, _reject) => {
               styleThisResolve = (css: string | Error) => {
                 // Update the actual content map when rust code calls resolve
@@ -485,14 +487,16 @@ const vitePlugin = (options: Options = {}) => {
             }) as CssCachEntry;
             styleThisEntry.resolve = styleThisResolve!;
             styleThisEntry.code = code;
-            
-            // Initialize with empty content
-            styleThisActualContent.set(styleThisFilepath, '');
-            
+
+            // Initialize with empty module object (not string!)
+            // This ensures if something tries to access it, it gets a valid module
+            const emptyModule = '({})';
+            styleThisActualContent.set(styleThisFilepath, emptyModule);
+
             // Resolve immediately with empty module to prevent hang during transform
             // The rust code will call resolve() again with real content, updating the map
-            styleThisResolve!('');
-            
+            styleThisResolve!(emptyModule);
+
             cssCache.set(styleThisFilepath, styleThisEntry);
           }
         }
@@ -522,13 +526,13 @@ const vitePlugin = (options: Options = {}) => {
           const virtualModuleId = resolvedVirtualModulePrefix + cssFilepath;
           const module = server.moduleGraph.getModuleById(virtualModuleId);
           if (module) server.reloadModule(module);
-          
+
           // In atomic mode, also invalidate the .style-this.js module and .atomic.css
           if (atomic) {
             const styleThisModuleId = resolvedVirtualModulePrefix + styleThisFilepath;
             const styleThisModule = server.moduleGraph.getModuleById(styleThisModuleId);
             if (styleThisModule) server.reloadModule(styleThisModule);
-            
+
             // Invalidate all .atomic.css modules (there could be multiple files importing it)
             for (const [id, mod] of server.moduleGraph.idToModuleMap) {
               if (id.includes('.atomic.css')) {
@@ -541,9 +545,9 @@ const vitePlugin = (options: Options = {}) => {
         return {
           code: isSvelte
             ? code.replace(
-                /<script[^>]*>([\s\S]*?)<\/script>/,
-                `<script>${transformedResult.code}</script>`
-              )
+              /<script[^>]*>([\s\S]*?)<\/script>/,
+              `<script>${transformedResult.code}</script>`
+            )
             : transformedResult.code,
           map: transformedResult.sourcemap,
         };

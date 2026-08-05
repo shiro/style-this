@@ -332,6 +332,13 @@ pub async fn evaluate_program<'alloc>(
             break;
         };
         let remote_module_id = import_declaration.source.value.to_string();
+        
+        // Skip the virtual atomic CSS import - it should not be evaluated as a dependency
+        // The atomic CSS file will be loaded separately by Vite when requested
+        if remote_module_id.starts_with("virtual:style-this:") && remote_module_id.ends_with(".atomic.css") {
+            continue;
+        }
+        
         let Some(specifiers) = &import_declaration.specifiers else {
             continue;
         };
@@ -659,6 +666,8 @@ pub async fn evaluate_program<'alloc>(
     let css_file_store_ref = &transformer.css_file_store_ref;
     let value_cache_ref = &transformer.value_cache_ref;
     let css_filepath = format!("'{program_filepath}.{}'", transformer.css_extension);
+    let css_filepath_unquoted = format!("{program_filepath}.{}", transformer.css_extension);
+
 
     if let Err(err) = futures::future::try_join_all(futures).await {
         let err = ExportedJSValue::new(err.into());
@@ -722,6 +731,16 @@ pub async fn evaluate_program<'alloc>(
     }
 
     let has_css = !css_variable_identifiers.is_empty();
+    
+    // Track the virtual CSS file if in atomic mode and we have CSS to generate
+    let virtual_css_filepath = if transformer.atomic && entrypoint && has_css {
+        use crate::compiler::atomic_sync::GLOBAL_SYNC;
+        let path = format!("{}.{}", program_filepath, transformer.css_extension);
+        GLOBAL_SYNC.add(path.clone());
+        Some(path)
+    } else {
+        None
+    };
 
     if entrypoint && has_css {
         if transformer.atomic {
@@ -1071,6 +1090,12 @@ pub async fn evaluate_program<'alloc>(
             "
         ))
         .unwrap();
+    }
+    
+    // Remove virtual CSS file from atomic sync tracking after CSS evaluation completes
+    if let Some(virtual_css_path) = virtual_css_filepath {
+        use crate::compiler::atomic_sync::GLOBAL_SYNC;
+        GLOBAL_SYNC.remove(&virtual_css_path);
     }
 }
 

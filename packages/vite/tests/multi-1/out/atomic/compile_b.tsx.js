@@ -1,29 +1,14 @@
-// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "exported", "css"}
+// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "css", "exported"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "red";
-let exported = new String("exported-w5y7wh");
+let exported = new String("exported-9qr0lu");
 exported.css = `background: ${color};`;
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] ?? {}), color};
 
-// /packages/vite/tests/multi-1/b.tsx: {"css", "color", "exported"}
-"use strict";
-let { css } = require("/packages/core/dist/index.mjs");
-let color = global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]['color'];
-let exported = new String("exported-w5y7wh");
-exported.css = `background: ${color};`;
-
-global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] ?? {}), color};const cssSourcemapData = [{className:'exported-w5y7wh',start:87,end:117}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/b.tsx.css').resolve([
-`.exported-w5y7wh {
-${exported.css}
-}`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-1/b.tsx.css');
-
-
-// /packages/vite/tests/multi-1/b.tsx: {"css", "exported", "color"}
-const exported = new String('exported-w5y7wh');
+// /packages/vite/tests/multi-1/b.tsx: {"exported", "css", "color"}
+const exported = new String('exported-9qr0lu');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]['color'];
@@ -43,20 +28,20 @@ if (!extractNonAtomicCss) {
 if (!exported.css) { console.error('[atomic] exported.css is undefined'); exported.css = ''; }
 const _exported_atomic = cssToAtomicClassList(exported.css);
 
-const cssSourcemapData = [{className:'exported-w5y7wh',start:87,end:117}];
+const cssSourcemapData = [{className:'exported-9qr0lu',start:87,end:117}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.exported-w5y7wh {\n${extractNonAtomicCss(exported.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.exported-9qr0lu {\n${extractNonAtomicCss(exported.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/b.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/multi-1/b.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_exported = "' + 'exported-w5y7wh' + ' ' + _exported_atomic + '";';
+const styleThisModule = 'export const _styleThis_exported = "' + 'exported-9qr0lu' + ' ' + _exported_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/b.tsx.style-this.js').resolve(styleThisModule);
 
 
 // /packages/vite/tests/multi-1/entry.tsx: {"a", "css", "color"}
-const a = new String('a-8pm3ch');
+const a = new String('a-5y38xq');
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
@@ -75,15 +60,15 @@ if (!extractNonAtomicCss) {
 if (!a.css) { console.error('[atomic] a.css is undefined'); a.css = ''; }
 const _a_atomic = cssToAtomicClassList(a.css);
 
-const cssSourcemapData = [{className:'a-8pm3ch',start:80,end:110}];
+const cssSourcemapData = [{className:'a-5y38xq',start:80,end:110}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.a-8pm3ch {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.a-5y38xq {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/multi-1/entry.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_a = "' + 'a-8pm3ch' + ' ' + _a_atomic + '";';
+const styleThisModule = 'export const _styleThis_a = "' + 'a-5y38xq' + ' ' + _a_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.style-this.js').resolve(styleThisModule);
 
 
@@ -91,11 +76,11 @@ global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.styl
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("a-8pm3ch");
+let a = new String("a-5y38xq");
 a.css = `background: ${color};`;
-const cssSourcemapData = [{className:'a-8pm3ch',start:80,end:110}];
+const cssSourcemapData = [{className:'a-5y38xq',start:80,end:110}];
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.css').resolve([
-`.a-8pm3ch {
+`.a-5y38xq {
 ${a.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-1/entry.tsx.css');

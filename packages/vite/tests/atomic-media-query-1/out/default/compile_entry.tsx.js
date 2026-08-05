@@ -1,10 +1,10 @@
-// /packages/vite/tests/atomic-media-query-1/entry.tsx: {"outerStyle", "innerStyle", "css"}
+// /packages/vite/tests/atomic-media-query-1/entry.tsx: {"innerStyle", "css", "outerStyle"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let innerStyle = new String("innerStyle-oty7sd");
+let innerStyle = new String("innerStyle-2zo1az");
 innerStyle.css = `background: red;
   padding: 10px;`;
-let outerStyle = new String("outerStyle-mvwhqz");
+let outerStyle = new String("outerStyle-z41ifw");
 outerStyle.css = `width: 100%;
   .${innerStyle} {
     background: coral;
@@ -14,19 +14,19 @@ outerStyle.css = `width: 100%;
       background: blue;
     }
   }`;
-const cssSourcemapData = [{className:'innerStyle-oty7sd',start:130,end:172},{className:'outerStyle-mvwhqz',start:308,end:460}];
+const cssSourcemapData = [{className:'innerStyle-2zo1az',start:130,end:172},{className:'outerStyle-z41ifw',start:308,end:460}];
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/atomic-media-query-1/entry.tsx.css').resolve([
-`.innerStyle-oty7sd {
+`.innerStyle-2zo1az {
 ${innerStyle.css}
 }`,
-`.outerStyle-mvwhqz {
+`.outerStyle-z41ifw {
 ${outerStyle.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/atomic-media-query-1/entry.tsx.css');
 
 
-// /packages/vite/tests/basic-1/entry.tsx: {"css", "a"}
-const a = new String('a-xezolq');
+// /packages/vite/tests/basic-1/entry.tsx: {"a", "css"}
+const a = new String('a-q3g9a7');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 a.css = `background: red;`;
@@ -44,40 +44,34 @@ if (!extractNonAtomicCss) {
 if (!a.css) { console.error('[atomic] a.css is undefined'); a.css = ''; }
 const _a_atomic = cssToAtomicClassList(a.css);
 
-const cssSourcemapData = [{className:'a-xezolq',start:51,end:76}];
+const cssSourcemapData = [{className:'a-q3g9a7',start:51,end:76}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.a-xezolq {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.a-q3g9a7 {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/basic-1/entry.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/basic-1/entry.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_a = "' + 'a-xezolq' + ' ' + _a_atomic + '";';
+const styleThisModule = 'export const _styleThis_a = "' + 'a-q3g9a7' + ' ' + _a_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/basic-1/entry.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/basic-2/entry.tsx: {"css", "a", "b", "foo"}
+// /packages/vite/tests/basic-1/entry.tsx: {"css", "a"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let foo = "red";
-let a = new String("a-j0523w");
-a.css = `background: ${foo};`;
-let b = new String("b-w5irkh");
-b.css = `background: ${foo};`;
-const cssSourcemapData = [{className:'a-j0523w',start:70,end:98},{className:'b-w5irkh',start:110,end:138}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/basic-2/entry.tsx.css').resolve([
-`.a-j0523w {
+let a = new String("a-q3g9a7");
+a.css = `background: red;`;
+const cssSourcemapData = [{className:'a-q3g9a7',start:51,end:76}];
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/basic-1/entry.tsx.css').resolve([
+`.a-q3g9a7 {
 ${a.css}
-}`,
-`.b-w5irkh {
-${b.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/basic-2/entry.tsx.css');
+].join('\n'), cssSourcemapData, '/packages/vite/tests/basic-1/entry.tsx.css');
 
 
-// /packages/vite/tests/basic-2/entry.tsx: {"foo", "b", "css", "a"}
-const a = new String('a-j0523w');
-const b = new String('b-w5irkh');
+// /packages/vite/tests/basic-2/entry.tsx: {"b", "foo", "css", "a"}
+const a = new String('a-ole3wx');
+const b = new String('b-r4x6jg');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let foo = "red";
@@ -99,14 +93,14 @@ const _a_atomic = cssToAtomicClassList(a.css);
 if (!b.css) { console.error('[atomic] b.css is undefined'); b.css = ''; }
 const _b_atomic = cssToAtomicClassList(b.css);
 
-const cssSourcemapData = [{className:'a-j0523w',start:70,end:98},{className:'b-w5irkh',start:110,end:138}];
+const cssSourcemapData = [{className:'a-ole3wx',start:70,end:98},{className:'b-r4x6jg',start:110,end:138}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.a-j0523w {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`,
-`.b-w5irkh {\n${extractNonAtomicCss(b.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.a-ole3wx {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`,
+`.b-r4x6jg {\n${extractNonAtomicCss(b.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/basic-2/entry.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/basic-2/entry.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_a = "' + 'a-j0523w' + ' ' + _a_atomic + '";' + '\n' + 'export const _styleThis_b = "' + 'b-w5irkh' + ' ' + _b_atomic + '";';
+const styleThisModule = 'export const _styleThis_a = "' + 'a-ole3wx' + ' ' + _a_atomic + '";' + '\n' + 'export const _styleThis_b = "' + 'b-r4x6jg' + ' ' + _b_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/basic-2/entry.tsx.style-this.js').resolve(styleThisModule);

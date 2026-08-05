@@ -1,6 +1,6 @@
-// /packages/vite/tests/styled-components-solid-1/entry.tsx: {"css", "unrelated"}
-const __styleThis_var_FancyButton_2 = new String('FancyButton-3slijs');
-const unrelated = new String('unrelated-96jgdy');
+// /packages/vite/tests/styled-components-solid-1/entry.tsx: {"unrelated", "css"}
+const __styleThis_var_FancyButton_2 = new String('FancyButton-mr0hyf');
+const unrelated = new String('unrelated-o9y7wh');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 __styleThis_var_FancyButton_2.css = `background: none;
@@ -24,14 +24,14 @@ const ___styleThis_var_FancyButton_2_atomic = cssToAtomicClassList(__styleThis_v
 if (!unrelated.css) { console.error('[atomic] unrelated.css is undefined'); unrelated.css = ''; }
 const _unrelated_atomic = cssToAtomicClassList(unrelated.css);
 
-const cssSourcemapData = [{className:'FancyButton-3slijs',start:112,end:241},{className:'unrelated-96jgdy',start:262,end:288}];
+const cssSourcemapData = [{className:'FancyButton-mr0hyf',start:112,end:241},{className:'unrelated-o9y7wh',start:262,end:288}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.FancyButton-3slijs {\n${extractNonAtomicCss(__styleThis_var_FancyButton_2.css)||'/* atomized */'}\n}`,
-`.unrelated-96jgdy {\n${extractNonAtomicCss(unrelated.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.FancyButton-mr0hyf {\n${extractNonAtomicCss(__styleThis_var_FancyButton_2.css)||'/* atomized */'}\n}`,
+`.unrelated-o9y7wh {\n${extractNonAtomicCss(unrelated.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/styled-components-solid-1/entry.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/styled-components-solid-1/entry.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_var_FancyButton_2 = "' + 'FancyButton-3slijs' + ' ' + ___styleThis_var_FancyButton_2_atomic + '";' + '\n' + 'export const _styleThis_unrelated = "' + 'unrelated-96jgdy' + ' ' + _unrelated_atomic + '";';
+const styleThisModule = 'export const _styleThis_var_FancyButton_2 = "' + 'FancyButton-mr0hyf' + ' ' + ___styleThis_var_FancyButton_2_atomic + '";' + '\n' + 'export const _styleThis_unrelated = "' + 'unrelated-o9y7wh' + ' ' + _unrelated_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/styled-components-solid-1/entry.tsx.style-this.js').resolve(styleThisModule);

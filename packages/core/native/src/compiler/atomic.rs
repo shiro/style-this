@@ -295,8 +295,14 @@ pub fn extract_non_atomic_css_js(css: &str) -> String {
 }
 
 /// Get all collected atomic CSS (JavaScript API)
+/// Waits for all files to finish transforming before returning
 #[wasm_bindgen]
-pub fn get_atomic_css() -> String {
+pub async fn get_atomic_css() -> String {
+    use crate::compiler::atomic_sync::GLOBAL_SYNC;
+    
+    // Wait until all transformations are complete
+    GLOBAL_SYNC.is_ready().await;
+    
     get_all_atomic_css()
 }
 

@@ -1,22 +1,5 @@
-// /packages/vite/tests/expressions-1/entry.tsx: {"css", "doPromise", "Promise", "setTimeout", "a"}
-"use strict";
-let { css } = require("/packages/core/dist/index.mjs");
-let doPromise = async () => {
-	await new Promise((resolve) => setTimeout(resolve, 10));
-	return "red";
-};
-let a = new String("a-f45qro");
-a.css = `background: ${doPromise()};`;
-const cssSourcemapData = [{className:'a-f45qro',start:162,end:198}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.css').resolve([
-`.a-f45qro {
-${a.css}
-}`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/expressions-1/entry.tsx.css');
-
-
-// /packages/vite/tests/expressions-1/entry.tsx: {"css", "doPromise", "setTimeout", "a", "Promise"}
-const a = new String('a-f45qro');
+// /packages/vite/tests/expressions-1/entry.tsx: {"css", "Promise", "setTimeout", "a", "doPromise"}
+const a = new String('a-y789mr');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let doPromise = async () => {
@@ -38,26 +21,43 @@ if (!extractNonAtomicCss) {
 if (!a.css) { console.error('[atomic] a.css is undefined'); a.css = ''; }
 const _a_atomic = cssToAtomicClassList(a.css);
 
-const cssSourcemapData = [{className:'a-f45qro',start:162,end:198}];
+const cssSourcemapData = [{className:'a-y789mr',start:162,end:198}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.a-f45qro {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.a-y789mr {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/expressions-1/entry.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_a = "' + 'a-f45qro' + ' ' + _a_atomic + '";';
+const styleThisModule = 'export const _styleThis_a = "' + 'a-y789mr' + ' ' + _a_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/expressions-2/entry.tsx: {"css", "a"}
+// /packages/vite/tests/expressions-1/entry.tsx: {"setTimeout", "doPromise", "css", "Promise", "a"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("a-7ohiv8");
+let doPromise = async () => {
+	await new Promise((resolve) => setTimeout(resolve, 10));
+	return "red";
+};
+let a = new String("a-y789mr");
+a.css = `background: ${doPromise()};`;
+const cssSourcemapData = [{className:'a-y789mr',start:162,end:198}];
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.css').resolve([
+`.a-y789mr {
+${a.css}
+}`
+].join('\n'), cssSourcemapData, '/packages/vite/tests/expressions-1/entry.tsx.css');
+
+
+// /packages/vite/tests/expressions-2/entry.tsx: {"a", "css"}
+"use strict";
+let { css } = require("/packages/core/dist/index.mjs");
+let a = new String("a-kde34p");
 a.css = `margin: ${() => 99}px;`;
-const cssSourcemapData = [{className:'a-7ohiv8',start:51,end:82}];
+const cssSourcemapData = [{className:'a-kde34p',start:51,end:82}];
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-2/entry.tsx.css').resolve([
-`.a-7ohiv8 {
+`.a-kde34p {
 ${a.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/expressions-2/entry.tsx.css');
