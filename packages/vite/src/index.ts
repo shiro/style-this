@@ -80,6 +80,10 @@ const vitePlugin = (options: Options = {}) => {
     { sourcemapData: CssSourceMapData; originalSource: string }
   >();
 
+  // Store actual .style-this.js content separately (for atomic mode)
+  // This allows updating content even after promise is resolved
+  const styleThisActualContent = new Map<string, string>();
+
   if (!global.__styleThis_valueCache) {
     global.__styleThis_valueCache = {};
   }
@@ -143,6 +147,24 @@ const vitePlugin = (options: Options = {}) => {
           throw new Error(`vite failed to resolve import '${id}'`);
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
+
+        // For virtual modules (style-this virtual modules), load from cache
+        if (filepath.startsWith(resolvedVirtualModulePrefix)) {
+          const virtualPath = filepath.slice(resolvedVirtualModulePrefix.length);
+          const entry = cssCache.get(virtualPath);
+          if (entry) {
+            // Wait for the entry to resolve
+            const content = await entry;
+            // For .style-this.js files in atomic mode, get actual content from map
+            if (atomic && virtualPath.endsWith('.style-this.js')) {
+              const actualContent = styleThisActualContent.get(virtualPath) || '';
+              return [virtualPath, actualContent];
+            }
+            return [virtualPath, typeof content === 'string' ? content : ''];
+          }
+          // If not in cache, return empty
+          return [virtualPath, ''];
+        }
 
         if (
           !filepath.startsWith(`${cwd}/node_modules/`) &&
@@ -273,6 +295,13 @@ const vitePlugin = (options: Options = {}) => {
               throw new Error(`Unexpected CSS resolution type: ${typeof resolved}`);
             }
 
+            // For .style-this.js files in atomic mode, return actual content from map
+            // This allows the content to be updated even after promise was resolved
+            let finalContent = resolved;
+            if (atomic && filepath.endsWith('.style-this.js')) {
+              finalContent = styleThisActualContent.get(filepath) || resolved;
+            }
+
             // Generate source map if we have metadata
             const metadata = cssSourceMapMetadata.get(filepath);
             if (metadata) {
@@ -282,7 +311,7 @@ const vitePlugin = (options: Options = {}) => {
                 : `/${sourceFilepath}`;
 
               const sourcemap = generateCssSourceMap(
-                resolved,
+                finalContent,
                 metadata.sourcemapData,
                 absoluteSourcePath,
                 metadata.originalSource,
@@ -290,14 +319,14 @@ const vitePlugin = (options: Options = {}) => {
               );
 
               return {
-                code: resolved,
+                code: finalContent,
                 map: sourcemap,
               };
             }
 
             // Return without source map if no metadata
             return {
-              code: resolved,
+              code: finalContent,
             };
           } catch (error) {
             if (error == TIMEOUT) {
@@ -440,14 +469,29 @@ const vitePlugin = (options: Options = {}) => {
           // In atomic mode, also create cache entry for .style-this.js file
           // This will be resolved during CSS evaluation by the rust code
           if (atomic) {
+            // In atomic mode, create a resolvable cache entry for .style-this.js
+            // We resolve it immediately with empty string to prevent hang during transform
+            // The rust code will update styleThisActualContent map with real content during CSS evaluation
             let styleThisResolve: CssCachEntry["resolve"] | undefined;
+            
             const styleThisEntry = new Promise((_resolve, _reject) => {
               styleThisResolve = (css: string | Error) => {
+                // Update the actual content map when rust code calls resolve
+                if (typeof css === 'string') {
+                  styleThisActualContent.set(styleThisFilepath, css);
+                }
                 _resolve(css);
               };
             }) as CssCachEntry;
             styleThisEntry.resolve = styleThisResolve!;
             styleThisEntry.code = code;
+            
+            // Initialize with empty content
+            styleThisActualContent.set(styleThisFilepath, '');
+            
+            // Resolve immediately with empty module to prevent hang during transform
+            // The rust code will call resolve() again with real content, updating the map
+            styleThisResolve!('');
             
             cssCache.set(styleThisFilepath, styleThisEntry);
           }

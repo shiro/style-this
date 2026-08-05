@@ -246,8 +246,24 @@ export const resetRandom = (() => {
 export const tsx = (raw: TemplateStringsArray) => raw.join("");
 
 export const setupPlugin = async (resolver: Record<string, string>, options?: Record<string, any>) => {
+  const pluginOptions = { debug: true, useRequire: true, ...(options || {}) };
+  const plugin = vitePlugin(pluginOptions as any);
+  
   const ctx = {
     async resolve(id: string) {
+      // First try plugin's resolveId for virtual modules
+      if (id.startsWith('virtual:style-this:')) {
+        const resolved = plugin.resolveId?.call(ctx, id, '');
+        if (resolved) {
+          return Promise.resolve({
+            id: typeof resolved === 'string' ? resolved : resolved.id,
+            external: false,
+            resolvedBy: "",
+          });
+        }
+      }
+      
+      // Then try the test resolver
       if (resolver[id] == undefined) return undefined;
       return Promise.resolve({
         id: resolver[id],
@@ -257,9 +273,6 @@ export const setupPlugin = async (resolver: Record<string, string>, options?: Re
     },
     addWatchFile: vi.fn(),
   } as any;
-
-  const pluginOptions = { debug: true, useRequire: true, ...(options || {}) };
-  const plugin = vitePlugin(pluginOptions as any);
 
   const config = plugin.config.bind(ctx);
   await config({});
