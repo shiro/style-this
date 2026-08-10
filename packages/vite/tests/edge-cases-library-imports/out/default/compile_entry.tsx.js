@@ -1,5 +1,5 @@
-// /packages/vite/tests/edge-cases-1/entry-1.tsx: {"css", "num", "a"}
-const a = new String('a-fody7g');
+// /packages/vite/tests/edge-cases-1/entry-1.tsx: {"css", "a", "num"}
+const a = new String('a-gxu385');
 "use strict";
 const num = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
 let { css } = require("/packages/core/dist/index.mjs");
@@ -18,34 +18,34 @@ if (!extractNonAtomicCss) {
 if (!a.css) { console.error('[atomic] a.css is undefined'); a.css = ''; }
 const _a_atomic = cssToAtomicClassList(a.css);
 
-const cssSourcemapData = [{className:'a-fody7g',start:83,end:109}];
+const cssSourcemapData = [{className:'a-gxu385',start:83,end:109}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.a-fody7g {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.a-gxu385 {\n${extractNonAtomicCss(a.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-1.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_a = "' + 'a-fody7g' + ' ' + _a_atomic + '";';
+const styleThisModule = 'export const _styleThis_a = "' + 'a-gxu385' + ' ' + _a_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/edge-cases-1/entry-1.tsx: {"num", "a", "css"}
+// /packages/vite/tests/edge-cases-1/entry-2.tsx: {"b", "css", "num"}
 "use strict";
 const num = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("a-fody7g");
-a.css = `margin: ${num}px;`;
-const cssSourcemapData = [{className:'a-fody7g',start:83,end:109}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.css').resolve([
-`.a-fody7g {
-${a.css}
+let b = new String("b-w56741");
+b.css = `margin: ${num}px;`;
+const cssSourcemapData = [{className:'b-w56741',start:83,end:109}];
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-2.tsx.css').resolve([
+`.b-w56741 {
+${b.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-1.tsx.css');
+].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-2.tsx.css');
 
 
-// /packages/vite/tests/edge-cases-1/entry-2.tsx: {"css", "num", "b"}
-const b = new String('b-d2joxu');
+// /packages/vite/tests/edge-cases-1/entry-2.tsx: {"num", "b", "css"}
+const b = new String('b-w56741');
 "use strict";
 const num = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
 let { css } = require("/packages/core/dist/index.mjs");
@@ -64,58 +64,44 @@ if (!extractNonAtomicCss) {
 if (!b.css) { console.error('[atomic] b.css is undefined'); b.css = ''; }
 const _b_atomic = cssToAtomicClassList(b.css);
 
-const cssSourcemapData = [{className:'b-d2joxu',start:83,end:109}];
+const cssSourcemapData = [{className:'b-w56741',start:83,end:109}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.b-d2joxu {\n${extractNonAtomicCss(b.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.b-w56741 {\n${extractNonAtomicCss(b.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-2.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-2.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_b = "' + 'b-d2joxu' + ' ' + _b_atomic + '";';
+const styleThisModule = 'export const _styleThis_b = "' + 'b-w56741' + ' ' + _b_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-2.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/edge-cases-1/entry-2.tsx: {"num", "b", "css"}
-"use strict";
-const num = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
-let { css } = require("/packages/core/dist/index.mjs");
-let b = new String("b-d2joxu");
-b.css = `margin: ${num}px;`;
-const cssSourcemapData = [{className:'b-d2joxu',start:83,end:109}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-2.tsx.css').resolve([
-`.b-d2joxu {
-${b.css}
-}`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-2.tsx.css');
-
-
-// /packages/vite/tests/edge-cases-1/shared.tsx (/packages/vite/tests/edge-cases-1/entry-1.tsx): {"shared", "css", "num", "Math"}
+// /packages/vite/tests/edge-cases-1/shared.tsx (/packages/vite/tests/edge-cases-1/entry-1.tsx): {"Math", "num", "shared", "css"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let num = Math.random();
-let shared = new String("shared-52bkdy");
+let shared = new String("shared-ar0tez");
 shared.css = `margin: ${num}px;`;
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};
 
-// /packages/vite/tests/edge-cases-1/shared.tsx: {"Math", "num", "css", "shared"}
+// /packages/vite/tests/edge-cases-1/shared.tsx: {"num", "css", "Math", "shared"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let num = global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]['num'];
-let shared = new String("shared-52bkdy");
+let shared = new String("shared-ar0tez");
 shared.css = `margin: ${num}px;`;
 
-global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};const cssSourcemapData = [{className:'shared-52bkdy',start:91,end:117}];
+global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};const cssSourcemapData = [{className:'shared-ar0tez',start:91,end:117}];
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.css').resolve([
-`.shared-52bkdy {
+`.shared-ar0tez {
 ${shared.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/shared.tsx.css');
 
 
-// /packages/vite/tests/edge-cases-1/shared.tsx: {"shared", "Math", "css", "num"}
-const shared = new String('shared-52bkdy');
+// /packages/vite/tests/edge-cases-1/shared.tsx: {"shared", "css", "Math", "num"}
+const shared = new String('shared-ar0tez');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let num = global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]['num'];
@@ -135,27 +121,27 @@ if (!extractNonAtomicCss) {
 if (!shared.css) { console.error('[atomic] shared.css is undefined'); shared.css = ''; }
 const _shared_atomic = cssToAtomicClassList(shared.css);
 
-const cssSourcemapData = [{className:'shared-52bkdy',start:91,end:117}];
+const cssSourcemapData = [{className:'shared-ar0tez',start:91,end:117}];
 
 // In atomic mode, resolve per-file CSS with marker classes for sourcemaps
 // The actual atomic CSS goes into the .atomic.css file via explicit import
-const perFileCss = [`.shared-52bkdy {\n${extractNonAtomicCss(shared.css)||'/* atomized */'}\n}`].join('\n');
+const perFileCss = [`.shared-ar0tez {\n${extractNonAtomicCss(shared.css)||'/* atomized */'}\n}`].join('\n');
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.css').resolve(perFileCss, cssSourcemapData, '/packages/vite/tests/edge-cases-1/shared.tsx.css');
 
 // Generate and resolve the .style-this.js module
-const styleThisModule = 'export const _styleThis_shared = "' + 'shared-52bkdy' + ' ' + _shared_atomic + '";';
+const styleThisModule = 'export const _styleThis_shared = "' + 'shared-ar0tez' + ' ' + _shared_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/edge-cases-library-imports/entry.tsx: {"a", "css", "getNumber"}
+// /packages/vite/tests/edge-cases-library-imports/entry.tsx: {"getNumber", "a", "css"}
 "use strict";
 const getNumber = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-library-imports/node_modules/some_lib/index.js"]["getNumber"];
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("a-wtyj0x");
+let a = new String("a-tej8d6");
 a.css = `margin: ${getNumber()};`;
-const cssSourcemapData = [{className:'a-wtyj0x',start:627,end:659}];
+const cssSourcemapData = [{className:'a-tej8d6',start:627,end:659}];
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/edge-cases-library-imports/entry.tsx.css').resolve([
-`.a-wtyj0x {
+`.a-tej8d6 {
 ${a.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-library-imports/entry.tsx.css');

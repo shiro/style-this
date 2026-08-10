@@ -1,12 +1,12 @@
-.innerStyle-2zo1az {
+.innerStyle-oty7sd {
 /* atomized */
 }
-.outerStyle-z41ifw {
-.innerStyle-2zo1az {
+.outerStyle-mvwhqz {
+.innerStyle-oty7sd {
     background: coral;
   }
 @media (max-width: 500px) {
-    .innerStyle-2zo1az {
+    .innerStyle-oty7sd {
       background: blue;
     }
   }

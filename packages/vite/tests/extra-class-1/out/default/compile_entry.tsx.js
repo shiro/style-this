@@ -1,18 +1,18 @@
-// /packages/vite/tests/extra-class-1/entry.tsx: {"extraClass", "b", "a", "css"}
+// /packages/vite/tests/extra-class-1/entry.tsx: {"b", "extraClass", "css", "a"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("a-chuvkp foo bar");
+let a = new String("a-4tu7c1 foo bar");
 a.css = `background: red;
   `;
-let b = new String("b-1iv0ta baz");
+let b = new String("b-9mz4di baz");
 b.css = `color: blue;
   `;
-const cssSourcemapData = [{className:'a-chuvkp',start:63,end:115},{className:'b-1iv0ta',start:128,end:172}];
+const cssSourcemapData = [{className:'a-4tu7c1',start:63,end:115},{className:'b-9mz4di',start:128,end:172}];
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/extra-class-1/entry.tsx.css').resolve([
-`.a-chuvkp {
+`.a-4tu7c1 {
 ${a.css}
 }`,
-`.b-1iv0ta {
+`.b-9mz4di {
 ${b.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/extra-class-1/entry.tsx.css');
