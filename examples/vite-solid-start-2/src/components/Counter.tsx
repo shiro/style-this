@@ -23,7 +23,7 @@ export const FancyButton = styled.button<{ a: number }>`
   padding: ${({ a }) => `${a}px`};
 `;
 
-export const FancyButton2 = styled(FancyButton)<{ b: number }>`
+export const FancyButton2 = styled(FancyButton) <{ b: number }>`
   margin: ${({ b }) => `${b}px`};
   min-height: ${({ b }) => `${b}px`};
   cursor: pointer;
@@ -45,3 +45,5 @@ export default function Counter() {
     </div>
   );
 }
+
+export const counterColor = "coral";

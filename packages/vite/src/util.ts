@@ -1,5 +1,41 @@
 export type Filter = RegExp | ((filepath: string) => boolean);
 
+const TIMEOUT = Symbol("TIMEOUT");
+
+/**
+ * Wraps a promise with a timeout. Returns a promise that races the input promise
+ * against a timeout. If the timeout wins, it rejects with the TIMEOUT symbol.
+ * The returned promise properly cleans up the timeout when the race completes.
+ */
+export function timeoutPromise<T>(
+  promise: Promise<T>,
+  timeoutDuration: number,
+): Promise<T> {
+  const controller = new AbortController();
+
+  const timeoutPromiseInternal = new Promise<T>((_, reject) => {
+    const timeoutId = setTimeout(() => {
+      if (!controller.signal.aborted) {
+        reject(TIMEOUT);
+      }
+    }, timeoutDuration);
+
+    // Clear timeout when aborted
+    controller.signal.addEventListener("abort", () => {
+      clearTimeout(timeoutId);
+    });
+  });
+
+  return Promise.race([promise, timeoutPromiseInternal]).finally(() => {
+    controller.abort();
+  });
+}
+
+/**
+ * Export TIMEOUT symbol for use in error checking
+ */
+export { TIMEOUT };
+
 export const filterMatches = (filter: Filter[], filepath: string) => {
   return (
     filter.length == 0 ||
@@ -16,8 +52,6 @@ export const handleTransformError = (
 ) => {
   if (!(maybeErr instanceof Error)) throw maybeErr;
   const err = maybeErr.cause instanceof Error ? maybeErr.cause : maybeErr;
-
-  console.log("stack", err.stack);
 
   const stackEntry = err.stack?.split("\n")[1];
   if (!stackEntry) throw err;

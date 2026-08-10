@@ -1,5 +1,5 @@
-import MainComponent from './MainComponent'
 import "@style-this/core/atomic"
+import MainComponent from './MainComponent'
 
 function App() {
   return (

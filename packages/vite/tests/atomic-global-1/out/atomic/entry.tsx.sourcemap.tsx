@@ -8,7 +8,7 @@
 //     "import { css } from \"@style-this/core\";\nimport \"@style-this/core/atomic\";\n\n// Regular style\nconst mainStyle = css`\n  background: red;\n  padding: 20px;\n`;\n\n// Global style with _Global prefix\nconst _GlobalMain = css`\n  .Global__Main {\n    background: coral;\n    margin: 10px;\n  }\n  \n  @media (max-width: 600px) {\n    .Global__Main {\n      background: blue;\n    }\n  }\n`;\n\nexport { mainStyle, _GlobalMain };\n"
 //   ],
 //   "names": [],
-//   "mappings": ";;;;;;;;;;;AAIkB"
+//   "mappings": "AAIkB"
 // }
 
 import { css } from "@style-this/core";

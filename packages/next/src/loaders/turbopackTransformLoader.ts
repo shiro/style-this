@@ -49,13 +49,6 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
       __dirname,
       `../../style-this.${qualifier}.css`,
     );
-    const noopFilepathRelative = path.relative(
-      path.dirname(filepath),
-      noopFilepath,
-    );
-
-    // Use noop workaround - reference the noop CSS file without writing virtual modules
-    const importSource = `${noopFilepathRelative}?filepath=${filepath}&time=${+new Date()}`;
     
     // Create CSS cache entry for this file
     const cssFilepath = `${filepath}.${cssExtension}`;
@@ -78,7 +71,6 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
       code.toString(),
       filepath,
       skipCssEval,
-      importSource,
     );
 
     if (!transformedResult) {

@@ -1,22 +1,24 @@
-import initWasm, { initialize, css_to_atomic_class_list, get_atomic_css, clear_atomic_css_cache, extract_non_atomic_css_js } from "../native/pkg/style_this.js";
+import initWasm, { initialize } from "../native/pkg/style_this.js";
 import wasm from "../native/pkg/style_this_bg.wasm";
 
-import { Transformer as _Transformer } from "../native/pkg/style_this.js";
+import { Transformer as _Transformer, CacheRegistry as _CacheRegistry } from "../native/pkg/style_this.js";
 
-// Re-export atomic CSS functions
-export { css_to_atomic_class_list, get_atomic_css, clear_atomic_css_cache, extract_non_atomic_css_js };
+export interface CacheRegistry {
+  css_cache_ref(): string;
+  atomic_cache_ref(): string;
+  value_cache_ref(): string;
+}
 
 export interface Transformer extends Omit<_Transformer, "transform"> {
   transform(
     code: string,
     filepath: string,
     skipCssEval: boolean,
-    importSource?: string,
   ): Promise<
     | {
-        code: string;
-        sourcemap: string;
-      }
+      code: string;
+      sourcemap: string;
+    }
     | undefined
   >;
 }
@@ -37,7 +39,7 @@ export type CssCachEntry = Promise<string | Error> & {
 };
 
 // fix types on rust-generated types
-export const Transformer = _Transformer as any as new (opts: {
+export const Transformer = _Transformer as unknown as new (opts: {
   cwd: string;
   ignoredImports: Record<string, string[]>;
 
@@ -45,7 +47,9 @@ export const Transformer = _Transformer as any as new (opts: {
   createRequire?: (filename: string) => NodeRequire;
 
   cssCache: Map<string, CssCachEntry>;
-  valueCache: Record<string, Record<string, any>>;
+  atomicCache: Map<string, CssCachEntry>;
+  valueCache: Map<string, Record<string, unknown>>;
+  cacheRegistry?: CacheRegistry;
 
   wrapSelectorsWithGlobal?: boolean;
 
@@ -53,10 +57,17 @@ export const Transformer = _Transformer as any as new (opts: {
   useRequire?: boolean;
   debug?: boolean;
   atomic?: boolean;
+  onDebugVirtualModule?: (name: string, code: string) => void;
 }) => Transformer;
 
+export const CacheRegistry = _CacheRegistry as unknown as new (
+  css_cache_ref: string,
+  atomic_cache_ref: string,
+  value_cache_ref: string,
+) => CacheRegistry;
+
 export const initializeStyleThis = async () => {
-  const instance = await (wasm as any)();
+  const instance = await (wasm as unknown as () => Promise<WebAssembly.Instance>)();
   await initWasm({ module_or_path: instance });
   initialize();
 };

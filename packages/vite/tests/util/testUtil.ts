@@ -1,13 +1,73 @@
 import { beforeEach, vi } from "vitest";
 import { afterEach } from "vitest";
+import type { OutputOptions } from "rollup";
+import type { BundleObject } from "rollup";
 import vitePlugin from "../../src/index";
 import { readdir, readFile } from "fs/promises";
 import { join, resolve } from "path";
 import { expect } from "vitest";
+import { test } from "vitest";
 
 const MONOREPO_ROOT_DIR = resolve(join(__dirname, "../../../.."));
 
-export const getResolver = async (testDir: string, options?: Record<string, any>) => {
+const normalizeTemporaryProgramKeys = (entries: [string, string][]): [string, string][] => {
+  return entries.map(([key, value]) => {
+    // Normalize the key by sorting variables within the braces
+    // Key format: "path: {var1, var2, ...}"
+    const match = key.match(/^(.*?):\s*\{([^}]*)\}(.*)$/);
+    if (match) {
+      const [, path, varsStr, rest] = match;
+      const vars = varsStr.split(',').map(v => v.trim()).sort().join(', ');
+      const normalizedKey = `${path}: {${vars}}${rest}`;
+      return [normalizedKey, value];
+    }
+    return [key, value];
+  });
+};
+
+const handleAtomicProgram = async (
+  testDir: string,
+  entry: string,
+  plugin: Awaited<ReturnType<typeof setupPlugin>>,
+  outDir: string,
+) => {
+  let atomicProgramId = plugin.resolveId(`virtual:style-this:${testDir}/${entry}.style-this.js`);
+  if (!atomicProgramId) throw new Error(`Failed to resolve atomic program for entry: ${entry}`);
+
+  const atomicProgram = await plugin.load(atomicProgramId);
+  if (typeof atomicProgram !== "object") throw new Error("expected object");
+
+  await expect(atomicProgram.code).toMatchFileSnapshot(`${outDir}/${entry}.compile.style-this.js`);
+};
+
+const getAtomicEntrypointCss = async (
+  plugin: Awaited<ReturnType<typeof setupPlugin>>,
+): Promise<string> => {
+  // Call generateBundle to generate the atomic CSS entrypoint
+  const bundle: Record<string, BundleObject> = {};
+  if (plugin.generateBundle) {
+    await plugin.generateBundle({} as OutputOptions, bundle);
+  }
+
+  const atomicEntrypointRaw = bundle["assets/atomic.css"].source;
+  if (typeof atomicEntrypointRaw !== "string") throw new Error("Failed to get atomic css entrypoint");
+
+  return atomicEntrypointRaw;
+};
+
+const snapshotAtomicEntrypoint = async (
+  outDir: string,
+  atomicCss: string,
+) => {
+  await expect(atomicCss).toMatchFileSnapshot(
+    `${outDir}/atomic.entrypoint.css`,
+  );
+};
+
+export const getResolver = async (
+  testDir: string,
+  options?: Record<string, unknown>,
+) => {
   const resolver = (await readdir(testDir, { withFileTypes: true }))
     .filter((dirent) => dirent.isFile())
     .reduce(
@@ -42,18 +102,21 @@ const evaluateProgramWithMode = async (
     `${outDir}/${entry}`,
   );
 
-  const id = plugin.resolveId(
-    `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`,
-  )!;
-  expect(id).toBeDefined();
+  if (mode === 'atomic') {
+    await handleAtomicProgram(testDir, entry, plugin, outDir);
+  }
 
-  const cssRaw = await plugin.load(id);
-  
+  const cssImport = `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`;
+  const cssId = plugin.resolveId(cssImport);
+  expect(cssId, `resolve id for '${cssImport}'`).toBeDefined();
+
+  const cssRaw = await plugin.load(cssId);
+
   // Handle both string and object responses (with source maps)
   let cssCode: string;
   let cssMap: string | undefined;
   let sourceContent: string | undefined;
-  
+
   if (typeof cssRaw === 'string') {
     cssCode = cssRaw;
   } else if (cssRaw && typeof cssRaw === 'object') {
@@ -73,49 +136,26 @@ const evaluateProgramWithMode = async (
   } else {
     cssCode = String(cssRaw || '');
   }
-  
+
   await expect(cssCode).toMatchFileSnapshot(
     `${outDir}/${entry}.${plugin.cssExtension}`,
   );
-  
+
   if (cssMap && sourceContent) {
     // Embed sourcemap as JSON comments at the top of the source file
     const sourceMapLines = cssMap.split('\n').map(line => `// ${line}`);
     const sourceMapComment = sourceMapLines.join('\n');
     const sourceWithSourceMap = `${sourceMapComment}\n\n${sourceContent}`;
-    
+
     // Save as .sourcemap.{ext} file (using entry's extension)
     const sourceMapFilename = `${entry}.sourcemap.${entry.split('.').pop()}`;
+
     await expect(sourceWithSourceMap).toMatchFileSnapshot(
       `${outDir}/${sourceMapFilename}`,
     );
   }
 
-  // Load atomic CSS (for atomic mode or check if it exists in default mode)
-  const atomicCssId = plugin.resolveId(
-    `virtual:style-this:${entryFilepath}.atomic.css`,
-  );
-  if (atomicCssId) {
-    const atomicCssRaw = await plugin.load(atomicCssId);
-    
-    let atomicCssCode: string;
-    if (typeof atomicCssRaw === 'string') {
-      atomicCssCode = atomicCssRaw;
-    } else if (atomicCssRaw && typeof atomicCssRaw === 'object') {
-      atomicCssCode = atomicCssRaw.code || '';
-    } else {
-      atomicCssCode = String(atomicCssRaw || '');
-    }
-    
-    // Always snapshot atomic CSS in atomic mode, or if it has content in default mode
-    if (mode === 'atomic' || atomicCssCode) {
-      await expect(atomicCssCode).toMatchFileSnapshot(
-        `${outDir}/${entry}.atomic.css`,
-      );
-    }
-  }
-
-  const temporaryPrograms = Object.entries(plugin.__getTemporaryPrograms())
+  const temporaryPrograms = normalizeTemporaryProgramKeys(Object.entries(plugin.__getDebugVirtualModules()))
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `// ${key}\n${value}`)
     .join("\n\n")
@@ -149,12 +189,12 @@ export const evaluateProgram = async (
   expect(id).toBeDefined();
 
   const cssRaw = await plugin.load(id);
-  
+
   // Handle both string and object responses (with source maps)
   let cssCode: string;
   let cssMap: string | undefined;
   let sourceContent: string | undefined;
-  
+
   if (typeof cssRaw === 'string') {
     cssCode = cssRaw;
   } else if (cssRaw && typeof cssRaw === 'object') {
@@ -174,17 +214,17 @@ export const evaluateProgram = async (
   } else {
     cssCode = String(cssRaw || '');
   }
-  
+
   await expect(cssCode).toMatchFileSnapshot(
     `${testDir}/out/${entry}.${plugin.cssExtension}`,
   );
-  
+
   if (cssMap && sourceContent) {
     // Embed sourcemap as JSON comments at the top of the source file
     const sourceMapLines = cssMap.split('\n').map(line => `// ${line}`);
     const sourceMapComment = sourceMapLines.join('\n');
     const sourceWithSourceMap = `${sourceMapComment}\n\n${sourceContent}`;
-    
+
     // Save as .sourcemap.{ext} file (using entry's extension)
     const sourceMapFilename = `${entry}.sourcemap.${entry.split('.').pop()}`;
     await expect(sourceWithSourceMap).toMatchFileSnapshot(
@@ -192,30 +232,7 @@ export const evaluateProgram = async (
     );
   }
 
-  // Try to load atomic CSS if it exists (for atomic mode)
-  const atomicCssId = plugin.resolveId(
-    `virtual:style-this:${entryFilepath}.atomic.css`,
-  );
-  if (atomicCssId) {
-    const atomicCssRaw = await plugin.load(atomicCssId);
-    
-    let atomicCssCode: string;
-    if (typeof atomicCssRaw === 'string') {
-      atomicCssCode = atomicCssRaw;
-    } else if (atomicCssRaw && typeof atomicCssRaw === 'object') {
-      atomicCssCode = atomicCssRaw.code || '';
-    } else {
-      atomicCssCode = String(atomicCssRaw || '');
-    }
-    
-    if (atomicCssCode) {
-      await expect(atomicCssCode).toMatchFileSnapshot(
-        `${testDir}/out/${entry}.atomic.css`,
-      );
-    }
-  }
-
-  const temporaryPrograms = Object.entries(plugin.__getTemporaryPrograms())
+  const temporaryPrograms = normalizeTemporaryProgramKeys(Object.entries(plugin.__getDebugVirtualModules()))
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `// ${key}\n${value}`)
     .join("\n\n")
@@ -240,6 +257,12 @@ export const evaluateProgramBothModes = async (
   resetRandom();
   const atomicPlugin = await setupPlugin(resolver, { atomic: true });
   await evaluateProgramWithMode(testDir, entry, atomicPlugin, "atomic");
+
+  // For single-file test, snapshot atomic entrypoint after transformation
+  const outDir = `${testDir}/out/atomic`;
+  await handleAtomicProgram(testDir, entry, atomicPlugin, outDir);
+  const atomicCss = await getAtomicEntrypointCss(atomicPlugin);
+  await snapshotAtomicEntrypoint(outDir, atomicCss);
 };
 
 export const evaluateProgramBothModesMultiFile = async (
@@ -257,9 +280,21 @@ export const evaluateProgramBothModesMultiFile = async (
   // Test with atomic mode
   resetRandom();
   const atomicPlugin = await setupPlugin(resolver, { atomic: true });
+  
+  // Transform all entries first to accumulate atomic CSS
   for (const entry of entries) {
     await evaluateProgramWithMode(testDir, entry, atomicPlugin, "atomic");
   }
+
+  // After all entries processed, snapshot the atomic program exports and entrypoint CSS
+  const outDir = `${testDir}/out/atomic`;
+  for (const entry of entries) {
+    await handleAtomicProgram(testDir, entry, atomicPlugin, outDir);
+  }
+
+  // Only snapshot the final atomic entrypoint CSS once at the end
+  const atomicCss = await getAtomicEntrypointCss(atomicPlugin);
+  await snapshotAtomicEntrypoint(outDir, atomicCss);
 };
 
 const originalRandom = Math.random;
@@ -283,10 +318,13 @@ export const resetRandom = (() => {
 
 export const tsx = (raw: TemplateStringsArray) => raw.join("");
 
-export const setupPlugin = async (resolver: Record<string, string>, options?: Record<string, any>) => {
-  const pluginOptions = { debug: true, useRequire: true, ...(options || {}) };
-  const plugin = vitePlugin(pluginOptions as any);
-  
+export const setupPlugin = async (
+  resolver: Record<string, string>,
+  options?: Record<string, unknown>,
+) => {
+  const pluginOptions = { useRequire: true, debug: true, ...(options || {}) };
+  const plugin = vitePlugin(pluginOptions as Parameters<typeof vitePlugin>[0]);
+
   const ctx = {
     async resolve(id: string) {
       // First try plugin's resolveId for virtual modules
@@ -300,7 +338,7 @@ export const setupPlugin = async (resolver: Record<string, string>, options?: Re
           });
         }
       }
-      
+
       // Then try the test resolver
       if (resolver[id] == undefined) return undefined;
       return Promise.resolve({
@@ -310,7 +348,7 @@ export const setupPlugin = async (resolver: Record<string, string>, options?: Re
       });
     },
     addWatchFile: vi.fn(),
-  } as any;
+  } as unknown as Parameters<typeof plugin.config>[0];
 
   const config = plugin.config.bind(ctx);
   await config({});
@@ -326,6 +364,7 @@ export const setupPlugin = async (resolver: Record<string, string>, options?: Re
     transform: plugin.transform.bind(ctx),
     resolveId: plugin.resolveId.bind(ctx),
     load: plugin.load.bind(ctx),
-    __getTemporaryPrograms: plugin.__getTemporaryPrograms.bind(ctx),
+    __getDebugVirtualModules: plugin.__getDebugVirtualModules.bind(ctx),
+    generateBundle: plugin.generateBundle?.bind(ctx),
   };
 };

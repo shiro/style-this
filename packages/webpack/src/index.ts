@@ -116,17 +116,11 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
     // console.log(code);
 
     // const request = `${cssFilepath}!=!${cssLoader}!${filepath}`;
-    const importSourceRequest = `${cssFilepath}!=!${cssLoader}!${filepath}`;
-
-    const importSource = this.utils.contextify(
-      this.context || this.rootContext,
-      importSourceRequest,
-    );
 
     const transformedResult = await styleThis.transform(
       code.toString(),
       filepath,
-      importSource,
+      false,
     );
 
     if (!transformedResult) {

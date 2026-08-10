@@ -1,4 +1,4 @@
-// /packages/vite/tests/extra-class-edge-cases/entry.tsx: {"test7", "test6", "css", "test5", "extraClass", "test1", "test3", "test4", "test2"}
+// /packages/vite/tests/extra-class-edge-cases/entry.tsx: {"css", "extraClass", "test1", "test2", "test3", "test4", "test5", "test6", "test7"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let test1 = new String("test1-6z85mr beginning");
@@ -10,7 +10,7 @@ test2.css = `background: blue;
   `;
 let test3 = new String("test3-mvkpe7 only-thing");
 test3.css = ``;
-let test4 = new String("test4-cxebwl first second third fourth");
+let test4 = new String("test4-cxebwl first fourth second third");
 test4.css = `background: green;
   
   padding: 10px;

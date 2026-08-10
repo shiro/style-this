@@ -2,10 +2,10 @@
 import { styled } from "@style-this/solid";
 import { css } from "@style-this/core";
 import { splitProps as __styleThis__splitProps } from "solid-js";
-import * as _styleThisClasses from "virtual:style-this:/entry.tsx.style-this.js";
-import "virtual:style-this:/home/shiro/project/style-this/packages/vite/tests/styled-components-solid-1/entry.tsx.css";
+import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
+import "virtual:style-this:/entry.tsx.css";
 export const FancyButton = (() => {
-	let FancyButton = _styleThisClasses._styleThis_var_FancyButton_2;
+	let FancyButton = _styleThisClasses.__styleThis_var_FancyButton_2;
 	let comp = (props) => {
 		const [_, rest] = __styleThis__splitProps(props, ["styleProps", "style"]);
 		return <button {...rest} class={props.class ? FancyButton + (" " + props.class) : FancyButton} style={{
@@ -19,4 +19,4 @@ export const FancyButton = (() => {
 	comp.toString = () => FancyButton;
 	return comp;
 })();
-const unrelated = _styleThisClasses._styleThis_unrelated;
+const unrelated = _styleThisClasses.unrelated;

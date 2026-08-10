@@ -1,3 +1,4 @@
+use super::cache_registry::CacheRegistry;
 use super::error::TransformError;
 use crate::PREFIX;
 use js_sys::Array;
@@ -12,7 +13,9 @@ pub struct Transformer {
 
     pub(crate) load_file: js_sys::Function,
     pub(crate) css_file_store_ref: String,
+    pub(crate) atomic_file_store_ref: String,
     pub(crate) value_cache_ref: String,
+    pub(crate) cache_registry: CacheRegistry,
     pub(crate) require_ref: Option<String>,
     pub(crate) css_extension: String,
     pub(crate) wrap_selectors_with_global: bool,
@@ -20,6 +23,7 @@ pub struct Transformer {
     pub(crate) use_require: bool,
     pub(crate) debug: bool,
     pub(crate) atomic: bool,
+    pub(crate) on_debug_virtual_module_ref: String,
 }
 
 #[wasm_bindgen]
@@ -77,9 +81,36 @@ impl Transformer {
         let css_file_store_ref = format!("{PREFIX}_css_{random_suffix}");
         js_sys::Reflect::set(&global, &JsValue::from_str(&css_file_store_ref), &css_cache).unwrap();
 
+        let atomic_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("atomicCache")).unwrap();
+        let atomic_file_store_ref = format!("{PREFIX}_atomic_{random_suffix}");
+        js_sys::Reflect::set(&global, &JsValue::from_str(&atomic_file_store_ref), &atomic_cache).unwrap();
+
         let value_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("valueCache")).unwrap();
         let value_cache_ref = format!("{PREFIX}_vars_{random_suffix}");
         js_sys::Reflect::set(&global, &JsValue::from_str(&value_cache_ref), &value_cache).unwrap();
+
+        // Create or use provided CacheRegistry
+        let cache_registry = if let Ok(registry) = js_sys::Reflect::get(&opts, &JsValue::from_str("cacheRegistry")) {
+            if !registry.is_undefined() && !registry.is_null() {
+                CacheRegistry::new(
+                    css_file_store_ref.clone(),
+                    atomic_file_store_ref.clone(),
+                    value_cache_ref.clone(),
+                )
+            } else {
+                CacheRegistry::new(
+                    css_file_store_ref.clone(),
+                    atomic_file_store_ref.clone(),
+                    value_cache_ref.clone(),
+                )
+            }
+        } else {
+            CacheRegistry::new(
+                css_file_store_ref.clone(),
+                atomic_file_store_ref.clone(),
+                value_cache_ref.clone(),
+            )
+        };
 
         let use_require = js_sys::Reflect::get(&opts, &JsValue::from_str("useRequire"))
             .unwrap()
@@ -103,10 +134,30 @@ impl Transformer {
         let require_ref = create_require.map(|create_require_fn| {
             let require_suffix = crate::utils::generate_random_id(8);
             let require_ref = format!("{PREFIX}_require_{require_suffix}");
-            
-            js_sys::Reflect::set(&global, &JsValue::from_str(&require_ref), &create_require_fn).unwrap();
+
+            js_sys::Reflect::set(
+                &global,
+                &JsValue::from_str(&require_ref),
+                &create_require_fn,
+            )
+            .unwrap();
             require_ref
         });
+
+        let on_debug_virtual_module = js_sys::Reflect::get(&opts, &JsValue::from_str("onDebugVirtualModule"))
+            .unwrap()
+            .dyn_into::<js_sys::Function>()
+            .unwrap();
+
+        let callback_suffix = crate::utils::generate_random_id(8);
+        let on_debug_virtual_module_ref = format!("{PREFIX}_debug_callback_{callback_suffix}");
+
+        js_sys::Reflect::set(
+            &global,
+            &JsValue::from_str(&on_debug_virtual_module_ref),
+            &on_debug_virtual_module,
+        )
+        .unwrap();
 
         Self {
             cwd,
@@ -114,7 +165,9 @@ impl Transformer {
 
             load_file,
             css_file_store_ref,
+            atomic_file_store_ref,
             value_cache_ref,
+            cache_registry,
             require_ref,
             css_extension,
             wrap_selectors_with_global,
@@ -122,7 +175,13 @@ impl Transformer {
             use_require,
             debug,
             atomic,
+            on_debug_virtual_module_ref,
         }
+    }
+
+    /// Get all collected atomic CSS
+    pub fn get_atomic_css(&self) -> String {
+        self.cache_registry.get_all_atomic_css()
     }
 
     /// loads file contents and id

@@ -56,9 +56,6 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       noopFilepath,
     );
 
-    // Import the noop CSS file with a query parameter pointing to the original source
-    const importSource = `${noopFilepathRelative}?filepath=${filepath}&time=${+new Date()}`;
-    
     // Create CSS cache entry for this file
     // Note: The cache key should NOT include the qualifier, only the css extension
     const cssFilepath = `${filepath}.${cssExtension}`;
@@ -85,7 +82,6 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       code.toString(),
       filepath,
       skipCssEval,
-      importSource,
     );
 
     if (!transformedResult) {

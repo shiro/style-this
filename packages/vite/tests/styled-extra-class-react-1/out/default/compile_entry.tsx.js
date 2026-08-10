@@ -1,4 +1,4 @@
-// /packages/vite/tests/styled-extra-class-react-1/entry.tsx: {"extraClass", "css", "unrelated"}
+// /packages/vite/tests/styled-extra-class-react-1/entry.tsx: {"css", "extraClass", "unrelated"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let __styleThis_var_FancyButton_2 = new String("FancyButton-bsxab0 custom-button primary");

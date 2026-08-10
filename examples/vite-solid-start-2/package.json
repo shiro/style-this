@@ -5,8 +5,9 @@
     "dev": "vite dev",
     "dev:atomic": "ATOMIC=1 vite dev",
     "build": "vite build",
+    "build:atomic": "ATOMIC=1 vite build",
     "start": "node .output/server/index.mjs",
-    "preview": "vite preview"
+    "preview": "node .output/server/index.mjs"
   },
   "dependencies": {
     "@solidjs/meta": "^0.29.4",

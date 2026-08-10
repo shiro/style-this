@@ -6,4 +6,5 @@ export default defineWorkspace([
   'packages/solid',
   'packages/vite',
   'packages/webpack',
+  'examples/test',
 ])

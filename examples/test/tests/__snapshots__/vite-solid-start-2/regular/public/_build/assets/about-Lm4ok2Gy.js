@@ -1,0 +1,2 @@
+import{d as e,i as t,o as n,r,v as i}from"./web-FxWejX55.js";import{n as a}from"./dist-DhYQqEd7.js";var o=e(`<main><!$><!/><h1>About`);function s(){return(()=>{var e=r(o),s=e.firstChild,[c,l]=t(s.nextSibling);return c.nextSibling,n(e,i(a,{children:`About`}),c,l),e})()}export{s as default};
+//# sourceMappingURL=about-Lm4ok2Gy.js.map

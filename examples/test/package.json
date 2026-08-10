@@ -1,0 +1,11 @@
+{
+  "name": "@style-this/examples-test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:update-snapshots": "vitest run --update"
+  }
+}

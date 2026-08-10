@@ -6,18 +6,19 @@ const mutate = (v) => v;
 const a1 = () => {
   const a2 = () => {
     const a3 = () => {
-      return css`a`;
+      return css`background: black;`;
     };
-    return [0];
+    return a3();
   };
   const wi = a2();
   const m = css`
     ${wi}
   `;
+  return wi;
 };
 
 const b = css`
-  ${a1}
+  ${a1()}
 `;
 
 const comp = () => {
@@ -35,7 +36,11 @@ const comp = () => {
 
   mutate(b);
 
-  return css``;
+  return css`
+    @media (max-width: 500px) {
+      background: blue;
+    }
+  `;
 };
 
 const { color } = { color: "blue" };

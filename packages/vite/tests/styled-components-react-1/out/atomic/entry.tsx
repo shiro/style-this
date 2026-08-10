@@ -1,10 +1,10 @@
 // @ts-nocheck
 import { styled } from "@style-this/react";
 import { css } from "@style-this/core";
-import * as _styleThisClasses from "virtual:style-this:/entry.tsx.style-this.js";
-import "virtual:style-this:/home/shiro/project/style-this/packages/vite/tests/styled-components-react-1/entry.tsx.css";
+import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
+import "virtual:style-this:/entry.tsx.css";
 export const FancyButton = (() => {
-	let FancyButton = _styleThisClasses._styleThis_var_FancyButton_2;
+	let FancyButton = _styleThisClasses.__styleThis_var_FancyButton_2;
 	let comp = (props) => {
 		const { styleProps: _styleProps, style: _style,...rest } = props;
 		return <button {...rest} className={rest.className ? FancyButton + (" " + rest.className) : FancyButton} style={{
@@ -18,4 +18,4 @@ export const FancyButton = (() => {
 	comp.toString = () => FancyButton;
 	return comp;
 })();
-const unrelated = _styleThisClasses._styleThis_unrelated;
+const unrelated = _styleThisClasses.unrelated;

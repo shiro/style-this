@@ -1,6 +1,7 @@
 use super::cache::CSS_CLASSNAME_CACHE;
 use super::error::TransformError;
 use super::types::{CssVariableIdentifier, VirtualProgramInsert};
+use crate::PREFIX;
 use crate::ast;
 use crate::error_mapping::get_pos_from_offset;
 use crate::utils::{
@@ -8,18 +9,17 @@ use crate::utils::{
     replace_in_expression_using_identifiers, replace_in_expression_using_spans,
     replace_in_statement_using_spans,
 };
-use crate::PREFIX;
 use oxc_allocator::{Allocator, CloneIn};
+use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
     BindingPatternKind, Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
-    Expression, ImportDeclarationSpecifier, Program, Statement,
-    TaggedTemplateExpression, VariableDeclarationKind, VariableDeclarator,
+    Expression, ImportDeclarationSpecifier, Program, Statement, TaggedTemplateExpression,
+    VariableDeclarationKind, VariableDeclarator,
 };
-use oxc_ast::AstBuilder;
 use oxc_ast_visit::VisitMut;
 use oxc_semantic::ScopeFlags;
 use oxc_span::{GetSpan, Span};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub struct VisitorTransformer<'a, 'alloc> {
     ast_builder: &'a AstBuilder<'alloc>,
@@ -217,7 +217,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     /// creates a class name or gets it from cache
     fn create_virtual_css_template(&mut self, variable_name: &str) -> String {
         let unique_number = self.css_unique_number();
-        
+
         // Try to get from cache if entrypoint
         if self.entrypoint {
             if let Some(cached) = CSS_CLASSNAME_CACHE.with(|cache| {
@@ -287,11 +287,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
     /// checks if the variable exits in the current scope or any scope above it
     fn variable_exists(&self, name: &str) -> bool {
-        self.aliases.iter().any(|aliases| aliases.contains_key(name))
+        self.aliases
+            .iter()
+            .any(|aliases| aliases.contains_key(name))
     }
 
     fn get_dynamic_variable(&self, name: &str) -> bool {
-        self.dynamic_variable_names.iter().rev().any(|vars| vars.contains(name))
+        self.dynamic_variable_names
+            .iter()
+            .rev()
+            .any(|vars| vars.contains(name))
     }
 
     /// Checks if any references are dynamic variables and sets error if found
@@ -436,23 +441,23 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         it: &TaggedTemplateExpression<'alloc>,
         variable_name: &str,
         class_name: &str,
-        extra_classes: Vec<String>,
+        extra_classes: BTreeSet<String>,
     ) {
         let span = it.span;
 
         // Filter out extraClass calls from expressions and adjust quasis accordingly
         let mut new_quasis = oxc_allocator::Vec::new_in(self.allocator);
         let mut new_expressions = oxc_allocator::Vec::new_in(self.allocator);
-        
+
         let extra_class_name = self.extra_class_function_name.as_deref();
         let mut quasi_iter = it.quasi.quasis.iter();
-        
+
         // First quasi always exists
         if let Some(first_quasi) = quasi_iter.next() {
             let mut current_quasi_raw = first_quasi.value.raw.as_str();
             let mut current_span = first_quasi.span;
             let mut current_tail = first_quasi.tail;
-            
+
             for expr in it.quasi.expressions.iter() {
                 let is_extra_class = if let Some(name) = extra_class_name {
                     if let Expression::CallExpression(call) = expr {
@@ -467,9 +472,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 } else {
                     false
                 };
-                
+
                 let next_quasi = quasi_iter.next().unwrap();
-                
+
                 if is_extra_class {
                     // Merge this quasi with the next one
                     let merged_value = format!("{}{}", current_quasi_raw, next_quasi.value.raw);
@@ -493,7 +498,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     current_tail = next_quasi.tail;
                 }
             }
-            
+
             // Add the final quasi
             let value = oxc_ast::ast::TemplateElementValue {
                 raw: self.ast_builder.atom(current_quasi_raw),
@@ -509,23 +514,22 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         utils::trim_newlines(self.ast_builder, &mut new_quasis);
 
-        let mut right = self.ast_builder.expression_template_literal(
-            span,
-            new_quasis,
-            new_expressions,
-        );
+        let mut right =
+            self.ast_builder
+                .expression_template_literal(span, new_quasis, new_expressions);
 
         replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
             self.get_alias(name).map(|v| v.to_string())
         });
 
         // Store the CSS variable identifier for the evaluator
-        self.css_variable_identifiers.push(CssVariableIdentifier::new(
-            variable_name.to_string(),
-            class_name.to_string(),
-            extra_classes,
-            span,
-        ));
+        self.css_variable_identifiers
+            .push(CssVariableIdentifier::new(
+                variable_name.to_string(),
+                class_name.to_string(),
+                extra_classes,
+                span,
+            ));
 
         let stmt = Statement::ExpressionStatement(self.ast_builder.alloc_expression_statement(
             span,
@@ -545,9 +549,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     }
 
     /// extracts extraClass("a b c") calls from template expressions
-    fn extract_extra_classes(&self, it: &TaggedTemplateExpression<'alloc>) -> Vec<String> {
-        let mut extra_classes = Vec::new();
-        
+    fn extract_extra_classes(&self, it: &TaggedTemplateExpression<'alloc>) -> BTreeSet<String> {
+        let mut extra_classes = BTreeSet::new();
+
         if let Some(extra_class_name) = &self.extra_class_function_name {
             for expr in &it.quasi.expressions {
                 if let Expression::CallExpression(call) = expr {
@@ -558,7 +562,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                                 if let oxc_ast::ast::Argument::StringLiteral(str_lit) = arg {
                                     // Split by whitespace and collect class names
                                     for class in str_lit.value.split_whitespace() {
-                                        extra_classes.push(class.to_string());
+                                        extra_classes.insert(class.to_string());
                                     }
                                 }
                             }
@@ -567,10 +571,9 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 }
             }
         }
-        
+
         extra_classes
     }
-
 
     fn alias_binding_pattern(&self, pattern: &mut BindingPatternKind<'alloc>) {
         match pattern {
@@ -725,7 +728,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
 
             let span = template.span;
-            let variable_name = &format!("{PREFIX}_expression_{}", self.unique_number());
+            let variable_name = &format!("{PREFIX}_{}", self.unique_number());
 
             let right_references = utils::tagged_template_expression_get_references(template);
 
@@ -747,7 +750,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 tag if Some(tag) == self.css_function_name.as_deref() => {
                     let class_name = self.create_virtual_css_template(variable_name);
                     let extra_classes = self.extract_extra_classes(template);
-                    
+
                     self.insert_into_virtual_program_css(
                         template,
                         &resolved_variable_name,
@@ -756,9 +759,19 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     );
 
                     if self.atomic {
-                        // Atomic mode: Reference the imported atomic class from .style-this.js module
-                        // DON'T insert variable declarator into virtual program - that happens in main program
-                        // The virtual program only needs to evaluate CSS templates
+                        // Atomic mode: In the virtual program, we need to declare the variable
+                        // so that the `.css = ...` assignment has something to assign to
+                        let variable_declarator = ast::build_variable_declarator(
+                            self.ast_builder,
+                            span,
+                            &resolved_variable_name,
+                            ast::build_decorated_string(self.ast_builder, span, ""),
+                        );
+
+                        self.insert_into_virtual_program(
+                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                            None,
+                        );
 
                         self.replacement_points.insert(
                             span,
@@ -768,11 +781,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                             )),
                         );
 
-                        // Replace with identifier reference (evaluated later from .style-this.js)
-                        let base_name = resolved_variable_name.strip_prefix(&format!("{}_", crate::PREFIX))
-                            .unwrap_or(&resolved_variable_name);
-                        let import_ref_name = format!("_styleThis_{}", base_name);
-                        
                         // Build expression: _styleThisClasses._styleThis_xxx
                         let member_expr = Expression::StaticMemberExpression(
                             self.ast_builder.alloc_static_member_expression(
@@ -780,34 +788,25 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                                 Expression::Identifier(
                                     self.ast_builder.alloc_identifier_reference(
                                         span,
-                                        self.ast_builder.atom("_styleThisClasses")
-                                    )
+                                        self.ast_builder.atom("_styleThisClasses"),
+                                    ),
                                 ),
-                                self.ast_builder.identifier_name(span, self.ast_builder.atom(&import_ref_name)),
-                                false,
-                            )
-                        );
-                        
-                        // Handle extra classes - concatenate with space if present
-                        *it = if !extra_classes.is_empty() {
-                            let extra_class_string = extra_classes.join(" ");
-                            let space_and_extra = format!(" {}", extra_class_string);
-                            Expression::BinaryExpression(
-                                self.ast_builder.alloc_binary_expression(
+                                self.ast_builder.identifier_name(
                                     span,
-                                    member_expr,
-                                    oxc_ast::ast::BinaryOperator::Addition,
-                                    ast::build_string(self.ast_builder, span, &space_and_extra),
-                                )
-                            )
-                        } else {
-                            member_expr
-                        };
+                                    self.ast_builder.atom(&resolved_variable_name),
+                                ),
+                                false,
+                            ),
+                        );
+
+                        // In atomic mode, extra classes are included in the exported variable,
+                        // so we just use the member expression directly
+                        *it = member_expr;
                     } else {
                         // Non-atomic mode: inline the class name string
                         // Build the full class list including generated class and extra classes
                         let mut full_class_list = vec![class_name.clone()];
-                        full_class_list.extend(extra_classes);
+                        full_class_list.extend(extra_classes.iter().cloned());
                         let full_class_string = full_class_list.join(" ");
 
                         let variable_declarator = ast::build_variable_declarator(
@@ -940,14 +939,21 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     );
 
                     if self.atomic {
-                        // Atomic mode: Reference the imported atomic class from .style-this.js module
-                        // DON'T insert variable declarator into virtual program - the virtual program
-                        // only evaluates CSS templates, the actual variable is imported in main program
+                        // Atomic mode: In the virtual program, we need to declare the variable
+                        // so that the `.css = ...` assignment has something to assign to
+                        let variable_declarator = ast::build_variable_declarator(
+                            self.ast_builder,
+                            span,
+                            &resolved_variable_name,
+                            ast::build_decorated_string(self.ast_builder, span, ""),
+                        );
 
-                        let base_name = resolved_variable_name.strip_prefix(&format!("{}_", crate::PREFIX))
-                            .unwrap_or(&resolved_variable_name);
-                        let import_ref_name = format!("_styleThis_{}", base_name);
-                        
+                        self.insert_into_virtual_program(
+                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                            None,
+                        );
+
+                        // In the main program, reference the imported atomic class from .style-this.js module
                         // Build expression: _styleThisClasses._styleThis_xxx
                         let member_expr = Expression::StaticMemberExpression(
                             self.ast_builder.alloc_static_member_expression(
@@ -955,29 +961,19 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                                 Expression::Identifier(
                                     self.ast_builder.alloc_identifier_reference(
                                         span,
-                                        self.ast_builder.atom("_styleThisClasses")
-                                    )
+                                        self.ast_builder.atom("_styleThisClasses"),
+                                    ),
                                 ),
-                                self.ast_builder.identifier_name(span, self.ast_builder.atom(&import_ref_name)),
-                                false,
-                            )
-                        );
-                        
-                        // Handle extra classes - concatenate with space if present
-                        *init = if !extra_classes.is_empty() {
-                            let extra_class_string = extra_classes.join(" ");
-                            let space_and_extra = format!(" {}", extra_class_string);
-                            Expression::BinaryExpression(
-                                self.ast_builder.alloc_binary_expression(
+                                self.ast_builder.identifier_name(
                                     span,
-                                    member_expr,
-                                    oxc_ast::ast::BinaryOperator::Addition,
-                                    ast::build_string(self.ast_builder, span, &space_and_extra),
-                                )
-                            )
-                        } else {
-                            member_expr
-                        };
+                                    self.ast_builder.atom(&resolved_variable_name),
+                                ),
+                                false,
+                            ),
+                        );
+
+                        // In atomic mode, extra classes are handled separately
+                        *init = member_expr;
 
                         self.replacement_points.insert(
                             span,
@@ -989,7 +985,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     } else {
                         // Non-atomic mode: inline the class name string
                         let mut full_class_list = vec![class_name.clone()];
-                        full_class_list.extend(extra_classes.clone());
+                        full_class_list.extend(extra_classes.iter().cloned());
                         let full_class_string = full_class_list.join(" ");
 
                         let variable_declarator = ast::build_variable_declarator(

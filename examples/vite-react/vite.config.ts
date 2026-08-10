@@ -18,6 +18,9 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  preview: {
+    port: 3000,
+  },
   build: {
     sourcemap: true,
     cssMinify: false,  // Disable CSS minification to debug

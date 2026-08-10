@@ -9,7 +9,7 @@ const test2 = "test2-rkpq3k ending";
 // extraClass as the only thing in the CSS block
 const test3 = "test3-mvkpe7 only-thing";
 // Three extraClass calls in the same css block
-const test4 = "test4-cxebwl first second third fourth";
+const test4 = "test4-cxebwl first fourth second third";
 // Child styled component extends parent, both have extraClass
 const ParentStyled = (() => {
 	let ParentStyled = "ParentStyled-difgta parent-class";

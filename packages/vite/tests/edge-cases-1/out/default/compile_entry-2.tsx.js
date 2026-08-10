@@ -1,4 +1,4 @@
-// /packages/vite/tests/edge-cases-1/entry-1.tsx: {"css", "a", "num"}
+// /packages/vite/tests/edge-cases-1/entry-1.tsx: {"a", "css", "num"}
 "use strict";
 const num = __styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
 let { css } = require("/packages/core/dist/index.mjs");
@@ -26,7 +26,7 @@ ${b.css}
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-2.tsx.css');
 
 
-// /packages/vite/tests/edge-cases-1/shared.tsx (/packages/vite/tests/edge-cases-1/entry-1.tsx): {"Math", "num", "shared", "css"}
+// /packages/vite/tests/edge-cases-1/shared.tsx (/packages/vite/tests/edge-cases-1/entry-1.tsx): {"Math", "css", "num", "shared"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let num = Math.random();
@@ -35,7 +35,7 @@ shared.css = `margin: ${num}px;`;
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};
 
-// /packages/vite/tests/edge-cases-1/shared.tsx: {"num", "css", "Math", "shared"}
+// /packages/vite/tests/edge-cases-1/shared.tsx: {"Math", "css", "num", "shared"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let num = global.__styleThis_vars_aabbbccc["/packages/vite/tests/edge-cases-1/shared.tsx"]['num'];

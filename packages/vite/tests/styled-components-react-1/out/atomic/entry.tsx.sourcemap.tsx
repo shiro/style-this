@@ -8,7 +8,7 @@
 //     "import { styled } from \"@style-this/react\";\nimport { css } from \"@style-this/core\";\n\nexport const FancyButton = styled.button<{ a: number }>`\n  background: none;\n  border: 1px solid blue;\n  border-radius: 2px;\n  padding: ${({ a }) => a}px;\n`;\n\nconst unrelated = css`\n  background: none;\n`;\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAG2B;;;AAOT"
+//   "mappings": "AAG2B;AAOT"
 // }
 
 import { styled } from "@style-this/react";

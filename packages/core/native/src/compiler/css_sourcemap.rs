@@ -23,11 +23,11 @@ pub fn generate_css_sourcemap(
     // Parse CSS content to find each rule and map it back to source
     for css_var in css_variables {
         // Find the selector in the generated CSS
-        let selector = if css_var.class_name.starts_with("_Global") {
+        let selector = if css_var.classname.starts_with("_Global") {
             // Global styles don't have a class selector
             continue;
         } else {
-            format!(".{}", css_var.class_name)
+            format!(".{}", css_var.classname)
         };
 
         // Find where this selector appears in the CSS

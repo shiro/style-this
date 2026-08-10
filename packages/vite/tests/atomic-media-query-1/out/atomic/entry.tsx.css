@@ -1,13 +1,9 @@
-.innerStyle-oty7sd {
-/* atomized */
-}
-.outerStyle-mvwhqz {
-.innerStyle-oty7sd {
+.innerStyle-oty7sd { /* marker */ }
+.outerStyle-mvwhqz {   . {
     background: coral;
   }
-@media (max-width: 500px) {
-    .innerStyle-oty7sd {
+  @media (max-width: 500px) {
+    . {
       background: blue;
     }
-  }
-}
+ }

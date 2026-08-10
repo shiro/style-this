@@ -8,7 +8,7 @@
 //     "import { css, extraClass } from \"@style-this/core\";\n\nconst a = css`\n  background: red;\n  ${extraClass(\"foo bar\")}\n`;\n\nconst b = css`\n  color: blue;\n  ${extraClass(\"baz\")}\n`;\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAEU;;;AAKA"
+//   "mappings": "AAEU;AAKA"
 // }
 
 import { css, extraClass } from "@style-this/core";

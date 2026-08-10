@@ -1,5 +1,5 @@
 import { css } from "@style-this/core";
-import Counter from "./Counter";
+import Counter, { counterColor } from "./Counter";
 
 const ContainerStyle = css`
   display: flex;
@@ -24,6 +24,6 @@ export default function Main() {
 
 const _GlobalMain = css`
   .Global__Main {
-    background: coral;
+    background: ${counterColor};
   }
 `

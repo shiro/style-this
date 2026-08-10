@@ -1,4 +1,4 @@
-// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "exported", "css"}
+// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "css", "exported"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "red";
@@ -7,7 +7,7 @@ exported.css = `background: ${color};`;
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"] ?? {}), color};
 
-// /packages/vite/tests/multi-1/b.tsx: {"exported", "color", "css"}
+// /packages/vite/tests/multi-1/b.tsx: {"color", "css", "exported"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]['color'];
@@ -22,7 +22,7 @@ ${exported.css}
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-1/b.tsx.css');
 
 
-// /packages/vite/tests/multi-1/entry.tsx: {"css", "a", "color"}
+// /packages/vite/tests/multi-1/entry.tsx: {"a", "color", "css"}
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");

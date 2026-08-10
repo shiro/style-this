@@ -1,8 +1,8 @@
-use crate::utils::binding_pattern_kind_get_idents;
 use crate::PREFIX;
+use crate::utils::binding_pattern_kind_get_idents;
 use oxc_ast::ast::{Class, Function, VariableDeclarator};
 use oxc_span::Span;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use wasm_bindgen::prelude::*;
 
 pub(crate) struct ExportedJSValue {
@@ -77,10 +77,10 @@ impl<'alloc> VirtualProgramInsert<'alloc> {
 pub struct CssVariableIdentifier {
     /// The variable name (e.g., "_styleThis_expression_0")
     pub variable_name: String,
-    /// The generated CSS class name (e.g., "myClass-abc123")
-    pub class_name: String,
+    /// The generated CSS class name for non-atomic CSS (e.g., "myClass-abc123")
+    pub classname: String,
     /// Extra classes from extraClass() calls
-    pub extra_classes: Vec<String>,
+    pub extra_classes: BTreeSet<String>,
     /// Source span of the original css`...` block
     pub span: Span,
 }
@@ -88,13 +88,13 @@ pub struct CssVariableIdentifier {
 impl CssVariableIdentifier {
     pub fn new(
         variable_name: String,
-        class_name: String,
-        extra_classes: Vec<String>,
+        non_atomic_class: String,
+        extra_classes: BTreeSet<String>,
         span: Span,
     ) -> Self {
         Self {
             variable_name,
-            class_name,
+            classname: non_atomic_class,
             extra_classes,
             span,
         }

@@ -1,18 +1,14 @@
-.__styleThis_expression_11-abwhir {
-a
+.__styleThis_11-abwhir {
+background: black;
 }
 .m-9ib41m {
-0
+__styleThis_11-abwhir
   
 }
 .b-aj4l6b {
-() => {
-	const a2 = __styleThis_var_a2_9;
-	const wi = __styleThis_var_wi_8;
-	const m = __styleThis_var_m_7;
+__styleThis_11-abwhir
 }
-}
-.__styleThis_expression_6-irk5mb {
+.__styleThis_6-irk5mb {
 background: blue;
     
 }
@@ -21,13 +17,19 @@ background: blue;
     
     
 }
-.__styleThis_expression_3-q74xyr {
-
+.__styleThis_3-q74xyr {
+@media (max-width: 500px) {
+      background: blue;
+    }
+  
 }
 .s2-3ctqjk {
 color: blue;
   color: green;
     
+  @media (max-width: 500px) {
+      background: blue;
+    }
   
 }
 .unrelated-5y7cxe {
