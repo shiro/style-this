@@ -11,15 +11,8 @@ import { generateCssSourceMap } from "@style-this/core/cssSourceMap";
 import { createRequire } from "node:module";
 import { Filter, filterMatches } from "./util";
 import { handleTransformError } from "./util";
-
-const solidMock = `
-export const template = () => () => {};
-export const spread = () => {};
-export const mergeProps = () => {};
-export function use(fn, element, arg) {
-  // return untrack(() => fn(element, arg));
-}
-`;
+import { initializeSolidMocks } from "./solid";
+import { isSvelteFile, extractSvelteScript, rewrapSvelteScript } from "./svelte";
 
 const TIMEOUT_DURATION = 5 * 60 * 1000; // 5 minutes
 const TIMEOUT = Symbol();
@@ -99,7 +92,7 @@ const vitePlugin = (options: Options = {}) => {
   // Timing variables
   let totalTransformTime = 0;
 
-  mocks.set("solid-js/web", solidMock);
+  initializeSolidMocks(mocks);
 
   return {
     name: "vite:style-this",
@@ -418,29 +411,20 @@ const vitePlugin = (options: Options = {}) => {
         return;
       }
 
-      // Extract script block from Svelte files
+      // Handle Svelte files: extract script block and normalize filepath
       let codeToTransform = code;
-      let isSvelte = false;
-      let filepathForRust = filepath;
-      if (filepath.endsWith(".svelte")) {
-        isSvelte = true;
-        const scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/);
-        if (scriptMatch) {
-          codeToTransform = scriptMatch[1];
-          // Use a .ts extension for the Rust compiler
-          filepathForRust = filepath.replace(/\.svelte$/, '.ts');
-        } else {
-          // No script block, nothing to transform
-          return;
-        }
+      let pathForImport = filepath;
+
+      if (isSvelteFile(filepath)) {
+        const svelteScript = extractSvelteScript(code, filepath);
+        if (!svelteScript) return; // Svelte file with no script block
+        codeToTransform = svelteScript.codeToTransform;
+        pathForImport = svelteScript.normalizedFilepath;
       }
 
-      // For Svelte files, use the modified filepath for the import source so it matches what Rust generates
-      const importSourceFilepath = isSvelte ? filepathForRust : filepath;
-      const importSource = `${virtualModulePrefix}${importSourceFilepath}.${cssExtension}`;
-      // But always use the original filepath for cache keys
-      const cssFilepath = `${importSourceFilepath}.${cssExtension}`;
-      const styleThisFilepath = `${importSourceFilepath}.style-this.js`;
+      const importSource = `${virtualModulePrefix}${pathForImport}.${cssExtension}`;
+      const cssFilepath = `${pathForImport}.${cssExtension}`;
+      const styleThisFilepath = `${pathForImport}.style-this.js`;
       // In atomic mode, also check if .style-this.js is cached
       const skipCssEval = atomic
         ? (cssCache.has(cssFilepath) && cssCache.has(styleThisFilepath))
@@ -498,7 +482,7 @@ const vitePlugin = (options: Options = {}) => {
 
         const transformedResult = await styleThis.transform(
           codeToTransform,
-          filepathForRust,
+          pathForImport,
           skipCssEval,
           importSource,
         );
@@ -537,13 +521,13 @@ const vitePlugin = (options: Options = {}) => {
           }
         }
 
+        let resultCode = transformedResult.code;
+        if (isSvelteFile(filepath)) {
+          resultCode = rewrapSvelteScript(code, transformedResult.code);
+        }
+
         return {
-          code: isSvelte
-            ? code.replace(
-              /<script[^>]*>([\s\S]*?)<\/script>/,
-              `<script>${transformedResult.code}</script>`
-            )
-            : transformedResult.code,
+          code: resultCode,
           map: transformedResult.sourcemap,
         };
       } catch (err) {
