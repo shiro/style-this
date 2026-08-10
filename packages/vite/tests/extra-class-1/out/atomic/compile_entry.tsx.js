@@ -1,4 +1,4 @@
-// /packages/vite/tests/extra-class-1/entry.tsx: {"b", "css", "extraClass", "a"}
+// /packages/vite/tests/extra-class-1/entry.tsx: {"a", "extraClass", "css", "b"}
 const a = new String('a-chuvkp');
 const b = new String('b-1iv0ta');
 "use strict";
@@ -34,3 +34,23 @@ global.__styleThis_css_aabbbccc.get('/packages/vite/tests/extra-class-1/entry.ts
 // Generate and resolve the .style-this.js module
 const styleThisModule = 'export const _styleThis_a = "' + 'a-chuvkp' + ' ' + _a_atomic + '";' + '\n' + 'export const _styleThis_b = "' + 'b-1iv0ta' + ' ' + _b_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/extra-class-1/entry.tsx.style-this.js').resolve(styleThisModule);
+
+
+// /packages/vite/tests/extra-class-1/entry.tsx: {"extraClass", "b", "a", "css"}
+"use strict";
+let { css } = require("/packages/core/dist/index.mjs");
+let a = new String("a-chuvkp foo bar");
+a.css = `background: red;
+  `;
+let b = new String("b-1iv0ta baz");
+b.css = `color: blue;
+  `;
+const cssSourcemapData = [{className:'a-chuvkp',start:63,end:115},{className:'b-1iv0ta',start:128,end:172}];
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/extra-class-1/entry.tsx.css').resolve([
+`.a-chuvkp {
+${a.css}
+}`,
+`.b-1iv0ta {
+${b.css}
+}`
+].join('\n'), cssSourcemapData, '/packages/vite/tests/extra-class-1/entry.tsx.css');

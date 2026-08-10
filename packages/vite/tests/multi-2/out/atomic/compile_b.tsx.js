@@ -1,4 +1,4 @@
-// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "css", "exported"}
+// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "exported", "css"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "red";
@@ -40,7 +40,7 @@ const styleThisModule = 'export const _styleThis_exported = "' + 'exported-9qr0l
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/b.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/multi-1/entry.tsx: {"a", "css", "color"}
+// /packages/vite/tests/multi-1/entry.tsx: {"a", "color", "css"}
 const a = new String('a-5y38xq');
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
@@ -72,7 +72,7 @@ const styleThisModule = 'export const _styleThis_a = "' + 'a-5y38xq' + ' ' + _a_
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/multi-1/entry.tsx: {"css", "color", "a"}
+// /packages/vite/tests/multi-1/entry.tsx: {"color", "a", "css"}
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
@@ -86,7 +86,7 @@ ${a.css}
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-1/entry.tsx.css');
 
 
-// /packages/vite/tests/multi-2/b.tsx (/packages/vite/tests/multi-2/entry.tsx): {"exported", "color", "css", "originalColor"}
+// /packages/vite/tests/multi-2/b.tsx (/packages/vite/tests/multi-2/entry.tsx): {"originalColor", "css", "color", "exported"}
 "use strict";
 const originalColor = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
@@ -96,7 +96,7 @@ exported.css = `background: ${color};`;
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"] ?? {}), color};
 
-// /packages/vite/tests/multi-2/b.tsx: {"color", "exported", "css", "originalColor"}
+// /packages/vite/tests/multi-2/b.tsx: {"color", "css", "exported", "originalColor"}
 "use strict";
 const originalColor = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
@@ -112,7 +112,7 @@ ${exported.css}
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-2/b.tsx.css');
 
 
-// /packages/vite/tests/multi-2/b.tsx: {"css", "color", "originalColor", "exported"}
+// /packages/vite/tests/multi-2/b.tsx: {"css", "originalColor", "exported", "color"}
 const exported = new String('exported-45274t');
 "use strict";
 const originalColor = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"]["color"];
@@ -155,7 +155,7 @@ exported.css = `background: ${color};`;
 
 global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"] ?? {}), color};
 
-// /packages/vite/tests/multi-2/c.tsx: {"color", "exported", "css"}
+// /packages/vite/tests/multi-2/c.tsx: {"color", "css", "exported"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"]['color'];
@@ -171,6 +171,20 @@ ${exported.css}
 
 
 // /packages/vite/tests/multi-2/entry.tsx: {"a", "css", "color"}
+"use strict";
+const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"]["color"];
+let { css } = require("/packages/core/dist/index.mjs");
+let a = new String("a-c1evwh");
+a.css = `background: ${color};`;
+const cssSourcemapData = [{className:'a-c1evwh',start:80,end:110}];
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-2/entry.tsx.css').resolve([
+`.a-c1evwh {
+${a.css}
+}`
+].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-2/entry.tsx.css');
+
+
+// /packages/vite/tests/multi-2/entry.tsx: {"color", "a", "css"}
 const a = new String('a-c1evwh');
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"]["color"];

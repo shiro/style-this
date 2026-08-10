@@ -1,4 +1,4 @@
-// /packages/vite/tests/expressions-1/entry.tsx: {"css", "Promise", "setTimeout", "a", "doPromise"}
+// /packages/vite/tests/expressions-1/entry.tsx: {"doPromise", "Promise", "css", "setTimeout", "a"}
 const a = new String('a-y789mr');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
@@ -33,7 +33,7 @@ const styleThisModule = 'export const _styleThis_a = "' + 'a-y789mr' + ' ' + _a_
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/expressions-1/entry.tsx: {"setTimeout", "doPromise", "css", "Promise", "a"}
+// /packages/vite/tests/expressions-1/entry.tsx: {"setTimeout", "doPromise", "Promise", "a", "css"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let doPromise = async () => {
@@ -51,6 +51,19 @@ ${a.css}
 
 
 // /packages/vite/tests/expressions-2/entry.tsx: {"a", "css"}
+"use strict";
+let { css } = require("/packages/core/dist/index.mjs");
+let a = new String("a-kde34p");
+a.css = `margin: ${() => 99}px;`;
+const cssSourcemapData = [{className:'a-kde34p',start:51,end:82}];
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/expressions-2/entry.tsx.css').resolve([
+`.a-kde34p {
+${a.css}
+}`
+].join('\n'), cssSourcemapData, '/packages/vite/tests/expressions-2/entry.tsx.css');
+
+
+// /packages/vite/tests/expressions-2/entry.tsx: {"css", "a"}
 const a = new String('a-kde34p');
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");

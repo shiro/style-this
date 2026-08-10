@@ -1,27 +1,4 @@
 // /packages/vite/tests/styled-extra-class-react-1/entry.tsx: {"css", "extraClass", "unrelated"}
-"use strict";
-let { css } = require("/packages/core/dist/index.mjs");
-let __styleThis_var_FancyButton_2 = new String("FancyButton-3gdav0 custom-button primary");
-__styleThis_var_FancyButton_2.css = `background: none;
-  border: 1px solid blue;
-  border-radius: 2px;
-  padding: ${"var(--var1-vklyb0)"}px;
-  `;
-let unrelated = new String("unrelated-l2f4xi test-class");
-unrelated.css = `background: none;
-  `;
-const cssSourcemapData = [{className:'FancyButton-3gdav0',start:124,end:294},{className:'unrelated-l2f4xi',start:315,end:371}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/styled-extra-class-react-1/entry.tsx.css').resolve([
-`.FancyButton-3gdav0 {
-${__styleThis_var_FancyButton_2.css}
-}`,
-`.unrelated-l2f4xi {
-${unrelated.css}
-}`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/styled-extra-class-react-1/entry.tsx.css');
-
-
-// /packages/vite/tests/styled-extra-class-react-1/entry.tsx: {"css", "unrelated", "extraClass"}
 const __styleThis_var_FancyButton_2 = new String('FancyButton-3gdav0');
 const unrelated = new String('unrelated-l2f4xi');
 "use strict";
@@ -60,3 +37,26 @@ global.__styleThis_css_aabbbccc.get('/packages/vite/tests/styled-extra-class-rea
 // Generate and resolve the .style-this.js module
 const styleThisModule = 'export const _styleThis_var_FancyButton_2 = "' + 'FancyButton-3gdav0' + ' ' + ___styleThis_var_FancyButton_2_atomic + '";' + '\n' + 'export const _styleThis_unrelated = "' + 'unrelated-l2f4xi' + ' ' + _unrelated_atomic + '";';
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/styled-extra-class-react-1/entry.tsx.style-this.js').resolve(styleThisModule);
+
+
+// /packages/vite/tests/styled-extra-class-react-1/entry.tsx: {"unrelated", "extraClass", "css"}
+"use strict";
+let { css } = require("/packages/core/dist/index.mjs");
+let __styleThis_var_FancyButton_2 = new String("FancyButton-3gdav0 custom-button primary");
+__styleThis_var_FancyButton_2.css = `background: none;
+  border: 1px solid blue;
+  border-radius: 2px;
+  padding: ${"var(--var1-vklyb0)"}px;
+  `;
+let unrelated = new String("unrelated-l2f4xi test-class");
+unrelated.css = `background: none;
+  `;
+const cssSourcemapData = [{className:'FancyButton-3gdav0',start:124,end:294},{className:'unrelated-l2f4xi',start:315,end:371}];
+global.__styleThis_css_aabbbccc.get('/packages/vite/tests/styled-extra-class-react-1/entry.tsx.css').resolve([
+`.FancyButton-3gdav0 {
+${__styleThis_var_FancyButton_2.css}
+}`,
+`.unrelated-l2f4xi {
+${unrelated.css}
+}`
+].join('\n'), cssSourcemapData, '/packages/vite/tests/styled-extra-class-react-1/entry.tsx.css');

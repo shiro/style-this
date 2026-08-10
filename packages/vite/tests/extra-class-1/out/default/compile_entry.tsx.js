@@ -1,4 +1,4 @@
-// /packages/vite/tests/extra-class-1/entry.tsx: {"b", "css", "extraClass", "a"}
+// /packages/vite/tests/extra-class-1/entry.tsx: {"extraClass", "b", "a", "css"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-chuvkp foo bar");

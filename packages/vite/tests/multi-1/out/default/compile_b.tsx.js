@@ -1,4 +1,4 @@
-// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "css", "exported"}
+// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "exported", "css"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "red";
@@ -22,7 +22,7 @@ ${exported.css}
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-1/b.tsx.css');
 
 
-// /packages/vite/tests/multi-1/entry.tsx: {"css", "color", "a"}
+// /packages/vite/tests/multi-1/entry.tsx: {"color", "a", "css"}
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");

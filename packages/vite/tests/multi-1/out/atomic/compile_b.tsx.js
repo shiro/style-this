@@ -1,4 +1,4 @@
-// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "css", "exported"}
+// /packages/vite/tests/multi-1/b.tsx (/packages/vite/tests/multi-1/entry.tsx): {"color", "exported", "css"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "red";
@@ -40,7 +40,7 @@ const styleThisModule = 'export const _styleThis_exported = "' + 'exported-9qr0l
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/b.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/multi-1/entry.tsx: {"a", "css", "color"}
+// /packages/vite/tests/multi-1/entry.tsx: {"a", "color", "css"}
 const a = new String('a-5y38xq');
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
@@ -72,7 +72,7 @@ const styleThisModule = 'export const _styleThis_a = "' + 'a-5y38xq' + ' ' + _a_
 global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.style-this.js').resolve(styleThisModule);
 
 
-// /packages/vite/tests/multi-1/entry.tsx: {"css", "color", "a"}
+// /packages/vite/tests/multi-1/entry.tsx: {"color", "a", "css"}
 "use strict";
 const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");

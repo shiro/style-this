@@ -1,4 +1,4 @@
-// /packages/vite/tests/expressions-1/entry.tsx: {"setTimeout", "doPromise", "css", "Promise", "a"}
+// /packages/vite/tests/expressions-1/entry.tsx: {"setTimeout", "doPromise", "Promise", "a", "css"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let doPromise = async () => {
