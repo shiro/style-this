@@ -75,59 +75,42 @@ impl Transformer {
                 .as_bool()
                 .unwrap_or(false);
 
-        // Get CacheRegistry from options (passed from Vite)
-        let cache_registry_value = js_sys::Reflect::get(&opts, &JsValue::from_str("cacheRegistry"))
-            .unwrap_or(JsValue::null());
-        
-        let (cache_registry, css_file_store_ref_str, atomic_file_store_ref_str, value_cache_ref_str) = 
-            if !cache_registry_value.is_null() && !cache_registry_value.is_undefined() {
-                // Generate unique refs for this instance
-                let css_ref_suffix = crate::utils::generate_random_id(8);
-                let atomic_ref_suffix = crate::utils::generate_random_id(8);
-                let value_ref_suffix = crate::utils::generate_random_id(8);
-                
-                let css_file_store_ref_str = format!("{PREFIX}_css_cache_{css_ref_suffix}");
-                let atomic_file_store_ref_str = format!("{PREFIX}_atomic_cache_{atomic_ref_suffix}");
-                let value_cache_ref_str = format!("{PREFIX}_value_cache_{value_ref_suffix}");
-                
-                // Call initializeRefs on the TS CacheRegistry to make it store its cache objects
-                // in global scope under the provided ref names
-                let init_refs_fn = js_sys::Reflect::get(&cache_registry_value, &JsValue::from_str("initializeRefs"))
-                    .ok()
-                    .and_then(|v| v.dyn_into::<js_sys::Function>().ok());
-                
-                if let Some(init_fn) = init_refs_fn {
-                    let _ = init_fn.call2(
-                        &cache_registry_value,
-                        &JsValue::from_str(&css_file_store_ref_str),
-                        &JsValue::from_str(&atomic_file_store_ref_str),
-                    );
-                }
-                
-                // Create a new Map for value_cache in global scope (not exposed in TS version)
-                let value_cache = js_sys::Map::new();
-                let _ = js_sys::Reflect::set(&global, &JsValue::from_str(&value_cache_ref_str), &value_cache);
-                
-                // Create a Rust-side CacheRegistry that references the TS cache objects via global refs
-                let rust_cache_registry = CacheRegistry::from_js_cache_registry(
-                    cache_registry_value.clone(),
-                    css_file_store_ref_str.clone(),
-                    atomic_file_store_ref_str.clone(),
-                    value_cache_ref_str.clone(),
-                );
-                
-                // Set __native on the TS CacheRegistry object to point to the Rust registry
-                let _ = js_sys::Reflect::set(&cache_registry_value, &JsValue::from_str("__native"), &rust_cache_registry.clone().into());
-                
-                (rust_cache_registry, css_file_store_ref_str, atomic_file_store_ref_str, value_cache_ref_str)
+        let random_suffix = crate::utils::generate_random_id(8);
+
+        let css_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("cssCache")).unwrap();
+        let css_file_store_ref = format!("{PREFIX}_css_{random_suffix}");
+        js_sys::Reflect::set(&global, &JsValue::from_str(&css_file_store_ref), &css_cache).unwrap();
+
+        let atomic_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("atomicCache")).unwrap();
+        let atomic_file_store_ref = format!("{PREFIX}_atomic_{random_suffix}");
+        js_sys::Reflect::set(&global, &JsValue::from_str(&atomic_file_store_ref), &atomic_cache).unwrap();
+
+        let value_cache = js_sys::Reflect::get(&opts, &JsValue::from_str("valueCache")).unwrap();
+        let value_cache_ref = format!("{PREFIX}_vars_{random_suffix}");
+        js_sys::Reflect::set(&global, &JsValue::from_str(&value_cache_ref), &value_cache).unwrap();
+
+        // Create or use provided CacheRegistry
+        let cache_registry = if let Ok(registry) = js_sys::Reflect::get(&opts, &JsValue::from_str("cacheRegistry")) {
+            if !registry.is_undefined() && !registry.is_null() {
+                CacheRegistry::new(
+                    css_file_store_ref.clone(),
+                    atomic_file_store_ref.clone(),
+                    value_cache_ref.clone(),
+                )
             } else {
-                // No TS CacheRegistry passed, create both TS and Rust caches
-                let cache_registry = CacheRegistry::new();
-                let css_file_store_ref_str = cache_registry.css_cache_ref();
-                let atomic_file_store_ref_str = cache_registry.atomic_cache_ref();
-                let value_cache_ref_str = cache_registry.value_cache_ref();
-                (cache_registry, css_file_store_ref_str, atomic_file_store_ref_str, value_cache_ref_str)
-            };
+                CacheRegistry::new(
+                    css_file_store_ref.clone(),
+                    atomic_file_store_ref.clone(),
+                    value_cache_ref.clone(),
+                )
+            }
+        } else {
+            CacheRegistry::new(
+                css_file_store_ref.clone(),
+                atomic_file_store_ref.clone(),
+                value_cache_ref.clone(),
+            )
+        };
 
         let use_require = js_sys::Reflect::get(&opts, &JsValue::from_str("useRequire"))
             .unwrap()
@@ -181,9 +164,9 @@ impl Transformer {
             ignored_imports,
 
             load_file,
-            css_file_store_ref: css_file_store_ref_str,
-            atomic_file_store_ref: atomic_file_store_ref_str,
-            value_cache_ref: value_cache_ref_str,
+            css_file_store_ref,
+            atomic_file_store_ref,
+            value_cache_ref,
             cache_registry,
             require_ref,
             css_extension,

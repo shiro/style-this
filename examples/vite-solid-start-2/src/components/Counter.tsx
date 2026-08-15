@@ -46,4 +46,4 @@ export default function Counter() {
   );
 }
 
-export const counterColor = "grey";
+export const counterColor = "coral";

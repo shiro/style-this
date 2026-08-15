@@ -6,6 +6,7 @@ import {
   initializeStyleThis,
   CssCachEntry,
   CssSourceMapData,
+  CacheRegistry,
 } from "@style-this/core/compiler";
 import { generateCssSourceMap } from "@style-this/core/cssSourceMap";
 import { createRequire } from "node:module";
@@ -13,7 +14,6 @@ import { Filter, filterMatches, timeoutPromise, TIMEOUT } from "./util";
 import { handleTransformError } from "./util";
 import { initializeSolidMocks } from "./solid";
 import { isSvelteFile, extractSvelteScript, rewrapSvelteScript } from "./svelte";
-import { CacheRegistry } from "./cacheRegistry";
 
 const TIMEOUT_DURATION = 5 * 60 * 1000; // 5 minutes
 export const DefaultImport = Symbol();
@@ -39,7 +39,7 @@ export interface ExtraFields {
 }
 
 const vitePlugin = (options: Options = {}) => {
-  let { cssExtension = "css", filter = [], debug, atomic = false, useRequire, cacheRegistry = new CacheRegistry() } = options;
+  let { cssExtension = "css", filter = [], debug, atomic = false, useRequire, cacheRegistry } = options;
 
   if (!Array.isArray(filter)) filter = [filter];
 
@@ -64,6 +64,24 @@ const vitePlugin = (options: Options = {}) => {
   const virtualModulePrefix = "virtual:style-this:";
   const resolvedVirtualModulePrefix = "\0" + virtualModulePrefix;
 
+  // Create new caches if no registry provided
+  let cssCache: Map<string, CssCachEntry>;
+  let atomicCache: Map<string, CssCachEntry>;
+  let valueCache: Map<string, Record<string, unknown>>;
+
+  if (cacheRegistry) {
+    // If a cache registry is provided, we still need to get the actual cache objects
+    // from global since the registry only holds refs to them
+    cssCache = (global as unknown as Record<string, unknown>)[cacheRegistry.css_cache_ref()] as Map<string, CssCachEntry>;
+    atomicCache = (global as unknown as Record<string, unknown>)[cacheRegistry.atomic_cache_ref()] as Map<string, CssCachEntry>;
+    valueCache = (global as unknown as Record<string, unknown>)[cacheRegistry.value_cache_ref()] as Map<string, Record<string, unknown>>;
+  } else {
+    // Create fresh local caches for this plugin instance
+    cssCache = new Map<string, CssCachEntry>();
+    atomicCache = new Map<string, CssCachEntry>();
+    valueCache = new Map<string, Record<string, unknown>>();
+  }
+
   // Store source map metadata alongside CSS cache
   const cssSourceMapMetadata = new Map<
     string,
@@ -85,7 +103,6 @@ const vitePlugin = (options: Options = {}) => {
   let resolve: (id: string, importer: string) => Promise<string | undefined>;
   let server: ViteDevServer | undefined;
   let styleThis: Transformer;
-  let cwd = process.cwd();
   const mocks = new Map<string, string>();
 
   // Timing variables
@@ -162,7 +179,7 @@ const vitePlugin = (options: Options = {}) => {
 
       await initializeStyleThis();
 
-      cwd = process.cwd();
+      const cwd = process.cwd();
       const require = createRequire(cwd + "/package.json");
 
       const loadFile = async (
@@ -184,8 +201,8 @@ const vitePlugin = (options: Options = {}) => {
         // For virtual modules, load from cache
         if (filepath.startsWith(resolvedVirtualModulePrefix)) {
           const virtualPath = filepath.slice(resolvedVirtualModulePrefix.length);
-          const entry = cacheRegistry.getCssModule(virtualPath);
-          if (entry && entry !== undefined) {
+          const entry = cssCache.get(virtualPath);
+          if (entry) {
             // Wait for the entry to resolve
             const content = await entry;
             return [virtualPath, typeof content === 'string' ? content : ''];
@@ -217,6 +234,9 @@ const vitePlugin = (options: Options = {}) => {
         ignoredImports: options.ignoredImports as Record<string, string[]>,
 
         loadFile,
+        cssCache,
+        atomicCache,
+        valueCache,
         cacheRegistry,
 
         cssExtension,
@@ -243,7 +263,8 @@ const vitePlugin = (options: Options = {}) => {
       if (id.startsWith(virtualModulePrefix)) {
         const resolved = resolvedVirtualModulePrefix + id.slice(virtualModulePrefix.length);
 
-        // Mark .style-this.js modules as external to prevent Vite from analyzing imports
+        // Mark .style-this.js modules as external to prevent Vite's import analyzer from trying to resolve imports
+        // within the generated atomic program code, which would cause "Failed to resolve import" errors
         if (id.endsWith('.style-this.js')) {
           return { id: resolved, external: true };
         }
@@ -290,28 +311,24 @@ const vitePlugin = (options: Options = {}) => {
 
       // Check if this is an atomic program (.style-this.js)
       const isAtomicProgram = filepath.endsWith('.style-this.js');
+      const cache = isAtomicProgram ? atomicCache : cssCache;
 
-      // Compute the cache key by stripping the virtual extension and re-adding with the proper extension
-      let cacheKey: string;
-      if (filepath.endsWith(`.${cssExtension}`)) {
-        const sourceFile = filepath.slice(0, -(cssExtension.length + 1));
-        cacheKey = `${sourceFile}.${cssExtension}`;
-      } else if (filepath.endsWith('.style-this.js')) {
-        const sourceFile = filepath.slice(0, -'.style-this.js'.length);
-        cacheKey = `${sourceFile}.style-this.js`;
-      } else {
-        cacheKey = filepath;
-      }
+      // Try to find the entry in the cache
+      // If the filepath is relative (e.g., "./MainComponent.tsx.style-this.js"),
+      // search through cache keys to find a match
+      let entry = cache.get(filepath);
 
-      // Try to find the entry in the cache using the constructed cache key
-      let entry = isAtomicProgram
-        ? cacheRegistry.getAtomicModule(cacheKey)
-        : cacheRegistry.getCssModule(cacheKey);
-
-      if ((!entry || entry === undefined) && filepath.startsWith('./')) {
+      if (!entry && filepath.startsWith('./')) {
         // Try to find a matching absolute path in the cache
-        // For now, we'll skip this optimization as it requires iterating through cache
-        // This can be enhanced later with additional registry methods if needed
+        const relativeName = filepath.substring(2); // Remove "./"
+
+        for (const [cachedPath, cachedEntry] of cache.entries()) {
+          if (cachedPath.endsWith(relativeName) || cachedPath.endsWith('/' + relativeName)) {
+            entry = cachedEntry;
+            filepath = cachedPath; // Update filepath to the absolute path
+            break;
+          }
+        }
       }
 
       if (entry == undefined) {
@@ -351,8 +368,6 @@ const vitePlugin = (options: Options = {}) => {
             throw new Error(`Unexpected CSS resolution type: ${typeof resolved}`);
           }
 
-          console.log('RES:\n', resolved)
-
           // Generate source map if we have metadata (not for atomic programs)
           if (!isAtomicProgram) {
             const metadata = cssSourceMapMetadata.get(filepath);
@@ -369,7 +384,6 @@ const vitePlugin = (options: Options = {}) => {
                 metadata.originalSource,
                 filepath,
               );
-
 
               return {
                 code: resolved,
@@ -431,13 +445,17 @@ const vitePlugin = (options: Options = {}) => {
       if (!watchedFiles.has(ctx.file)) return;
 
       // remove from value cache
-      cacheRegistry.deleteValueCacheEntry(ctx.file);
+      if (valueCache instanceof Map) {
+        valueCache.delete(ctx.file);
+      } else {
+        valueCache[ctx.file] = {};
+      }
 
       const cssFilepath = `${ctx.file}.${cssExtension}`;
       const styleThisFilepath = `${ctx.file}.style-this.js`;
 
-      cacheRegistry.deleteCssModule(cssFilepath);
-      cacheRegistry.deleteAtomicModule(styleThisFilepath);
+      cssCache.delete(cssFilepath);
+      atomicCache.delete(styleThisFilepath);
       cssSourceMapMetadata.delete(cssFilepath);
 
       // Atomic CSS cache doesn't need clearing on hot update — rules are re-accumulated
@@ -492,18 +510,18 @@ const vitePlugin = (options: Options = {}) => {
 
       // In atomic mode, we should not skip CSS eval if the atomic cache entry hasn't been resolved yet
       // In non-atomic mode, we can skip if the CSS cache entry exists
-      const skipCssEval = cacheRegistry.hasCssModule(cssFilepath) && (!atomic || cacheRegistry.hasAtomicModule(atomicProgramFilepath));
+      const skipCssEval = cssCache.has(cssFilepath) && (!atomic || atomicCache.has(atomicProgramFilepath));
 
       try {
         const startTime = performance.now();
 
-        if (atomic && !cacheRegistry.hasAtomicModule(atomicProgramFilepath)) {
-          cacheRegistry.setAtomicModule(atomicProgramFilepath, createCachePromise(code));
+        if (atomic && !atomicCache.has(atomicProgramFilepath)) {
+          atomicCache.set(atomicProgramFilepath, createCachePromise(code));
         }
 
-        if (!cacheRegistry.hasCssModule(cssFilepath)) {
+        if (!cssCache.has(cssFilepath)) {
           // Create cache entry for CSS file
-          cacheRegistry.setCssModule(cssFilepath, createCachePromise(code));
+          cssCache.set(cssFilepath, createCachePromise(code));
         }
 
         const transformedResult = await styleThis.transform(
