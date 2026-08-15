@@ -953,6 +953,13 @@ pub async fn evaluate_program<'alloc>(
         for css_var in css_variable_identifiers.iter() {
             if let Some(css_string) = css_blocks.get(&css_var.variable_name) {
                 let classname = &css_var.classname;
+
+                // Global styles don't need a wrapper selector
+                if css_var.classname.starts_with("_Global") {
+                    module_css.push_str(&format!("{}\n", css_string));
+                    continue;
+                }
+
                 let parse_result = css_parser::parse_css(css_string);
 
                 let atomic_classes: BTreeSet<String> = parse_result
@@ -964,12 +971,7 @@ pub async fn evaluate_program<'alloc>(
 
                 variable_to_atomics.insert(css_var.variable_name.clone(), atomic_classes);
 
-                if css_var.classname.starts_with("_Global") {
-                    // Global styles don't need a wrapper selector
-                    if let Some(non_atomizable) = parse_result.non_atomizable {
-                        module_css.push_str(&format!("{}\n", non_atomizable));
-                    }
-                } else if let Some(non_atomizable) = parse_result.non_atomizable {
+                if let Some(non_atomizable) = parse_result.non_atomizable {
                     module_css.push_str(&format!(".{classname} {{ {} }}\n", non_atomizable));
                 } else {
                     module_css.push_str(&format!(".{classname} {{ /* marker */ }}\n"));

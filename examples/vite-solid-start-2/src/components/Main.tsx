@@ -8,11 +8,12 @@ const ContainerStyle = css`
 
 const colorStyle = css`
   color: coral;
+  background: ${counterColor};
 `;
 
 export default function Main() {
   return (
-    <div class={`${ContainerStyle} Global__Main`}>
+    <div class={`${ContainerStyle} global__Main`}>
       <Counter />
       hello
       <span class={colorStyle}>
