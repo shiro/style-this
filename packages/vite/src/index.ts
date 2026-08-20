@@ -88,10 +88,8 @@ const vitePlugin = (options: Options = {}) => {
   let cwd = process.cwd();
   const mocks = new Map<string, string>();
 
-  // Timing variables
   let totalTransformTime = 0;
 
-  // Atomic CSS invalidation debouncing
   let atomicCssInvalidationTimer: NodeJS.Timeout | undefined;
   const ATOMIC_CSS_INVALIDATION_DEBOUNCE_MS = 500;
 
@@ -151,7 +149,6 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async config(config: ViteConfig) {
-      // this is a CJS library, need to bundle it
       config.optimizeDeps = {
         ...(config.optimizeDeps ?? {}),
         include: [
@@ -181,16 +178,13 @@ const vitePlugin = (options: Options = {}) => {
 
         let [filepath, _query] = filepathWithQuery.split("?", 2);
 
-        // For virtual modules, load from cache
         if (filepath.startsWith(resolvedVirtualModulePrefix)) {
           const virtualPath = filepath.slice(resolvedVirtualModulePrefix.length);
           const entry = cacheRegistry.getCssModule(virtualPath);
           if (entry && entry !== undefined) {
-            // Wait for the entry to resolve
             const content = await entry;
             return [virtualPath, typeof content === 'string' ? content : ''];
           }
-          // If not in cache, return empty
           return [virtualPath, ''];
         }
 
@@ -204,9 +198,6 @@ const vitePlugin = (options: Options = {}) => {
           } catch (err) { }
         }
 
-        // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
-        // bundled one (that might not yet exist on disk)
-        // also do not load the contents, the transformer should require(...) it as-is
         filepath = require.resolve(id);
 
         return [filepath, ""];
@@ -215,40 +206,39 @@ const vitePlugin = (options: Options = {}) => {
       styleThis = new Transformer({
         cwd,
         ignoredImports: options.ignoredImports as Record<string, string[]>,
-
         loadFile,
         cacheRegistry,
-
         cssExtension,
-
         useRequire,
         debug,
         atomic,
         onDebugVirtualModule: debug ? onDebugVirtualModule : noopCallback,
       });
 
-      // In atomic mode, set up global helper function using the Transformer instance
       if (atomic) {
         global.__styleThis_getAtomicCss = () => styleThis.get_atomic_css();
       }
     },
 
-    resolveId(id, _importer) {
-      // Handle @style-this/core/atomic imports
+    resolveId(id, importer) {
       if (id === '@style-this/core/atomic') {
         const atomicPath = `${virtualModulePrefix}__style_this_atomic_entrypoint.css`;
         return resolvedVirtualModulePrefix + atomicPath.slice(virtualModulePrefix.length);
       }
 
       if (id.startsWith(virtualModulePrefix)) {
-        const resolved = resolvedVirtualModulePrefix + id.slice(virtualModulePrefix.length);
+        return resolvedVirtualModulePrefix + id.slice(virtualModulePrefix.length);
+      }
 
-        // Mark .style-this.js modules as external to prevent Vite from analyzing imports
-        if (id.endsWith('.style-this.js')) {
-          return { id: resolved, external: true };
+      if (importer && importer.startsWith(resolvedVirtualModulePrefix) && importer.endsWith('.style-this.js')) {
+        const virtualPath = importer.slice(resolvedVirtualModulePrefix.length);
+        const sourceFilePath = virtualPath.slice(0, -'.style-this.js'.length);
+        
+        if ((id.startsWith('./') || id.startsWith('../')) && sourceFilePath) {
+          const path = require('path');
+          const resolvedPath = path.resolve(path.dirname(sourceFilePath), id);
+          return resolvedPath;
         }
-
-        return resolved;
       }
     },
 
@@ -258,16 +248,12 @@ const vitePlugin = (options: Options = {}) => {
       const [id, _query] = fullId.split("?", 2);
       let filepath = id.slice(resolvedVirtualModulePrefix.length);
 
-      // Check if this is the atomic entrypoint file (always available)
       if (filepath === "__style_this_atomic_entrypoint.css") {
         if (atomic) {
           if (!server) {
-            // In production builds, return empty—the actual atomic CSS will be injected via generateBundle hook
             return { code: '' };
           }
 
-          // Dev mode: Make this module depend on all source files that have been watched
-          // This ensures that if any of them change/transform, this module gets re-evaluated
           for (const sourceFile of watchedFiles) {
             this.addWatchFile(sourceFile);
           }
@@ -288,10 +274,8 @@ const vitePlugin = (options: Options = {}) => {
         }
       }
 
-      // Check if this is an atomic program (.style-this.js)
       const isAtomicProgram = filepath.endsWith('.style-this.js');
 
-      // Compute the cache key by stripping the virtual extension and re-adding with the proper extension
       let cacheKey: string;
       if (filepath.endsWith(`.${cssExtension}`)) {
         const sourceFile = filepath.slice(0, -(cssExtension.length + 1));
@@ -303,7 +287,6 @@ const vitePlugin = (options: Options = {}) => {
         cacheKey = filepath;
       }
 
-      // Try to find the entry in the cache using the constructed cache key
       let entry = isAtomicProgram
         ? cacheRegistry.getAtomicModule(cacheKey)
         : cacheRegistry.getCssModule(cacheKey);
@@ -325,8 +308,6 @@ const vitePlugin = (options: Options = {}) => {
           `virtual CSS file '${filepath}' from id '${id}' not yet ready`,
         );
 
-      // tell Vite that this virtual module depends on the source file
-      // remove the extension to get the original source file path
       let sourceFilepath: string;
       if (filepath.endsWith(`.${cssExtension}`)) {
         sourceFilepath = filepath.slice(0, -(cssExtension.length + 1));
@@ -351,13 +332,9 @@ const vitePlugin = (options: Options = {}) => {
             throw new Error(`Unexpected CSS resolution type: ${typeof resolved}`);
           }
 
-          console.log('RES:\n', resolved)
-
-          // Generate source map if we have metadata (not for atomic programs)
           if (!isAtomicProgram) {
             const metadata = cssSourceMapMetadata.get(filepath);
             if (metadata) {
-              // Ensure source filepath is absolute for proper browser resolution
               const absoluteSourcePath = sourceFilepath.startsWith('/')
                 ? sourceFilepath
                 : `/${sourceFilepath}`;
@@ -370,7 +347,6 @@ const vitePlugin = (options: Options = {}) => {
                 filepath,
               );
 
-
               return {
                 code: resolved,
                 map: sourcemap,
@@ -378,7 +354,6 @@ const vitePlugin = (options: Options = {}) => {
             }
           }
 
-          // Return without source map if no metadata
           return {
             code: resolved,
           };
@@ -394,16 +369,13 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async generateBundle(_outputOptions, bundle) {
-      // In atomic mode, after all files have been transformed, inject the final atomic CSS into the bundle
       if (!atomic) return;
 
       const finalAtomicCss = styleThis.get_atomic_css();
 
-      // Find or create the main CSS asset in the bundle
       let cssAsset = null;
       let cssFileName = null;
 
-      // Look for existing CSS assets
       for (const [fileName, asset] of Object.entries(bundle)) {
         if (asset.type === 'asset' && fileName.endsWith('.css')) {
           cssAsset = asset;
@@ -413,11 +385,9 @@ const vitePlugin = (options: Options = {}) => {
       }
 
       if (cssAsset && cssFileName) {
-        // Append the atomic CSS to the existing CSS file
         const existingCss = typeof cssAsset.source === 'string' ? cssAsset.source : cssAsset.source.toString();
         cssAsset.source = `${existingCss}\n${finalAtomicCss}`;
       } else {
-        // Create a new CSS asset with the atomic CSS if no CSS file exists
         const atomicCssFileName = 'assets/atomic.css';
         bundle[atomicCssFileName] = {
           type: 'asset',
@@ -430,7 +400,6 @@ const vitePlugin = (options: Options = {}) => {
     async handleHotUpdate(ctx) {
       if (!watchedFiles.has(ctx.file)) return;
 
-      // remove from value cache
       cacheRegistry.deleteValueCacheEntry(ctx.file);
 
       const cssFilepath = `${ctx.file}.${cssExtension}`;
@@ -440,13 +409,12 @@ const vitePlugin = (options: Options = {}) => {
       cacheRegistry.deleteAtomicModule(styleThisFilepath);
       cssSourceMapMetadata.delete(cssFilepath);
 
-      // Atomic CSS cache doesn't need clearing on hot update — rules are re-accumulated
-      // deterministically when files re-transform, and other files' rules should be preserved.
+      if (atomic) {
+        scheduleAtomicCssInvalidation();
+      }
 
-      // invalidate all modules that import this one
       const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
       if (sourceModule) {
-        // TODO get the files who evaluted this one from rust only
         for (const importer of sourceModule.importers) {
           ctx.server.reloadModule(importer);
         }
@@ -475,23 +443,19 @@ const vitePlugin = (options: Options = {}) => {
         return;
       }
 
-      // Handle Svelte files: extract script block and normalize filepath
       let codeToTransform = code;
       let pathForImport = filepath;
 
       if (isSvelteFile(filepath)) {
         const svelteScript = extractSvelteScript(code, filepath);
-        if (!svelteScript) return; // Svelte file with no script block
+        if (!svelteScript) return;
         codeToTransform = svelteScript.codeToTransform;
         pathForImport = svelteScript.normalizedFilepath;
       }
 
       const cssFilepath = `${pathForImport}.${cssExtension}`;
-
       const atomicProgramFilepath = `${pathForImport}.style-this.js`;
 
-      // In atomic mode, we should not skip CSS eval if the atomic cache entry hasn't been resolved yet
-      // In non-atomic mode, we can skip if the CSS cache entry exists
       const skipCssEval = cacheRegistry.hasCssModule(cssFilepath) && (!atomic || cacheRegistry.hasAtomicModule(atomicProgramFilepath));
 
       try {
@@ -502,7 +466,6 @@ const vitePlugin = (options: Options = {}) => {
         }
 
         if (!cacheRegistry.hasCssModule(cssFilepath)) {
-          // Create cache entry for CSS file
           cacheRegistry.setCssModule(cssFilepath, createCachePromise(code));
         }
 
@@ -515,31 +478,25 @@ const vitePlugin = (options: Options = {}) => {
         const transformTime = endTime - startTime;
         totalTransformTime += transformTime;
 
-
-        // console.log(
-        //   `Transform took ${ transformTime.toFixed(2) }ms for ${ filepath }(total: ${ totalTransformTime.toFixed(2) }ms)`,
-        // );
-
         if (!transformedResult) {
           watchedFiles.delete(filepath);
           return;
         }
         watchedFiles.add(filepath);
 
-        // during dev, invalidate the virtual CSS module
         if (server) {
           const virtualModuleId = resolvedVirtualModulePrefix + cssFilepath;
           const module = server.moduleGraph.getModuleById(virtualModuleId);
-          if (module) server.reloadModule(module);
+          if (module && module.importers && module.importers.size > 0) {
+            server.reloadModule(module);
+          }
 
-          // In atomic mode, also invalidate the .style-this.js module and schedule atomic entrypoint invalidation
           if (atomic) {
             const styleThisModuleId = resolvedVirtualModulePrefix + atomicProgramFilepath;
             const styleThisModule = server.moduleGraph.getModuleById(styleThisModuleId);
-            if (styleThisModule) server.reloadModule(styleThisModule);
-
-            // Schedule debounced invalidation of the atomic CSS entrypoint
-            scheduleAtomicCssInvalidation();
+            if (styleThisModule && styleThisModule.importers && styleThisModule.importers.size > 0) {
+              server.reloadModule(styleThisModule);
+            }
           }
         }
 
@@ -553,9 +510,7 @@ const vitePlugin = (options: Options = {}) => {
           map: transformedResult.sourcemap,
         };
       } catch (err) {
-        // we need to watch it since it might contain style templates
         watchedFiles.add(filepath);
-
         handleTransformError(filepath, code, err);
       }
     },
