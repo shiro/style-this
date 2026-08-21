@@ -56,7 +56,7 @@ impl CacheRegistry {
         // The TS version stores them as private fields, so we need to create refs to them
         // The Rust code will have already called initializeRefs on the TS side
         // which stores the cache Maps in global scope under the provided ref names
-        
+
         Self {
             css_cache_ref,
             atomic_cache_ref,
@@ -85,7 +85,7 @@ impl CacheRegistry {
     pub fn invalidate_module(&self, filepath: &str) {
         let css_key = format!("{}.css", filepath);
         let atomic_key = format!("{}.style-this.js", filepath);
-        
+
         Self::delete_from_cache(&self.css_cache_ref, &css_key);
         Self::delete_from_cache(&self.atomic_cache_ref, &atomic_key);
     }
@@ -155,12 +155,12 @@ impl CacheRegistry {
     /// Initialize JS-side caches in global scope
     fn init_caches(css_cache_ref: &str, atomic_cache_ref: &str, value_cache_ref: &str) {
         let global = js_sys::global();
-        
+
         // Create Map constructors and set them in global scope
         let css_map = js_sys::Map::new();
         let atomic_map = js_sys::Map::new();
         let value_map = js_sys::Map::new();
-        
+
         let _ = js_sys::Reflect::set(&global, &JsValue::from_str(css_cache_ref), &css_map);
         let _ = js_sys::Reflect::set(&global, &JsValue::from_str(atomic_cache_ref), &atomic_map);
         let _ = js_sys::Reflect::set(&global, &JsValue::from_str(value_cache_ref), &value_map);
@@ -169,7 +169,7 @@ impl CacheRegistry {
     /// Delete a value from a cache by key
     fn delete_from_cache(cache_ref: &str, key: &str) {
         let global = js_sys::global();
-        
+
         // Get the cache Map from global
         if let Ok(cache) = js_sys::Reflect::get(&global, &JsValue::from_str(cache_ref)) {
             if !cache.is_undefined() && !cache.is_null() {
@@ -189,7 +189,7 @@ impl CacheRegistry {
     /// Check if a key exists in a cache
     fn has_in_cache(cache_ref: &str, key: &str) -> bool {
         let global = js_sys::global();
-        
+
         if let Ok(cache) = js_sys::Reflect::get(&global, &JsValue::from_str(cache_ref)) {
             if !cache.is_undefined() && !cache.is_null() {
                 let key_value = JsValue::from_str(key);
@@ -210,7 +210,7 @@ impl CacheRegistry {
     /// Get a value from a cache by key
     fn get_from_cache(cache_ref: &str, key: &str) -> JsValue {
         let global = js_sys::global();
-        
+
         if let Ok(cache) = js_sys::Reflect::get(&global, &JsValue::from_str(cache_ref)) {
             if !cache.is_undefined() && !cache.is_null() {
                 let key_value = JsValue::from_str(key);
@@ -231,7 +231,7 @@ impl CacheRegistry {
     /// Set a value in a cache by key
     fn set_in_cache(cache_ref: &str, key: &str, value: JsValue) {
         let global = js_sys::global();
-        
+
         if let Ok(cache) = js_sys::Reflect::get(&global, &JsValue::from_str(cache_ref)) {
             if !cache.is_undefined() && !cache.is_null() {
                 let key_value = JsValue::from_str(key);
@@ -248,10 +248,7 @@ impl CacheRegistry {
     }
 
     /// Get or create the value cache for a specific file
-    pub fn get_or_create_value_cache(
-        &self,
-        filepath: String,
-    ) -> Rc<FutureMutex<HashSet<String>>> {
+    pub fn get_or_create_value_cache(&self, filepath: String) -> Rc<FutureMutex<HashSet<String>>> {
         let mut cache = self.value_cache.borrow_mut();
         cache
             .entry(filepath)
@@ -261,7 +258,9 @@ impl CacheRegistry {
 
     /// Insert an atomic CSS class into the cache
     pub fn insert_atomic_class(&self, declaration: String, class_name: String) {
-        self.atomic_css_cache.borrow_mut().insert(declaration, class_name);
+        self.atomic_css_cache
+            .borrow_mut()
+            .insert(declaration, class_name);
     }
 
     /// Get an atomic CSS class from the cache
@@ -276,7 +275,10 @@ impl CacheRegistry {
             .iter()
             .map(|(declaration, class_name)| format!(".{} {{ {} }}", class_name, declaration))
             .collect();
-        rules.sort(); // Ensure deterministic output
+
+        // Ensure deterministic output
+        rules.sort();
+
         rules.join("\n")
     }
 
@@ -291,4 +293,3 @@ impl CacheRegistry {
         self.value_cache.borrow_mut().remove(filepath);
     }
 }
-

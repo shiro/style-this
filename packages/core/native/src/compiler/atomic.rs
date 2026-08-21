@@ -183,8 +183,6 @@ pub fn add_atomic(declaration: &str, cache_registry: &CacheRegistry) -> String {
     class_name
 }
 
-/// Get all collected atomic CSS rules collected so far
-
 /// Transform @style-this/core/atomic imports into virtual module imports
 pub fn transform_atomic_entrypoint<'alloc>(
     program: &mut Program<'alloc>,
