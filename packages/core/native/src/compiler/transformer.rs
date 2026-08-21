@@ -201,6 +201,11 @@ impl Transformer {
         self.cache_registry.get_all_atomic_css()
     }
 
+    /// Clear value cache for a specific file
+    pub fn clear_value_cache(&self, filepath: &str) {
+        self.cache_registry.clear_file(filepath);
+    }
+
     /// loads file contents and id
     pub(crate) async fn load_file(
         &self,

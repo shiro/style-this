@@ -233,7 +233,7 @@ const vitePlugin = (options: Options = {}) => {
       if (importer && importer.startsWith(resolvedVirtualModulePrefix) && importer.endsWith('.style-this.js')) {
         const virtualPath = importer.slice(resolvedVirtualModulePrefix.length);
         const sourceFilePath = virtualPath.slice(0, -'.style-this.js'.length);
-        
+
         if ((id.startsWith('./') || id.startsWith('../')) && sourceFilePath) {
           const path = require('path');
           const resolvedPath = path.resolve(path.dirname(sourceFilePath), id);
@@ -398,6 +398,12 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async handleHotUpdate(ctx) {
+      // If file has .tsx/.jsx/.ts/.js extension, add it to watchedFiles
+      const isSourceFile = /\.(tsx?|jsx?)$/.test(ctx.file);
+      if (isSourceFile && !watchedFiles.has(ctx.file)) {
+        watchedFiles.add(ctx.file);
+      }
+
       if (!watchedFiles.has(ctx.file)) return;
 
       cacheRegistry.deleteValueCacheEntry(ctx.file);
@@ -409,6 +415,32 @@ const vitePlugin = (options: Options = {}) => {
       cacheRegistry.deleteAtomicModule(styleThisFilepath);
       cssSourceMapMetadata.delete(cssFilepath);
 
+      // Re-transform the changed file itself first to update its exports
+      if (styleThis && watchedFiles.has(ctx.file)) {
+        try {
+          const fs = await import("fs");
+          const changedCode = fs.readFileSync(ctx.file, "utf-8");
+
+          // Create cache promises for the changed file
+          if (atomic) {
+            cacheRegistry.setAtomicModule(styleThisFilepath, createCachePromise(changedCode));
+          }
+          const cssPromise = createCachePromise(changedCode);
+          cacheRegistry.setCssModule(cssFilepath, cssPromise);
+
+          // Re-transform the changed file
+          const transformedResult = await styleThis.transform(
+            changedCode,
+            ctx.file,
+            false,
+          );
+
+          const cssResult = await cssPromise;
+        } catch (err) {
+          // Silently ignore transform errors during HMR
+        }
+      }
+
       if (atomic) {
         scheduleAtomicCssInvalidation();
       }
@@ -416,6 +448,38 @@ const vitePlugin = (options: Options = {}) => {
       const sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
       if (sourceModule) {
         for (const importer of sourceModule.importers) {
+          // Re-transform the importer to regenerate CSS with new values
+          if (importer.file && styleThis) {
+            try {
+              const fs = await import("fs");
+              const importerCode = fs.readFileSync(importer.file, "utf-8");
+              const importerCssFilepath = `${importer.file}.${cssExtension}`;
+              const importerAtomicProgramFilepath = `${importer.file}.style-this.js`;
+
+              // Clear old cache entries
+              cacheRegistry.deleteCssModule(importerCssFilepath);
+              cacheRegistry.deleteAtomicModule(importerAtomicProgramFilepath);
+
+              // Create cache promises BEFORE calling transform (required by Rust side)
+              if (atomic) {
+                cacheRegistry.setAtomicModule(importerAtomicProgramFilepath, createCachePromise(importerCode));
+              }
+              const cssPromise = createCachePromise(importerCode);
+              cacheRegistry.setCssModule(importerCssFilepath, cssPromise);
+
+              // Re-transform
+              const transformedResult = await styleThis.transform(
+                importerCode,
+                importer.file,
+                false, // skipCssEval = false to force re-evaluation
+              );
+
+              // Wait for the cache promise to be resolved
+              const cssResult = await cssPromise;
+            } catch (err) {
+              // Silently ignore transform errors during HMR
+            }
+          }
           ctx.server.reloadModule(importer);
         }
       }
