@@ -148,17 +148,6 @@ const vitePlugin = (options: Options = {}) => {
       server = viteServer;
     },
 
-    configResolved(resolvedConfig) {
-      const envs = (resolvedConfig as any).environments;
-      if (envs) {
-        console.log('Solid Start environments:', {
-          client: envs.client?.consumer,
-          ssr: envs.ssr?.consumer,
-          nitro: envs.nitro?.consumer,
-        });
-      }
-    },
-
     async config(config: ViteConfig) {
       config.optimizeDeps = {
         ...(config.optimizeDeps ?? {}),
@@ -238,7 +227,14 @@ const vitePlugin = (options: Options = {}) => {
       }
 
       if (id.startsWith(virtualModulePrefix)) {
-        return resolvedVirtualModulePrefix + id.slice(virtualModulePrefix.length);
+        if (!importer)
+          throw new Error(`Virtual module '${id}' must be imported from another module, not loaded directly`);
+
+        const idPart = id.slice(virtualModulePrefix.length);
+        const importerDir = require('path').dirname(importer);
+        const absoluteIdPart = require('path').resolve(importerDir, idPart);
+
+        return resolvedVirtualModulePrefix + absoluteIdPart;
       }
 
       if (importer && importer.startsWith(resolvedVirtualModulePrefix) && importer.endsWith('.style-this.js')) {
@@ -274,8 +270,6 @@ const vitePlugin = (options: Options = {}) => {
           if (typeof atomicCss !== "string") {
             throw new Error(`Unexpected atomic CSS type: ${typeof atomicCss}`);
           }
-
-          console.log('load atomic', atomicCss)
 
           return {
             code: atomicCss,
@@ -360,11 +354,6 @@ const vitePlugin = (options: Options = {}) => {
                 filepath,
               );
 
-              console.log('load done', filepath)
-              if (filepath.endsWith("/src/components/Counter.tsx.css")) {
-                console.log('content:\n', resolved)
-              }
-
               return {
                 code: resolved,
                 map: sourcemap,
@@ -416,7 +405,6 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async handleHotUpdate(ctx) {
-      console.log('hmr', ctx.file)
       // If file has .tsx/.jsx/.ts/.js extension, add it to watchedFiles
       const isSourceFile = /\.(tsx?|jsx?)$/.test(ctx.file);
       if (isSourceFile && !watchedFiles.has(ctx.file)) {
@@ -430,39 +418,9 @@ const vitePlugin = (options: Options = {}) => {
       const cssFilepath = `${ctx.file}.${cssExtension}`;
       const styleThisFilepath = `${ctx.file}.style-this.js`;
 
-      cacheRegistry.deleteCssModule(cssFilepath);
+      // cacheRegistry.deleteCssModule(cssFilepath);
       cacheRegistry.deleteAtomicModule(styleThisFilepath);
       cssSourceMapMetadata.delete(cssFilepath);
-
-      // Re-transform the changed file itself first to update its exports
-      // if (styleThis && watchedFiles.has(ctx.file)) {
-      //   try {
-      //     const fs = await import("fs");
-      //     const changedCode = fs.readFileSync(ctx.file, "utf-8");
-      //
-      //     // Create cache promises for the changed file
-      //     if (atomic) {
-      //       cacheRegistry.setAtomicModule(styleThisFilepath, createCachePromise(changedCode));
-      //     }
-      //     const cssPromise = createCachePromise(changedCode);
-      //     cacheRegistry.setCssModule(cssFilepath, cssPromise);
-      //
-      //     // Re-transform the changed file
-      //     const transformedResult = await styleThis.transform(
-      //       changedCode,
-      //       ctx.file,
-      //       false,
-      //     );
-      //
-      //     const cssResult = await cssPromise;
-      //   } catch (err) {
-      //     // Silently ignore transform errors during HMR
-      //   }
-      // }
-
-      // if (atomic) {
-      //   scheduleAtomicCssInvalidation();
-      // }
 
       let sourceModule = ctx.server.moduleGraph.getModuleById(ctx.file);
 
@@ -481,52 +439,21 @@ const vitePlugin = (options: Options = {}) => {
         }
       }
 
-      console.log('here', ctx.file, !!sourceModule)
-      console.log('this.environment:', (this as any).environment?.name, 'Consumer:', (this as any).environment?.consumer);
-
-
       if (sourceModule) {
         for (const importer of sourceModule.importers) {
-          // Re-transform the importer to regenerate CSS with new values
-          if (importer.file && styleThis) {
-            try {
-              const fs = await import("fs");
-              const importerCode = fs.readFileSync(importer.file, "utf-8");
-              const importerCssFilepath = `${importer.file}.${cssExtension}`;
-              const importerAtomicProgramFilepath = `${importer.file}.style-this.js`;
-
-              // Clear old cache entries
-              cacheRegistry.deleteCssModule(importerCssFilepath);
-              cacheRegistry.deleteAtomicModule(importerAtomicProgramFilepath);
-
-              // Create cache promises BEFORE calling transform (required by Rust side)
-              if (atomic) {
-                cacheRegistry.setAtomicModule(importerAtomicProgramFilepath, createCachePromise(importerCode));
-              }
-              const cssPromise = createCachePromise(importerCode);
-              cacheRegistry.setCssModule(importerCssFilepath, cssPromise);
-
-              // Re-transform
-              const transformedResult = await styleThis.transform(
-                importerCode,
-                importer.file,
-                false, // skipCssEval = false to force re-evaluation
-              );
-
-              // Wait for the cache promise to be resolved
-              const cssResult = await cssPromise;
-            } catch (err) {
-              // Silently ignore transform errors during HMR
-            }
+          if (importer.file) {
+            cacheRegistry.invalidateModule(importer.file);
           }
           ctx.server.reloadModule(importer);
         }
 
-        // const atomicEntryfileModule = ctx.server.moduleGraph.getModuleById(`${virtualModulePrefix}__style_this_atomic_entrypoint.css`);
-        // console.log('finding atomic...', atomicEntryfileModule)
-        // if (atomicEntryfileModule) {
-        //   ctx.server.reloadModule(atomicEntryfileModule);
-        // }
+        // also invalidate virtual module
+        const p = `${resolvedVirtualModulePrefix}${ctx.file}.style-this.js`
+        const l = ctx.server.moduleGraph.getModuleById(p);
+        if (l) {
+          ctx.server.reloadModule(l);
+        }
+
       }
     },
 
@@ -578,7 +505,6 @@ const vitePlugin = (options: Options = {}) => {
           cacheRegistry.setCssModule(cssFilepath, createCachePromise(code));
         }
 
-        console.log('transform', filepath)
         const transformedResult = await styleThis.transform(
           codeToTransform,
           pathForImport,
