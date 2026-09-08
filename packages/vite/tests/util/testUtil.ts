@@ -31,7 +31,8 @@ const handleAtomicProgram = async (
   plugin: Awaited<ReturnType<typeof setupPlugin>>,
   outDir: string,
 ) => {
-  let atomicProgramId = plugin.resolveId(`virtual:style-this:${testDir}/${entry}.style-this.js`);
+  const entryPath = `${testDir}/${entry}`;
+  let atomicProgramId = plugin.resolveId(`virtual:style-this:${entryPath}.style-this.js`, entryPath);
   if (!atomicProgramId) throw new Error(`Failed to resolve atomic program for entry: ${entry}`);
 
   const atomicProgram = await plugin.load(atomicProgramId);
@@ -107,7 +108,7 @@ const evaluateProgramWithMode = async (
   }
 
   const cssImport = `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`;
-  const cssId = plugin.resolveId(cssImport);
+  const cssId = plugin.resolveId(cssImport, entryFilepath);
   expect(cssId, `resolve id for '${cssImport}'`).toBeDefined();
 
   const cssRaw = await plugin.load(cssId);
@@ -185,6 +186,7 @@ export const evaluateProgram = async (
 
   const id = plugin.resolveId(
     `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`,
+    entryFilepath,
   )!;
   expect(id).toBeDefined();
 
@@ -366,5 +368,10 @@ export const setupPlugin = async (
     load: plugin.load.bind(ctx),
     __getDebugVirtualModules: plugin.__getDebugVirtualModules.bind(ctx),
     generateBundle: plugin.generateBundle?.bind(ctx),
+    getTransitiveImporters: plugin.getTransitiveImporters?.bind(plugin),
+    getFileExports: plugin.getFileExports?.bind(plugin),
+    clearFileImports: plugin.clearFileImports?.bind(plugin),
+    clearValueCache: plugin.clearValueCache?.bind(plugin),
+    invalidateModule: plugin.invalidateModule?.bind(plugin),
   };
 };

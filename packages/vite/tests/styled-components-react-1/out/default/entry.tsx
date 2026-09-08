@@ -3,7 +3,7 @@ import { styled } from "@style-this/react";
 import { css } from "@style-this/core";
 import "virtual:style-this:/entry.tsx.css";
 export const FancyButton = (() => {
-	let FancyButton = "FancyButton-b05mnk";
+	let FancyButton = "FancyButton-t6j09m";
 	let comp = (props) => {
 		const { styleProps: _styleProps, style: _style,...rest } = props;
 		return <button {...rest} className={rest.className ? FancyButton + (" " + rest.className) : FancyButton} style={{
@@ -17,4 +17,4 @@ export const FancyButton = (() => {
 	comp.toString = () => FancyButton;
 	return comp;
 })();
-const unrelated = "unrelated-hqnklm";
+const unrelated = "unrelated-2rc96v";

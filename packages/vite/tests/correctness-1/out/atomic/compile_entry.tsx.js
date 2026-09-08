@@ -15,12 +15,12 @@ class __global__export__ {
 	}
 }
 
-global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
 // /packages/vite/tests/correctness-1/entry.tsx: {"__styleThis_11", "__styleThis_3", "__styleThis_6", "_styleThisClasses", "a", "a1", "b", "color", "comp", "css", "mib", "mutate", "s2", "st", "style", "unrelated"}
 "use strict";
-const a = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"];
-const mib = __styleThis_vars_aabbbccc["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
+const a = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"];
+const mib = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
 let { css } = require("/packages/core/dist/index.mjs");
 let mutate = (v) => v;
 let __styleThis_11 = new String("");

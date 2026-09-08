@@ -1,24 +1,24 @@
 // /packages/vite/tests/multi-2/b.tsx (/packages/vite/tests/multi-2/entry.tsx): {"color", "css", "exported", "originalColor"}
 "use strict";
-const originalColor = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"]["color"];
+const originalColor = __styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "hot" + originalColor;
-let exported = new String("exported-ev01qj");
+let exported = new String("exported-45274t");
 exported.css = `background: ${color};`;
 
-global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"] ?? {}), color};
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"] ?? {}), color};
 
 // /packages/vite/tests/multi-2/b.tsx: {"color", "css", "exported", "originalColor"}
 "use strict";
-const originalColor = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"]["color"];
+const originalColor = __styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
-let color = global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"]['color'];
-let exported = new String("exported-ev01qj");
+let color = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"]['color'];
+let exported = new String("exported-45274t");
 exported.css = `background: ${color};`;
 
-global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"] ?? {}), color};const cssSourcemapData = [{className:'exported-ev01qj',start:149,end:179}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-2/b.tsx.css').resolve([
-`.exported-ev01qj {
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"] ?? {}), color};const cssSourcemapData = [{className:'exported-45274t',start:149,end:179}];
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-2/b.tsx.css').resolve([
+`.exported-45274t {
 ${exported.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-2/b.tsx.css');
@@ -28,21 +28,21 @@ ${exported.css}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "pink";
-let exported = new String("exported-4lyf89");
+let exported = new String("exported-iv0de3");
 exported.css = `background: ${color};`;
 
-global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"] ?? {}), color};
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"] ?? {}), color};
 
 // /packages/vite/tests/multi-2/c.tsx: {"color", "css", "exported"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let color = global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"]['color'];
-let exported = new String("exported-4lyf89");
+let color = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"]['color'];
+let exported = new String("exported-iv0de3");
 exported.css = `background: ${color};`;
 
-global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"] = {...(global.__styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/c.tsx"] ?? {}), color};const cssSourcemapData = [{className:'exported-4lyf89',start:88,end:118}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-2/c.tsx.css').resolve([
-`.exported-4lyf89 {
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"] ?? {}), color};const cssSourcemapData = [{className:'exported-iv0de3',start:88,end:118}];
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-2/c.tsx.css').resolve([
+`.exported-iv0de3 {
 ${exported.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-2/c.tsx.css');
@@ -50,13 +50,13 @@ ${exported.css}
 
 // /packages/vite/tests/multi-2/entry.tsx: {"a", "color", "css"}
 "use strict";
-const color = __styleThis_vars_aabbbccc["/packages/vite/tests/multi-2/b.tsx"]["color"];
+const color = __styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"]["color"];
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("a-k1mv0l");
+let a = new String("a-c1evwh");
 a.css = `background: ${color};`;
-const cssSourcemapData = [{className:'a-k1mv0l',start:80,end:110}];
-global.__styleThis_css_aabbbccc.get('/packages/vite/tests/multi-2/entry.tsx.css').resolve([
-`.a-k1mv0l {
+const cssSourcemapData = [{className:'a-c1evwh',start:80,end:110}];
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-2/entry.tsx.css').resolve([
+`.a-c1evwh {
 ${a.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-2/entry.tsx.css');
