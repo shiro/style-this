@@ -3,6 +3,7 @@ mod cache_registry;
 mod compiler;
 mod css_parser;
 mod css_sourcemap;
+mod dependency_tracker;
 mod error;
 mod evaluator;
 mod transformer;

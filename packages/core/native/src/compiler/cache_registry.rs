@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
+use super::dependency_tracker::DependencyTracker;
 
 /// Registry for all caches used during CSS transformation.
 /// Holds Rust-side VALUE_CACHE, ATOMIC_CSS_CACHE, and owns JS-side caches.
@@ -16,10 +17,12 @@ pub struct CacheRegistry {
     /// Reference to JS value cache
     value_cache_ref: String,
     /// Rust-side value cache - stores evaluated identifiers per file
-    value_cache: Rc<RefCell<HashMap<String, Rc<FutureMutex<HashSet<String>>>>>>,
+    pub(crate) value_cache: Rc<RefCell<HashMap<String, Rc<FutureMutex<HashSet<String>>>>>>,
     /// Rust-side atomic CSS class cache - Maps CSS declaration to atomic class name
     /// e.g., "margin-top:10px" -> "a1b2c"
     atomic_css_cache: Rc<RefCell<HashMap<String, String>>>,
+    /// Dependency tracker for variable imports
+    dependency_tracker: Rc<RefCell<DependencyTracker>>,
 }
 
 #[wasm_bindgen]
@@ -41,6 +44,7 @@ impl CacheRegistry {
             value_cache_ref,
             value_cache: Rc::new(RefCell::new(HashMap::new())),
             atomic_css_cache: Rc::new(RefCell::new(HashMap::new())),
+            dependency_tracker: Rc::new(RefCell::new(DependencyTracker::new())),
         }
     }
 
@@ -63,6 +67,7 @@ impl CacheRegistry {
             value_cache_ref,
             value_cache: Rc::new(RefCell::new(HashMap::new())),
             atomic_css_cache: Rc::new(RefCell::new(HashMap::new())),
+            dependency_tracker: Rc::new(RefCell::new(DependencyTracker::new())),
         }
     }
 
@@ -291,5 +296,10 @@ impl CacheRegistry {
     /// Clear value cache for a specific file
     pub fn clear_file(&self, filepath: &str) {
         self.value_cache.borrow_mut().remove(filepath);
+    }
+    
+    /// Get reference to dependency tracker
+    pub fn dependency_tracker(&self) -> Rc<RefCell<DependencyTracker>> {
+        self.dependency_tracker.clone()
     }
 }

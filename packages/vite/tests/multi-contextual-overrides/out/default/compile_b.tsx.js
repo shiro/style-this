@@ -2,7 +2,7 @@
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "blue";
-let inner = new String("inner-v4l63w");
+let inner = new String("inner-wxav4x");
 inner.css = `background: ${color};`;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] ?? {}), color,inner};
@@ -14,9 +14,9 @@ let color = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-
 let inner = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"]['inner'];
 inner.css = `background: ${color};`;
 
-global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] ?? {}), color};const cssSourcemapData = [{className:'inner-v4l63w',start:92,end:122}];
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] ?? {}), color};const cssSourcemapData = [{className:'inner-wxav4x',start:92,end:122}];
 global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-contextual-overrides/b.tsx.css').resolve([
-`.inner-v4l63w {
+`.inner-wxav4x {
 ${inner.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-contextual-overrides/b.tsx.css');
@@ -26,13 +26,13 @@ ${inner.css}
 "use strict";
 const inner = __styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"]["inner"];
 let { css } = require("/packages/core/dist/index.mjs");
-let outer = new String("outer-yvgxuz");
+let outer = new String("outer-folqvg");
 outer.css = `.${inner} {
     background: "red";
   }`;
-const cssSourcemapData = [{className:'outer-yvgxuz',start:84,end:131}];
+const cssSourcemapData = [{className:'outer-folqvg',start:84,end:131}];
 global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-contextual-overrides/entry.tsx.css').resolve([
-`.outer-yvgxuz {
+`.outer-folqvg {
 ${outer.css}
 }`
 ].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-contextual-overrides/entry.tsx.css');

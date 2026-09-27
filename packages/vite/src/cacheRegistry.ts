@@ -134,7 +134,15 @@ export class CacheRegistry {
   invalidateModule(filepath: string): void {
     const cssKey = `${filepath}.css`;
     const atomicKey = `${filepath}.style-this.js`;
+    
+    console.log('[cacheRegistry] Invalidating:', filepath);
+    console.log('[cacheRegistry] CSS key:', cssKey, '- exists:', this.cssCache.has(cssKey));
+    console.log('[cacheRegistry] Atomic key:', atomicKey, '- exists:', this.atomicCache.has(atomicKey));
+    
+    // Delete both CSS and atomic cache entries so they will be regenerated
     this.cssCache.delete(cssKey);
     this.atomicCache.delete(atomicKey);
+    
+    console.log('[cacheRegistry] After delete - CSS exists:', this.cssCache.has(cssKey), 'Atomic exists:', this.atomicCache.has(atomicKey));
   }
 }

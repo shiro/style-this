@@ -19,6 +19,16 @@ impl Transformer {
         filepath: String,
         skip_css_eval: bool,
     ) -> Result<Option<JsValue>, TransformError> {
+        // Clear old import registrations before re-transforming
+        // BUT only if we're going to re-evaluate (skip_css_eval = false)
+        // If we skip evaluation, we won't re-register imports, so we must keep the old ones
+        if !skip_css_eval {
+            self.cache_registry
+                .dependency_tracker()
+                .borrow()
+                .clear_file_imports(&filepath);
+        }
+        
         let _self = self.clone();
         let (tx, rx) = futures::channel::oneshot::channel();
 

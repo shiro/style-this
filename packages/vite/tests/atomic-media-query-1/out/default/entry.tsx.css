@@ -1,14 +1,14 @@
-.innerStyle-2zo1az {
+.innerStyle-oty7sd {
 background: red;
   padding: 10px;
 }
-.outerStyle-z41ifw {
+.outerStyle-mvwhqz {
 width: 100%;
-  .innerStyle-2zo1az {
+  .innerStyle-oty7sd {
     background: coral;
   }
   @media (max-width: 500px) {
-    .innerStyle-2zo1az {
+    .innerStyle-oty7sd {
       background: blue;
     }
   }

@@ -1,2 +1,2 @@
-export const mainStyle = "mainStyle-wheb81 gKimM tQ4Gf";
+export const mainStyle = "mainStyle-74hqzc gKimM tQ4Gf";
 export const _GlobalMain = "_GlobalMain"

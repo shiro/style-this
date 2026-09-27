@@ -402,6 +402,23 @@ fn evaluate_dependencies<'alloc>(
                         .borrow_mut()
                         .body
                         .insert(0, variable_declaration);
+                    
+                    // Track this import dependency
+                    let var_name_for_tracking = if let Some(ref remote_name) = remote_name {
+                        remote_name.as_str()
+                    } else {
+                        "__star__" // Namespace import
+                    };
+                    
+                    transformer.cache_registry
+                        .dependency_tracker()
+                        .borrow()
+                        .register_import(
+                            &remote_filepath,
+                            var_name_for_tracking,
+                            &program_filepath,
+                        );
+                    
                     if let Some(remote_name) = remote_name {
                         remote_referenced_idents.insert(remote_name);
                     }
@@ -529,12 +546,10 @@ pub async fn evaluate_program<'alloc>(
 
     referenced_idents.retain(|ident| !value_cache.contains(ident));
 
-    if !entrypoint && referenced_idents.is_empty() {
-        if let Some(tx) = tx {
-            let _ = tx.send(Ok(None));
-        }
-        return;
-    }
+    // We used to return early here if !entrypoint && referenced_idents.is_empty(),
+    // but we need to continue to extract exports for dependency tracking
+    // The CSS transformer visit is fast (just an AST walk), so we'll do it even if
+    // the file doesn't use CSS
 
     let cache_ref = &transformer.value_cache_ref;
     let store = format!("global.{cache_ref}[\"{program_filepath}\"]");
@@ -605,13 +620,9 @@ pub async fn evaluate_program<'alloc>(
         }
     }
 
-    if return_early {
-        // return Ok(EvaluateProgramReturnStatus::NotTransformed);
-        if let Some(tx) = tx {
-            let _ = tx.send(Ok(None));
-        }
-        return;
-    }
+    // Early return check happens here, but we need to handle it differently for dependency tracking
+    // We'll check return_early after running the CSS transformer to extract exports
+    let should_return_early = return_early;
 
     if solid_prepass {
         solid_js_prepass(ast_builder, program_filepath.clone(), program, false);
@@ -621,7 +632,8 @@ pub async fn evaluate_program<'alloc>(
         react_prepass(ast_builder, program_filepath.clone(), program, false);
     }
 
-    // transform all css`...` expresisons into classname strings
+    // Always run CSS transformer to extract exports, even if we'll return early
+    // This is necessary for dependency tracking to know what a file exports
     let mut css_transformer = VisitorTransformer::new(
         ast_builder,
         allocator,
@@ -651,6 +663,20 @@ pub async fn evaluate_program<'alloc>(
         exported_idents,
         tmp_program,
     ) = css_transformer.finish();
+
+    // Now check if we should return early (no CSS functions imported)
+    // But we've already extracted exports, so dependency tracking will work
+    if should_return_early {
+        // Populate value cache with exports before returning
+        if !exported_idents.is_empty() {
+            value_cache.extend(exported_idents.iter().cloned());
+        }
+        
+        if let Some(tx) = tx {
+            let _ = tx.send(Ok(None));
+        }
+        return;
+    }
 
     // Transform @style-this/core/atomic imports into virtual module imports
     transform_atomic_entrypoint(program, ast_builder, transformer, &program_filepath);
@@ -693,11 +719,9 @@ pub async fn evaluate_program<'alloc>(
         }
     }
 
-    if skip_css_eval {
-        return;
-    }
-
     // first evaluate dependencies (imports) and transform imports into varible assignments
+    // NOTE: We MUST do this even when skip_css_eval is true, because import registration
+    // happens inside evaluate_dependencies. If we skip it, dependency tracking won't work.
     let eval_program = Rc::new(RefCell::new(tmp_program));
 
     let css_file_store_ref = &transformer.css_file_store_ref;
@@ -726,6 +750,17 @@ pub async fn evaluate_program<'alloc>(
             "
         ))
         .unwrap();
+        return;
+    }
+
+    // Always populate value cache with exported idents, even when skipping CSS eval
+    // This is needed for dependency tracking to know what exports a file has
+    if !exported_idents.is_empty() {
+        value_cache.extend(exported_idents.iter().cloned());
+    }
+
+    // After registering imports and exports, if we're skipping CSS evaluation, return early
+    if skip_css_eval {
         return;
     }
 
@@ -1008,6 +1043,12 @@ pub async fn evaluate_program<'alloc>(
             .replace('\\', "\\\\")
             .replace('\'', "\\'")
             .replace('\n', "\\n");
+        
+        // Escape atomic_module for use in template literal
+        let atomic_module = atomic_module
+            .replace('\\', "\\\\")
+            .replace('`', "\\`")
+            .replace("${", "\\${");
 
         // Stage 2: Resolve .style-this.js with atomic exports and .css with non-atomizable CSS
         js_sys::eval(&format!(
