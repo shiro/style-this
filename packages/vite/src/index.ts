@@ -93,18 +93,22 @@ const vitePlugin = (options: Options = {}) => {
   let atomicCssInvalidationTimer: NodeJS.Timeout | undefined;
   const ATOMIC_CSS_INVALIDATION_DEBOUNCE_MS = 500;
 
+  const invalidateAtomicEntrypoint = () => {
+    if (!server || !atomic) return;
+    const atomicCssModuleId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
+    const atomicModule = server.moduleGraph.getModuleById(atomicCssModuleId);
+    if (atomicModule) {
+      server.moduleGraph.invalidateModule(atomicModule);
+      server.reloadModule(atomicModule);
+    }
+  };
+
   const scheduleAtomicCssInvalidation = () => {
     if (atomicCssInvalidationTimer) {
       clearTimeout(atomicCssInvalidationTimer);
     }
     atomicCssInvalidationTimer = setTimeout(() => {
-      if (server) {
-        const atomicCssModuleId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
-        const atomicModule = server.moduleGraph.getModuleById(atomicCssModuleId);
-        if (atomicModule) {
-          server.reloadModule(atomicModule);
-        }
-      }
+      invalidateAtomicEntrypoint();
       atomicCssInvalidationTimer = undefined;
     }, ATOMIC_CSS_INVALIDATION_DEBOUNCE_MS);
   };
@@ -252,7 +256,7 @@ const vitePlugin = (options: Options = {}) => {
       }
 
       if (id.startsWith(virtualModulePrefix)) {
-        console.log('[style-this] resolveId:', id);
+        // console.log('[style-this] resolveId:', id);
 
         if (!importer)
           throw new Error(`Virtual module '${id}' must be imported from another module, not loaded directly`);
@@ -516,18 +520,9 @@ const vitePlugin = (options: Options = {}) => {
         cacheRegistry.invalidateModule(filepath);
         console.log('[style-this] Invalidated CSS/atomic cache for:', filepath);
 
-        // For atomic mode: Immediately create new pending promises so the atomic entrypoint
-        // can await them. These will be resolved when the transform completes.
-        if (atomic) {
-          const atomicKey = `${filepath}.style-this.js`;
-          // Only create if transform hasn't already created one
-          if (!cacheRegistry.hasAtomicModule(atomicKey)) {
-            // We don't have the original source code here, so pass empty string
-            // The transform function will replace this promise if needed
-            cacheRegistry.setAtomicModule(atomicKey, createCachePromise(''));
-            console.log('[style-this] Created pending atomic promise for:', filepath);
-          }
-        }
+        // Note: We do NOT create new pending promises here.
+        // The transform() function will create them when it runs.
+        // Creating them prematurely causes skipCssEval to be true, preventing evaluation.
 
         // Find source module
         let sourceModule = ctx.server.moduleGraph.getModuleById(filepath);
@@ -568,18 +563,10 @@ const vitePlugin = (options: Options = {}) => {
         }
       }
 
-      // STEP 5: Schedule atomic CSS regeneration if needed
-      if (atomic) {
-        // Invalidate the global atomic CSS module so new classes get included
-        const atomicCssModuleId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
-        console.log('[style-this] Looking for atomic entrypoint with ID:', atomicCssModuleId);
-        const atomicCssEntrypointModule = ctx.server.moduleGraph.getModuleById(atomicCssModuleId);
-        console.log('[style-this] Atomic entrypoint module:', atomicCssEntrypointModule ? 'found' : 'NOT FOUND');
-        if (atomicCssEntrypointModule) {
-          ctx.server.moduleGraph.invalidateModule(atomicCssEntrypointModule);
-          modulesToReload.push(atomicCssEntrypointModule);
-          console.log('[style-this] Added atomic entrypoint to modulesToReload');
-        }
+      // STEP 5: Schedule atomic entrypoint invalidation after transforms complete
+      // Use debouncing to ensure it only runs once after all transforms finish
+      if (atomic && filesToInvalidate.size > 0) {
+        scheduleAtomicCssInvalidation();
       }
 
       // STEP 6: Return modules to reload - this tells Vite what needs to be updated

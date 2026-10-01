@@ -129,20 +129,26 @@ export class CacheRegistry {
   }
 
   /**
-   * Invalidate a module by removing it from both CSS and atomic caches
+   * Invalidate a module by resolving and removing it from both CSS and atomic caches
    */
   invalidateModule(filepath: string): void {
     const cssKey = `${filepath}.css`;
     const atomicKey = `${filepath}.style-this.js`;
     
-    console.log('[cacheRegistry] Invalidating:', filepath);
-    console.log('[cacheRegistry] CSS key:', cssKey, '- exists:', this.cssCache.has(cssKey));
-    console.log('[cacheRegistry] Atomic key:', atomicKey, '- exists:', this.atomicCache.has(atomicKey));
+    // Resolve stale promises before deleting to prevent deadlocks
+    // If the atomic entrypoint is already awaiting these promises, they need to resolve
+    const cssEntry = this.cssCache.get(cssKey);
+    if (cssEntry && cssEntry.resolve) {
+      cssEntry.resolve('/* invalidated */');
+    }
+    
+    const atomicEntry = this.atomicCache.get(atomicKey);
+    if (atomicEntry && atomicEntry.resolve) {
+      atomicEntry.resolve('/* invalidated */');
+    }
     
     // Delete both CSS and atomic cache entries so they will be regenerated
     this.cssCache.delete(cssKey);
     this.atomicCache.delete(atomicKey);
-    
-    console.log('[cacheRegistry] After delete - CSS exists:', this.cssCache.has(cssKey), 'Atomic exists:', this.atomicCache.has(atomicKey));
   }
 }
