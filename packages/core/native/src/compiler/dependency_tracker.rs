@@ -118,53 +118,37 @@ impl DependencyTracker {
         result
     }
     
-    /// Get all files that transitively depend on changed exports from `source_file`
+    /// Get all files that transitively depend on changed exports from `source_file`.
     ///
-    /// Performs a BFS to find the full transitive closure:
-    /// - Start with direct importers of changed exports
-    /// - For each affected file, check what it exports and what changed
-    /// - Continue until no more files are affected
-    ///
-    /// The `get_file_exports` callback should return the current exports for a file
-    pub fn get_transitive_importers<F>(
+    /// Empty `changed_exports` means any export might have changed. Since we don't track which
+    /// imports affect which exports, every importer is assumed to have all of its exports changed.
+    pub fn get_transitive_importers(
         &self,
         source_file: &str,
         changed_exports: &HashSet<String>,
-        get_file_exports: F,
-    ) -> HashSet<String>
-    where
-        F: Fn(&str) -> Option<HashSet<String>>,
-    {
+    ) -> HashSet<String> {
         let mut result = HashSet::new();
-        let mut to_visit: Vec<(String, HashSet<String>)> = vec![
-            (source_file.to_string(), changed_exports.clone())
-        ];
         let mut visited = HashSet::new();
-        
-        while let Some((file, changed)) = to_visit.pop() {
+
+        let mut to_visit = if changed_exports.is_empty() {
+            vec![source_file.to_string()]
+        } else {
+            visited.insert(source_file.to_string());
+            self.get_importers_of_changed_exports(source_file, changed_exports)
+                .into_iter()
+                .collect()
+        };
+
+        while let Some(file) = to_visit.pop() {
+            if file != source_file {
+                result.insert(file.clone());
+            }
             if !visited.insert(file.clone()) {
-                continue; // Already processed this file
+                continue;
             }
-            
-            // Get direct importers of changed exports
-            let direct_importers = self.get_importers_of_changed_exports(&file, &changed);
-            
-            for importer in direct_importers {
-                result.insert(importer.clone());
-                
-                // Check if this importer itself exports anything
-                // If it does, those exports might have changed too
-                if let Some(importer_exports) = get_file_exports(&importer) {
-                    // For now, assume all exports from this file might have changed
-                    // since we don't track which imports affect which exports
-                    // This is conservative but safe
-                    if !importer_exports.is_empty() {
-                        to_visit.push((importer, importer_exports));
-                    }
-                }
-            }
+            to_visit.extend(self.get_all_importers(&file));
         }
-        
+
         result
     }
     
@@ -278,6 +262,23 @@ mod tests {
         assert!(importers.contains("d.tsx"));
     }
     
+    #[test]
+    fn test_transitive_importers() {
+        let tracker = DependencyTracker::new();
+
+        tracker.register_import("a.ts", "color", "b.tsx");
+        tracker.register_import("a.ts", "size", "e.tsx");
+        tracker.register_import("b.tsx", "derived", "c.tsx");
+        tracker.register_import("c.tsx", "__default__", "d.tsx");
+
+        let all = tracker.get_transitive_importers("a.ts", &HashSet::new());
+        assert_eq!(all, ["b.tsx", "c.tsx", "d.tsx", "e.tsx"].map(String::from).into());
+
+        let changed = HashSet::from(["color".to_string()]);
+        let selective = tracker.get_transitive_importers("a.ts", &changed);
+        assert_eq!(selective, ["b.tsx", "c.tsx", "d.tsx"].map(String::from).into());
+    }
+
     #[test]
     fn test_clear_file_imports() {
         let tracker = DependencyTracker::new();

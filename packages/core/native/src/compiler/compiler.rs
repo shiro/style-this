@@ -13,23 +13,22 @@ use wasm_bindgen_futures::spawn_local;
 
 #[wasm_bindgen]
 impl Transformer {
+    /// * `load_file` - Overrides the transformer's `loadFile` for this transform and all of its
+    /// dependency evaluations, e.g. to resolve within the calling plugin context.
     pub async fn transform(
         &self,
         code: String,
         filepath: String,
         skip_css_eval: bool,
+        load_file: Option<js_sys::Function>,
     ) -> Result<Option<JsValue>, TransformError> {
-        // Clear old import registrations before re-transforming
-        // BUT only if we're going to re-evaluate (skip_css_eval = false)
-        // If we skip evaluation, we won't re-register imports, so we must keep the old ones
-        if !skip_css_eval {
-            self.cache_registry
-                .dependency_tracker()
-                .borrow()
-                .clear_file_imports(&filepath);
+        // NOTE: import registrations are not cleared here, other files' evaluations register
+        // imports for this file too and wouldn't re-register them due to the value cache.
+        // They are cleared on HMR when this file's content changes.
+        let mut _self = self.clone();
+        if let Some(load_file) = load_file {
+            _self.load_file = load_file;
         }
-        
-        let _self = self.clone();
         let (tx, rx) = futures::channel::oneshot::channel();
 
         spawn_local(async move {

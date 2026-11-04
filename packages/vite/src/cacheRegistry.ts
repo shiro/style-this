@@ -37,60 +37,26 @@ export class CacheRegistry {
     global[atomicRef] = this.atomicCache;
   }
 
-  /**
-   * Check if CSS module exists in cache
-   */
   hasCssModule(filepath: string): boolean {
-    const entry = this.getCssModule(filepath);
-    return !!entry;
+    return this.cssCache.has(filepath);
   }
 
-  /**
-   * Check if atomic module exists in cache
-   */
   hasAtomicModule(filepath: string): boolean {
-    const entry = this.getAtomicModule(filepath);
-    return !!entry;
+    return this.atomicCache.has(filepath);
   }
 
   /**
    * Get CSS module from cache by filepath (including .css extension)
    */
   getCssModule(filepath: string): CssCachEntry | undefined {
-    let result = this.cssCache.get(filepath);
-    
-    // If not found, try basename matching for relative paths
-    if (!result) {
-      const basename = filepath.split('/').pop() || filepath;
-      
-      for (const [key, value] of this.cssCache) {
-        if (key.endsWith(`/${basename}`) || key === basename) {
-          return value;
-        }
-      }
-    }
-    
-    return result;
+    return this.cssCache.get(filepath);
   }
 
   /**
    * Get atomic module from cache by filepath (including .style-this.js extension)
    */
   getAtomicModule(filepath: string): CssCachEntry | undefined {
-    let result = this.atomicCache.get(filepath);
-    
-    // If not found, try basename matching for relative paths
-    if (!result) {
-      const basename = filepath.split('/').pop() || filepath;
-      
-      for (const [key, value] of this.atomicCache) {
-        if (key.endsWith(`/${basename}`) || key === basename) {
-          return value;
-        }
-      }
-    }
-    
-    return result;
+    return this.atomicCache.get(filepath);
   }
 
   /**
@@ -131,8 +97,8 @@ export class CacheRegistry {
   /**
    * Invalidate a module by resolving and removing it from both CSS and atomic caches
    */
-  invalidateModule(filepath: string): void {
-    const cssKey = `${filepath}.css`;
+  invalidateModule(filepath: string, cssExtension = "css"): void {
+    const cssKey = `${filepath}.${cssExtension}`;
     const atomicKey = `${filepath}.style-this.js`;
     
     // Resolve stale promises before deleting to prevent deadlocks

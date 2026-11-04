@@ -1,10 +1,8 @@
 use super::cache_registry::CacheRegistry;
 use super::error::TransformError;
 use crate::PREFIX;
-use futures::lock::Mutex as FutureMutex;
 use js_sys::Array;
 use std::collections::HashMap;
-use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -265,9 +263,8 @@ impl Transformer {
     }
 
     /// Get all files that transitively depend on changed exports from the given file
-    /// This performs a BFS to find the full transitive closure
     ///
-    /// `changed_exports` should be a JS Array of export names that changed
+    /// `changed_exports` should be a JS Array of export names that changed, empty means any
     pub fn get_transitive_importers(&self, filepath: &str, changed_exports: JsValue) -> Array {
         let changed_exports_arr = Array::from(&changed_exports);
         let mut changed_set = std::collections::HashSet::new();
@@ -278,28 +275,11 @@ impl Transformer {
             }
         }
 
-        // Create a closure to get file exports from the value cache
-        let value_cache = self.cache_registry.value_cache.clone();
-        let get_exports = move |file: &str| -> Option<std::collections::HashSet<String>> {
-            let cache = value_cache.borrow();
-            cache.get(file).and_then(
-                |mutex_ref: &Rc<FutureMutex<std::collections::HashSet<String>>>| {
-                    // Try to lock synchronously - if we can't, assume no exports
-                    // This is safe because we're only reading, not modifying
-                    mutex_ref.try_lock().map(
-                        |guard: futures::lock::MutexGuard<std::collections::HashSet<String>>| {
-                            guard.clone()
-                        },
-                    )
-                },
-            )
-        };
-
         let importers = self
             .cache_registry
             .dependency_tracker()
             .borrow()
-            .get_transitive_importers(filepath, &changed_set, get_exports);
+            .get_transitive_importers(filepath, &changed_set);
 
         let arr = Array::new();
         for importer in importers {

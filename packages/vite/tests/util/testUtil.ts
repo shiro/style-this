@@ -373,5 +373,7 @@ export const setupPlugin = async (
     clearFileImports: plugin.clearFileImports?.bind(plugin),
     clearValueCache: plugin.clearValueCache?.bind(plugin),
     invalidateModule: plugin.invalidateModule?.bind(plugin),
+    hotUpdate: plugin.hotUpdate,
+    configureServer: plugin.configureServer,
   };
 };

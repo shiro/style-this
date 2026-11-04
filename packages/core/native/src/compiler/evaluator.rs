@@ -175,8 +175,7 @@ fn evaluate_dependencies<'alloc>(
             Box::pin(async move {
                 let (remote_filepath, code) = transformer
                     .load_file(&remote_module_id, &program_filepath)
-                    .await
-                    .unwrap();
+                    .await?;
 
                 for specifier in specifiers.iter() {
                     // ignore `css` imports from us
@@ -746,7 +745,8 @@ pub async fn evaluate_program<'alloc>(
         let err = ExportedJSValue::new(err.into());
         js_sys::eval(&format!(
             "
-            {css_file_store_ref}.get({css_filepath}).reject({err});
+            {css_file_store_ref}.get({css_filepath})?.resolve({err});
+            {atomic_file_store_ref}.get({atomic_filepath})?.resolve({err});
             "
         ))
         .unwrap();
@@ -925,8 +925,8 @@ pub async fn evaluate_program<'alloc>(
                 Err(err) => {
                     let err_str = ExportedJSValue::new(err.into());
                     js_sys::eval(&format!(
-                        "global.{css_file_store_ref}.get({css_filepath}).reject({err_str});
-                         global.{atomic_file_store_ref}.get({atomic_filepath}).reject({err_str});"
+                        "global.{css_file_store_ref}.get({css_filepath})?.resolve({err_str});
+                         global.{atomic_file_store_ref}.get({atomic_filepath})?.resolve({err_str});"
                     ))
                     .unwrap();
                     return;
@@ -942,8 +942,8 @@ pub async fn evaluate_program<'alloc>(
                 let err_str = ExportedJSValue::new(err.into());
                 js_sys::eval(&format!(
                     "
-                    global.{css_file_store_ref}.get({css_filepath}).reject({err_str}); 
-                    global.{atomic_file_store_ref}.get({atomic_filepath}).reject({err_str});
+                    global.{css_file_store_ref}.get({css_filepath})?.resolve({err_str}); 
+                    global.{atomic_file_store_ref}.get({atomic_filepath})?.resolve({err_str});
                     "
                 ))
                 .unwrap();

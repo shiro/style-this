@@ -15,6 +15,7 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
     code: string,
     filepath: string,
     skipCssEval: boolean,
+    loadFile?: (id: string, importer: string) => Promise<[string, string]>,
   ): Promise<
     | {
       code: string;

@@ -82,7 +82,8 @@ const vitePlugin = (options: Options = {}) => {
 
   /** Files that contain styled templates, changes cause all importers to reload. */
   const watchedFiles = new Set<string>();
-  let resolve: (id: string, importer: string) => Promise<string | undefined>;
+  type Resolve = (id: string, importer: string) => Promise<string | undefined>;
+  let createLoadFile: (resolve: Resolve) => (id: string, importer: string) => Promise<[string, string]>;
   let server: ViteDevServer | undefined;
   let styleThis: Transformer;
   let cwd = process.cwd();
@@ -90,27 +91,43 @@ const vitePlugin = (options: Options = {}) => {
 
   let totalTransformTime = 0;
 
-  let atomicCssInvalidationTimer: NodeJS.Timeout | undefined;
-  const ATOMIC_CSS_INVALIDATION_DEBOUNCE_MS = 500;
+  const atomicEntrypointId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
+  /** Atomic CSS last served by the entrypoint, per environment. */
+  const servedAtomicCss = new Map<string, string>();
+  let atomicCssUpdateTimer: NodeJS.Timeout | undefined;
 
-  const invalidateAtomicEntrypoint = () => {
-    if (!server || !atomic) return;
-    const atomicCssModuleId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
-    const atomicModule = server.moduleGraph.getModuleById(atomicCssModuleId);
-    if (atomicModule) {
-      server.moduleGraph.invalidateModule(atomicModule);
-      server.reloadModule(atomicModule);
-    }
+  /** Reloads the atomic entrypoint in every environment that has served outdated atomic CSS. */
+  const scheduleAtomicCssUpdate = () => {
+    clearTimeout(atomicCssUpdateTimer);
+    atomicCssUpdateTimer = setTimeout(() => {
+      if (!server) return;
+      const atomicCss = styleThis.get_atomic_css();
+      for (const environment of Object.values(server.environments)) {
+        const mod = environment.moduleGraph.getModuleById(atomicEntrypointId);
+        if (!mod || servedAtomicCss.get(environment.name) === atomicCss) continue;
+        environment.moduleGraph.invalidateModule(mod);
+        if (environment.config.consumer === "client") environment.reloadModule(mod);
+      }
+    }, 20);
   };
 
-  const scheduleAtomicCssInvalidation = () => {
-    if (atomicCssInvalidationTimer) {
-      clearTimeout(atomicCssInvalidationTimer);
+  let hmrBatch: { key: string; files?: string[] } | undefined;
+
+  /** Invalidates the changed file and all of its transitive importers, returns them. */
+  const invalidateForHotUpdate = (file: string, type: string) => {
+    const importers = styleThis.get_transitive_importers(file, []) as string[];
+    if (!watchedFiles.has(file) && !importers.length) return;
+
+    if (type === "delete") watchedFiles.delete(file);
+    styleThis.clear_file_imports(file);
+
+    const files = [file, ...importers];
+    for (const filepath of files) {
+      styleThis.clear_value_cache(filepath);
+      cacheRegistry.invalidateModule(filepath, cssExtension);
+      cssSourceMapMetadata.delete(`${filepath}.${cssExtension}`);
     }
-    atomicCssInvalidationTimer = setTimeout(() => {
-      invalidateAtomicEntrypoint();
-      atomicCssInvalidationTimer = undefined;
-    }, ATOMIC_CSS_INVALIDATION_DEBOUNCE_MS);
+    return files;
   };
 
   const createCachePromise = (originalSource: string): CssCachEntry => {
@@ -191,7 +208,7 @@ const vitePlugin = (options: Options = {}) => {
       cwd = process.cwd();
       const require = createRequire(cwd + "/package.json");
 
-      const loadFile = async (
+      createLoadFile = (resolve: Resolve) => async (
         id: string,
         importer: string,
       ): Promise<[string, string]> => {
@@ -235,7 +252,9 @@ const vitePlugin = (options: Options = {}) => {
       styleThis = new Transformer({
         cwd,
         ignoredImports: options.ignoredImports as Record<string, string[]>,
-        loadFile,
+        loadFile: createLoadFile(async () => {
+          throw new Error("transform must be called with a plugin context loadFile");
+        }),
         cacheRegistry,
         cssExtension,
         useRequire,
@@ -294,27 +313,19 @@ const vitePlugin = (options: Options = {}) => {
             return { code: '' };
           }
 
-          for (const sourceFile of watchedFiles) {
-            this.addWatchFile(sourceFile);
-          }
-
-          // wait for all pending atomic module transformations to complete
-          const atomicModules = Array.from(watchedFiles)
-            .map(file => ({ file, entry: cacheRegistry.getAtomicModule(`${file}.style-this.js`) }))
-            .filter(({ entry }) => entry);
-
-          if (atomicModules.length) {
-            console.log(`[atomic-entrypoint] Waiting for ${atomicModules.length} atomic modules:\n${atomicModules.map(({ file }) => `  - ${file}`).join('\n')}`);
-            await Promise.all(atomicModules.map(({ entry }) => entry));
-          } else {
-            console.log('[atomic-entrypoint] No atomic modules to wait for - this might be a problem during HMR!');
-          }
+          // wait for pending atomic modules, ones that aren't transformed yet trigger a reload once
+          // they resolve (see `scheduleAtomicCssUpdate`)
+          await Promise.all(
+            Array.from(watchedFiles, (file) => cacheRegistry.getAtomicModule(`${file}.style-this.js`)),
+          );
 
           const atomicCss = styleThis.get_atomic_css();
 
           if (typeof atomicCss !== "string") {
             throw new Error(`Unexpected atomic CSS type: ${typeof atomicCss}`);
           }
+
+          servedAtomicCss.set(this.environment?.name ?? "client", atomicCss);
 
           return {
             code: atomicCss,
@@ -368,7 +379,9 @@ const vitePlugin = (options: Options = {}) => {
       } else {
         sourceFilepath = filepath;
       }
-      this.addWatchFile(sourceFilepath);
+      // in dev, HMR is handled by `hotUpdate`, watching here would reload the virtual module
+      // before its source file is re-transformed
+      if (!server) this.addWatchFile(sourceFilepath);
 
       let time = 0;
 
@@ -449,139 +462,30 @@ const vitePlugin = (options: Options = {}) => {
       }
     },
 
-    async handleHotUpdate(ctx) {
-      // If file has .tsx/.jsx/.ts/.js extension, add it to watchedFiles
-      const isSourceFile = /\.(tsx?|jsx?)$/.test(ctx.file);
-      if (isSourceFile && !watchedFiles.has(ctx.file)) {
-        watchedFiles.add(ctx.file);
+    hotUpdate({ file, type, timestamp, modules }) {
+      const key = `${type}:${file}:${timestamp}`;
+      if (hmrBatch?.key !== key) hmrBatch = { key, files: invalidateForHotUpdate(file, type) };
+      if (!hmrBatch.files) return;
+
+      const { moduleGraph } = this.environment;
+      const result = new Set(modules);
+
+      for (const filepath of hmrBatch.files) {
+        for (const mod of moduleGraph.getModulesByFile(filepath) ?? []) result.add(mod);
+
+        // CSS modules are self-accepting and would be requested before the re-transform, they
+        // get reloaded from `transform` once ready instead
+        const cssModule = moduleGraph.getModuleById(`${resolvedVirtualModulePrefix}${filepath}.${cssExtension}`);
+        if (cssModule) moduleGraph.invalidateModule(cssModule);
+
+        const atomicModule = moduleGraph.getModuleById(`${resolvedVirtualModulePrefix}${filepath}.style-this.js`);
+        if (atomicModule) result.add(atomicModule);
       }
 
-      if (!watchedFiles.has(ctx.file)) return;
-
-      // STEP 1: Get old exports before invalidating
-      const oldExports = styleThis.get_file_exports?.(ctx.file) || [];
-
-      // STEP 2: Clear caches for this file
-      const cssFilepath = `${ctx.file}.${cssExtension}`;
-      const styleThisFilepath = `${ctx.file}.style-this.js`;
-
-      cacheRegistry.deleteValueCacheEntry(ctx.file);
-      cacheRegistry.deleteAtomicModule(styleThisFilepath);
-      cacheRegistry.deleteCssModule(cssFilepath);
-      cssSourceMapMetadata.delete(cssFilepath);
-
-      // STEP 3: Get transitive importers based on old exports
-      // (We use old exports because we don't know what changed yet - Vite will re-transform)
-      const exportsToCheck = oldExports.length > 0 ? oldExports : [];
-
-      console.log('[style-this] HMR for:', ctx.file);
-      console.log('[style-this] Old exports:', oldExports);
-      console.log('[style-this] Checking for importers of these exports...');
-
-      const affectedFiles = styleThis.get_transitive_importers?.(
-        ctx.file,
-        exportsToCheck
-      ) || [];
-
-      console.log('[style-this] Affected files:', affectedFiles);
-
-      // Debug: Check what Main.tsx imports
-      if (affectedFiles.length === 0 && oldExports.length > 0) {
-        console.log('[style-this] WARNING: No affected files found despite having exports!');
-        console.log('[style-this] This might indicate dependency tracking is not working.');
-
-        // Try to manually check if Main.tsx has imports registered
-        const mainPath = ctx.file.replace('Counter.tsx', 'Main.tsx');
-        console.log('[style-this] Manually checking exports for Main.tsx:', mainPath);
-        const mainExports = styleThis.get_file_exports?.(mainPath) || [];
-        console.log('[style-this] Main.tsx exports:', mainExports);
-      }
-
-      // STEP 4: Invalidate all affected files and collect modules to reload
-      const filesToInvalidate = new Set([ctx.file, ...affectedFiles]);
-      const modulesToReload = [];
-
-      console.log('[style-this] Files to invalidate:', Array.from(filesToInvalidate));
-
-      for (const filepath of filesToInvalidate) {
-        console.log('[style-this] Invalidating:', filepath);
-
-        // Clear value cache (Rust-side) - this is critical for CSS variable imports
-        // This ensures that when modules are re-evaluated, they'll fetch fresh values
-        styleThis.clear_value_cache?.(filepath);
-        console.log('[style-this] Cleared value cache for:', filepath);
-
-        // NOTE: We do NOT clear file imports here during HMR!
-        // Import dependencies should stay registered unless the file is actually re-transformed
-        // by Vite (which happens when file content changes, not just on HMR invalidation)
-        // The transform() function will call clear_file_imports() before re-registering.
-
-        // Invalidate CSS/atomic caches
-        cacheRegistry.invalidateModule(filepath);
-        console.log('[style-this] Invalidated CSS/atomic cache for:', filepath);
-
-        // Note: We do NOT create new pending promises here.
-        // The transform() function will create them when it runs.
-        // Creating them prematurely causes skipCssEval to be true, preventing evaluation.
-
-        // Find source module
-        let sourceModule = ctx.server.moduleGraph.getModuleById(filepath);
-
-        if (!sourceModule && typeof ctx.server.moduleGraph.getModuleByFile === 'function') {
-          sourceModule = ctx.server.moduleGraph.getModuleByFile(filepath);
-        }
-
-        if (!sourceModule) {
-          for (const [_id, mod] of ctx.server.moduleGraph.idToModuleMap) {
-            if (mod.file === filepath) {
-              sourceModule = mod;
-              break;
-            }
-          }
-        }
-
-        if (sourceModule) {
-          // Invalidate the module in Vite's module graph so it reloads the file content
-          ctx.server.moduleGraph.invalidateModule(sourceModule);
-          modulesToReload.push(sourceModule);
-        }
-
-        // Also invalidate virtual CSS module
-        const virtualCss = `${resolvedVirtualModulePrefix}${filepath}.${cssExtension}`;
-        const cssModule = ctx.server.moduleGraph.getModuleById(virtualCss);
-        if (cssModule) {
-          modulesToReload.push(cssModule);
-        }
-
-        // Also invalidate virtual atomic module
-        if (atomic) {
-          const virtualAtomic = `${resolvedVirtualModulePrefix}${filepath}.style-this.js`;
-          const atomicModule = ctx.server.moduleGraph.getModuleById(virtualAtomic);
-          if (atomicModule) {
-            modulesToReload.push(atomicModule);
-          }
-        }
-      }
-
-      // STEP 5: Schedule atomic entrypoint invalidation after transforms complete
-      // Use debouncing to ensure it only runs once after all transforms finish
-      if (atomic && filesToInvalidate.size > 0) {
-        scheduleAtomicCssInvalidation();
-      }
-
-      // STEP 6: Return modules to reload - this tells Vite what needs to be updated
-      console.log('[style-this] Returning', modulesToReload.length, 'modules to reload');
-      return modulesToReload;
+      return [...result];
     },
 
     async transform(code, filepath) {
-      if (!resolve) {
-        resolve = async (id: string, importer: string) => {
-          if (!id) return;
-          return (await this.resolve(id, importer))?.id;
-        };
-      }
-
       if (
         !filepath ||
         filepath.includes("/node_modules/") ||
@@ -615,15 +519,6 @@ const vitePlugin = (options: Options = {}) => {
 
       const skipCssEval = cacheRegistry.hasCssModule(cssFilepath) && (!atomic || cacheRegistry.hasAtomicModule(atomicProgramFilepath));
 
-      if (filepath.includes('Counter.tsx') || filepath.includes('Main.tsx')) {
-        console.log('[style-this] Transform', filepath, '- skipCssEval:', skipCssEval);
-        if (filepath.includes('Counter.tsx')) {
-          // Log the counterColor value in the code
-          const match = code.match(/counterColor\s*=\s*"([^"]+)"/);
-          console.log('[style-this] Counter.tsx counterColor value in code:', match ? match[1] : 'NOT FOUND');
-        }
-      }
-
       try {
         const startTime = performance.now();
 
@@ -639,6 +534,9 @@ const vitePlugin = (options: Options = {}) => {
           codeToTransform,
           pathForImport,
           skipCssEval,
+          // resolve within this transform's own environment/context, other contexts may resolve
+          // differently or be disposed already
+          createLoadFile(async (id, importer) => id ? (await this.resolve(id, importer))?.id : undefined),
         );
         const endTime = performance.now();
         const transformTime = endTime - startTime;
@@ -650,20 +548,14 @@ const vitePlugin = (options: Options = {}) => {
         }
         watchedFiles.add(filepath);
 
-        if (server) {
-          const virtualModuleId = resolvedVirtualModulePrefix + cssFilepath;
-          const module = server.moduleGraph.getModuleById(virtualModuleId);
-          if (module && module.importers && module.importers.size > 0) {
-            server.reloadModule(module);
+        if (server && !skipCssEval) {
+          for (const environment of Object.values(server.environments)) {
+            if (environment.config.consumer !== "client") continue;
+            const cssModule = environment.moduleGraph.getModuleById(resolvedVirtualModulePrefix + cssFilepath);
+            if (cssModule?.importers.size) environment.reloadModule(cssModule);
           }
 
-          if (atomic) {
-            const styleThisModuleId = resolvedVirtualModulePrefix + atomicProgramFilepath;
-            const styleThisModule = server.moduleGraph.getModuleById(styleThisModuleId);
-            if (styleThisModule && styleThisModule.importers && styleThisModule.importers.size > 0) {
-              server.reloadModule(styleThisModule);
-            }
-          }
+          if (atomic) cacheRegistry.getAtomicModule(atomicProgramFilepath)?.then(scheduleAtomicCssUpdate);
         }
 
         let resultCode = transformedResult.code;
