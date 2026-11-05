@@ -276,15 +276,14 @@ impl CacheRegistry {
     /// Get all atomic CSS rules as a string
     pub fn get_all_atomic_css(&self) -> String {
         let cache = self.atomic_css_cache.borrow();
-        let mut rules: Vec<String> = cache
-            .iter()
+        let mut entries: Vec<(&String, &String)> = cache.iter().collect();
+        super::atomic::sort_atomic_rules(&mut entries);
+
+        entries
+            .into_iter()
             .map(|(declaration, class_name)| format!(".{} {{ {} }}", class_name, declaration))
-            .collect();
-
-        // Ensure deterministic output
-        rules.sort();
-
-        rules.join("\n")
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Clear all caches

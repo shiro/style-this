@@ -5,8 +5,8 @@ use std::collections::HashSet;
 /// Result of parsing a CSS block
 #[derive(Debug, Clone)]
 pub struct ParseCssResult {
-    /// Statements that can be atomized (simple top-level declarations)
-    pub atomizable: HashSet<String>,
+    /// Statements that can be atomized (simple top-level declarations), in source order
+    pub atomizable: Vec<String>,
     /// Remaining CSS that cannot be atomized (media queries, nested rules, etc.)
     pub non_atomizable: Option<String>,
 }
@@ -27,15 +27,16 @@ pub fn parse_css(css: &str) -> ParseCssResult {
     //   from original source, but this requires mapping byte offsets carefully.
 
     let segments = split_top_level_segments(css);
-    let mut atomizable = HashSet::new();
+    let mut atomizable: Vec<String> = Vec::new();
     let mut non_atomizable_ranges = Vec::new();
 
     for segment in segments {
         match segment {
             TopLevelSegment::Declaration(decl_text) => {
                 if is_valid_declaration(&decl_text) {
-                    let normalized = decl_text.trim_end_matches(';');
-                    atomizable.insert(normalized.to_string());
+                    let normalized = decl_text.trim_end_matches(';').to_string();
+                    atomizable.retain(|existing| existing != &normalized);
+                    atomizable.push(normalized);
                 } else {
                     non_atomizable_ranges.push(decl_text);
                 }
@@ -50,7 +51,10 @@ pub fn parse_css(css: &str) -> ParseCssResult {
     let non_atomizable = if non_atomizable_ranges.is_empty() {
         None
     } else {
-        Some(reconstruct_non_atomizable(css, &atomizable))
+        Some(reconstruct_non_atomizable(
+            css,
+            &atomizable.iter().cloned().collect(),
+        ))
     };
 
     ParseCssResult {
@@ -337,7 +341,7 @@ mod tests {
         let result = parse_css(input);
 
         assert_eq!(result.non_atomizable.as_deref(), expected);
-        assert_eq!(result.atomizable, expected_atomics);
+        assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
     }
 
     #[test]
@@ -352,12 +356,12 @@ mod tests {
                 background: blue;
             }
         "});
-        let expected_atomics = HashSet::from([]);
+        let expected_atomics: HashSet<String> = HashSet::from([]);
 
         let result = parse_css(input);
 
         assert_eq!(result.non_atomizable.as_deref(), expected);
-        assert_eq!(result.atomizable, expected_atomics);
+        assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
     }
 
     #[test]
@@ -408,7 +412,7 @@ mod tests {
 
         let result = parse_css(input);
 
-        assert_eq!(result.atomizable, expected_atomics);
+        assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
         assert_eq!(result.non_atomizable, expected_non_atomizable);
     }
 
@@ -423,7 +427,7 @@ mod tests {
 
         let result = parse_css(input);
 
-        assert_eq!(result.atomizable, expected_atomics);
+        assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
         assert_eq!(result.non_atomizable, expected_non_atomizable);
     }
 
@@ -442,7 +446,7 @@ mod tests {
 
         let result = parse_css(input);
 
-        assert_eq!(result.atomizable, expected_atomics);
+        assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
         assert_eq!(result.non_atomizable, expected_non_atomizable);
     }
 }

@@ -453,12 +453,11 @@ const vitePlugin = (options: Options = {}) => {
         const existingCss = typeof cssAsset.source === 'string' ? cssAsset.source : cssAsset.source.toString();
         cssAsset.source = `${existingCss}\n${finalAtomicCss}`;
       } else {
-        const atomicCssFileName = 'assets/atomic.css';
-        bundle[atomicCssFileName] = {
+        this.emitFile({
           type: 'asset',
-          fileName: atomicCssFileName,
+          fileName: 'assets/atomic.css',
           source: finalAtomicCss,
-        };
+        });
       }
     },
 

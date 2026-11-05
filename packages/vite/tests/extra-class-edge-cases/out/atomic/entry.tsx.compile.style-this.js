@@ -1,9 +1,9 @@
-export const test1 = "test1-6z85mr aJx1V gKimM beginning";
-export const test2 = "test2-rkpq3k YxMsp i1jU1 ending";
+export const test1 = "test1-6z85mr bg-gKimM c-aJx1V beginning";
+export const test2 = "test2-rkpq3k bg-i1jU1 c-YxMsp ending";
 export const test3 = "test3-mvkpe7 only-thing";
-export const test4 = "test4-cxebwl vrRc6 yChpQ yObSb first fourth second third";
-export const __styleThis_var_ParentStyled_4 = "ParentStyled-difgta i73of tQ4Gf parent-class";
-export const __styleThis_var_ChildStyled_2 = "ChildStyled-hyrg5m GdxDt YRmdu child-class";
-export const test5 = "test5-9ibg5y W_LRO bOc9D class1 class2 class3 class4 class5";
-export const test6 = "test6-9e3s16 JAAIK aJx1V";
-export const test7 = "test7-ijc9m3 EcIBn"
+export const test4 = "test4-cxebwl bg-yObSb m-yChpQ p-vrRc6 first fourth second third";
+export const __styleThis_var_ParentStyled_4 = "ParentStyled-difgta bg-i73of p-tQ4Gf parent-class";
+export const __styleThis_var_ChildStyled_2 = "ChildStyled-hyrg5m b-GdxDt c-YRmdu child-class";
+export const test5 = "test5-9ibg5y d-W_LRO p-bOc9D class1 class2 class3 class4 class5";
+export const test6 = "test6-9e3s16 bg-JAAIK c-aJx1V";
+export const test7 = "test7-ijc9m3 bg-EcIBn"

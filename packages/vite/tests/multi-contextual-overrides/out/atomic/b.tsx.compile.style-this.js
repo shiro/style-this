@@ -1,1 +1,1 @@
-export const inner = "inner-wxav4x i1jU1"
+export const inner = "inner-wxav4x bg-i1jU1"

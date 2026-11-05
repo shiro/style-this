@@ -1,0 +1,2 @@
+import{a as e,f as t,i as n,s as r,y as i}from"./web-lT-EAg3V.js";import{n as a}from"./dist-CPkBsN0R.js";var o=t(`<main><!$><!/><h1>About`);function s(){return(()=>{var t=n(o),s=t.firstChild,[c,l]=e(s.nextSibling);return c.nextSibling,r(t,i(a,{children:`About`}),c,l),t})()}export{s as default};
+//# sourceMappingURL=about-DEF-GuGf.js.map

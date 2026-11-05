@@ -1,0 +1,36 @@
+/* @style-this/core/atomic is a no-op in non-atomic mode */.CounterStyle-zodu74 {
+display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  margin: 4px;
+  border: 1px solid blue;
+  border-radius: 8px;
+  background: white;
+  
+}
+.FancyButton-otinw9 {
+background: none;
+  border: 1px solid blue;
+  border-radius: 2px;
+  padding: var(--var1-z45ijk);
+}
+.FancyButton2-wtirkd {
+margin: var(--var1-q7w5yn);
+  min-height: var(--var2-6jgtub);
+  cursor: pointer;
+  background: var(--var3-wt27w9);
+}.ContainerStyle-3wxanc {
+display: flex;
+  flex-direction: column;
+}
+.colorStyle-v856z4 {
+color: coral;
+  background: lightyellow;
+}
+.highlightStyle-s1ybc1 {
+color: crimson;
+}
+.Global__Main {
+    background: lightyellow;
+  }

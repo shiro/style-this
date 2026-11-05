@@ -12,4 +12,3 @@ describe('@style-this/core', () => {
     );
   });
 });
-

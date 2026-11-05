@@ -1,6 +1,8 @@
 import { css, extraClass } from "@style-this/core";
 import { styled } from "@style-this/solid";
 import { createSignal } from "solid-js";
+import { exportedColorA, exportedNumberA } from "~/components/a";
+import { exportedColorB } from "~/components/b";
 
 const spacing = 16;
 
@@ -9,7 +11,7 @@ export const CounterStyle = css`
   align-items: center;
   gap: 8px;
   padding: ${spacing}px;
-  margin: ${spacing}px;
+  margin: ${exportedNumberA}px;
   border: 1px solid blue;
   border-radius: ${spacing / 2}px;
   background: white;
@@ -23,7 +25,7 @@ export const FancyButton = styled.button<{ a: number }>`
   padding: ${({ a }) => `${a}px`};
 `;
 
-export const FancyButton2 = styled(FancyButton)<{ b: number }>`
+export const FancyButton2 = styled(FancyButton) <{ b: number }>`
   margin: ${({ b }) => `${b}px`};
   min-height: ${({ b }) => `${b}px`};
   cursor: pointer;
@@ -45,3 +47,5 @@ export default function Counter() {
     </div>
   );
 }
+
+export const counterColor = exportedColorA;

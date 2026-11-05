@@ -120,7 +120,7 @@ var clientViteManifest = {
 		"name": "web"
 	},
 	"src/entry-client.tsx": {
-		"file": "_build/assets/entry-client-CZaA08xg.js",
+		"file": "_build/assets/entry-client-CJmU377F.js",
 		"name": "entry-client",
 		"src": "src/entry-client.tsx",
 		"isEntry": true,
@@ -155,12 +155,12 @@ var clientViteManifest = {
 		"imports": ["_web-lT-EAg3V.js", "_dist-CPkBsN0R.js"]
 	},
 	"src/routes/index.tsx?pick=default&pick=$css&lang.tsx": {
-		"file": "_build/assets/index-BvXG0Y3m.js",
+		"file": "_build/assets/index-CyCcmmxN.js",
 		"name": "index",
 		"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
 		"isEntry": true,
 		"imports": ["_web-lT-EAg3V.js"],
-		"css": ["_build/assets/index-CZSh5de2.css"]
+		"css": ["_build/assets/index-BIEvVuAN.css"]
 	}
 };
 function getSsrProdManifest() {
@@ -1009,8 +1009,8 @@ var solid_start_routes_default = [
 		"page": true,
 		"$component": {
 			"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
-			"build": () => import("./index-D9fwfCj7.mjs"),
-			"import": () => import("./index-D9fwfCj7.mjs")
+			"build": () => import("./index-BSG_is3Q.mjs"),
+			"import": () => import("./index-BSG_is3Q.mjs")
 		},
 		"path": "/"
 	}
@@ -7212,7 +7212,7 @@ function stripBaseUrl(path) {
 * Checks if user has set a redirect status in the response.
 * If not, falls back to the 302 (temporary redirect)
 */
-var AppWrapper$1 = "AppWrapper-12rw9u F56Lh W_LRO Zlz3L";
+var AppWrapper$1 = "AppWrapper-12rw9u d-W_LRO flex-d-F56Lh min-h-Zlz3L";
 var _tmpl$ = ["<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link rel=\"icon\" href=\"/favicon.ico\">", "</head>"];
 var _tmpl$2 = [
 	"<html",

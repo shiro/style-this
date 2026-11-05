@@ -1,4 +1,4 @@
-import { css } from "@style-this/core";
+import { css, mergeStyles } from "@style-this/core";
 import Counter, { counterColor } from "./Counter";
 
 const ContainerStyle = css`
@@ -11,12 +11,16 @@ const colorStyle = css`
   background: ${counterColor};
 `;
 
+const highlightStyle = css`
+  color: green;
+`;
+
 export default function Main() {
   return (
-    <div class={`${ContainerStyle} global__Main`}>
+    <div class={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
-      <span class={colorStyle}>
+      <span class={mergeStyles(colorStyle, highlightStyle)}>
         world
       </span>
     </div>

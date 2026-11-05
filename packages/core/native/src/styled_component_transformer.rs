@@ -1,6 +1,44 @@
 use crate::{utils::SeededRandom, *};
 use oxc_ast::ast::JSXAttributeItem;
 
+pub const MERGE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeStyles";
+
+/// Inserts `import { mergeStyles as __styleThis__mergeStyles } from "@style-this/core"` after the last import.
+pub fn insert_merge_styles_import<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    program: &mut Program<'alloc>,
+) {
+    use oxc_ast::ast::{ImportDeclarationSpecifier, ImportOrExportKind, ImportSpecifier, ModuleExportName};
+
+    let import_spec = ast_builder.alloc(ImportSpecifier {
+        span: program.span,
+        imported: ModuleExportName::IdentifierName(
+            ast_builder.identifier_name(program.span, ast_builder.atom("mergeStyles")),
+        ),
+        local: ast_builder.binding_identifier(program.span, ast_builder.atom(MERGE_STYLES_LOCAL_NAME)),
+        import_kind: ImportOrExportKind::Value,
+    });
+
+    let import_declaration = ast_builder.alloc_import_declaration(
+        program.span,
+        Some(ast_builder.vec1(ImportDeclarationSpecifier::ImportSpecifier(import_spec))),
+        ast_builder.string_literal(program.span, ast_builder.atom(LIBRARY_CORE_IMPORT_NAME), None),
+        None,
+        None::<oxc_allocator::Box<oxc_ast::ast::WithClause>>,
+        ImportOrExportKind::Value,
+    );
+
+    let insert_pos = program
+        .body
+        .iter()
+        .position(|stmt| !matches!(stmt, Statement::ImportDeclaration(_)))
+        .unwrap_or(0);
+
+    program
+        .body
+        .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
+}
+
 pub struct CapturedExpression<'alloc> {
     pub expression: Expression<'alloc>,
     pub var_name: String,
@@ -259,6 +297,8 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         )
     }
 
+    /// Builds `class={__styleThis__mergeStyles(ClassVar, props.class)}` so classes passed in by the
+    /// parent win over the component's own atomic classes.
     pub fn build_class_attribute(
         &self,
         span: oxc_span::Span,
@@ -273,18 +313,27 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
             ),
             Some(self.ast_builder.jsx_attribute_value_expression_container(
                 span,
-                JSXExpression::ConditionalExpression(
-                    self.ast_builder.alloc_conditional_expression(
+                JSXExpression::CallExpression(self.ast_builder.alloc_call_expression(
+                    span,
+                    Expression::Identifier(self.ast_builder.alloc_identifier_reference(
                         span,
-                        Expression::StaticMemberExpression(
+                        self.ast_builder.atom(MERGE_STYLES_LOCAL_NAME),
+                    )),
+                    None as Option<oxc_allocator::Box<_>>,
+                    self.ast_builder.vec_from_iter([
+                        oxc_ast::ast::Argument::Identifier(
+                            self.ast_builder.alloc_identifier_reference(
+                                span,
+                                self.ast_builder.atom(class_variable_name),
+                            ),
+                        ),
+                        oxc_ast::ast::Argument::StaticMemberExpression(
                             self.ast_builder.alloc_static_member_expression(
                                 span,
-                                Expression::Identifier(
-                                    self.ast_builder.alloc_identifier_reference(
-                                        span,
-                                        self.ast_builder.atom(props_identifier),
-                                    ),
-                                ),
+                                Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                                    span,
+                                    self.ast_builder.atom(props_identifier),
+                                )),
                                 self.ast_builder.identifier_name(
                                     span,
                                     self.ast_builder.atom(self.class_prop_name),
@@ -292,55 +341,9 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                                 false,
                             ),
                         ),
-                        Expression::BinaryExpression(
-                            self.ast_builder.alloc_binary_expression(
-                                span,
-                                Expression::Identifier(
-                                    self.ast_builder.alloc_identifier_reference(
-                                        span,
-                                        self.ast_builder.atom(class_variable_name),
-                                    ),
-                                ),
-                                oxc_ast::ast::BinaryOperator::Addition,
-                                Expression::BinaryExpression(
-                                    self.ast_builder.alloc_binary_expression(
-                                        span,
-                                        Expression::StringLiteral(
-                                            self.ast_builder.alloc_string_literal(
-                                                span,
-                                                self.ast_builder.atom(" "),
-                                                None,
-                                            ),
-                                        ),
-                                        oxc_ast::ast::BinaryOperator::Addition,
-                                        Expression::StaticMemberExpression(
-                                            self.ast_builder.alloc_static_member_expression(
-                                                span,
-                                                Expression::Identifier(
-                                                    self.ast_builder.alloc_identifier_reference(
-                                                        span,
-                                                        self.ast_builder.atom(props_identifier),
-                                                    ),
-                                                ),
-                                                self.ast_builder.identifier_name(
-                                                    span,
-                                                    self.ast_builder.atom(self.class_prop_name),
-                                                ),
-                                                false,
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                        Expression::Identifier(
-                            self.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.ast_builder.atom(class_variable_name),
-                            ),
-                        ),
-                    ),
-                ),
+                    ]),
+                    false,
+                )),
             )),
         )
     }

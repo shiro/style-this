@@ -325,4 +325,8 @@ pub fn react_prepass<'alloc>(
 ) {
     let mut transformer = ReactStyledComponentTransformer::new(ast_builder, skip_jsx, filepath);
     transformer.visit_program(program);
+
+    if transformer.base.component_counter > 0 && !transformer.base.skip_jsx {
+        insert_merge_styles_import(ast_builder, program);
+    }
 }

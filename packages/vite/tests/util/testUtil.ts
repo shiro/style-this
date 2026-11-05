@@ -367,7 +367,18 @@ export const setupPlugin = async (
     resolveId: plugin.resolveId.bind(ctx),
     load: plugin.load.bind(ctx),
     __getDebugVirtualModules: plugin.__getDebugVirtualModules.bind(ctx),
-    generateBundle: plugin.generateBundle?.bind(ctx),
+    // emitted assets are written into the passed bundle
+    generateBundle: (outputOptions: any, bundle: Record<string, any>) =>
+      plugin.generateBundle?.call(
+        {
+          ...ctx,
+          emitFile: (file: { fileName: string }) => {
+            bundle[file.fileName] = { type: "asset", ...file };
+          },
+        } as any,
+        outputOptions,
+        bundle,
+      ),
     getTransitiveImporters: plugin.getTransitiveImporters?.bind(plugin),
     getFileExports: plugin.getFileExports?.bind(plugin),
     clearFileImports: plugin.clearFileImports?.bind(plugin),

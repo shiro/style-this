@@ -186,9 +186,9 @@ impl Transformer {
 
         let on_debug_virtual_module =
             js_sys::Reflect::get(&opts, &JsValue::from_str("onDebugVirtualModule"))
-                .unwrap()
-                .dyn_into::<js_sys::Function>()
-                .unwrap();
+                .ok()
+                .and_then(|v| v.dyn_into::<js_sys::Function>().ok())
+                .unwrap_or_else(|| js_sys::Function::new_no_args(""));
 
         let callback_suffix = crate::utils::generate_random_id(8);
         let on_debug_virtual_module_ref = format!("{PREFIX}_debug_callback_{callback_suffix}");

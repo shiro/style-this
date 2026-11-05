@@ -318,6 +318,10 @@ pub fn solid_js_prepass<'alloc>(
     let mut transformer = SolidStyledComponentTransformer::new(ast_builder, skip_jsx, filepath);
     transformer.visit_program(program);
 
+    if transformer.base.component_counter > 0 && !transformer.base.skip_jsx {
+        insert_merge_styles_import(ast_builder, program);
+    }
+
     // Add import for splitProps if we generated any styled components with captured expressions
     if transformer.base.component_counter > 0 && !transformer.base.skip_jsx {
         use oxc_ast::ast::{ImportDeclarationSpecifier, ImportSpecifier, ImportOrExportKind, ModuleExportName};

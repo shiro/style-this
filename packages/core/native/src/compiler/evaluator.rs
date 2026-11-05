@@ -4,7 +4,7 @@ use super::error::TransformError;
 use super::transformer::Transformer;
 use super::types::ExportedJSValue;
 use super::visitor::VisitorTransformer;
-use crate::compiler::atomic::add_atomic;
+use crate::compiler::atomic::{add_atomic, dedupe_atomic_declarations, rewrite_merge_styles_imports};
 use crate::error_mapping;
 use crate::react::react_prepass;
 use crate::solid_js::solid_js_prepass;
@@ -81,6 +81,29 @@ fn wrap_eval_program(
 }
 
 /// Helper to get the local name from any import specifier type
+fn codegen_transform_result(program: &Program, program_filepath: &str) -> JsValue {
+    let options = CodegenOptions {
+        source_map_path: Some(PathBuf::from_str(program_filepath).unwrap()),
+        ..Default::default()
+    };
+    let output_js = Codegen::new().with_options(options).build(program);
+
+    let result = js_sys::Object::new();
+    js_sys::Reflect::set(
+        &result,
+        &JsValue::from_str("code"),
+        &JsValue::from_str(&format!("// @ts-nocheck\n{}", output_js.code)),
+    )
+    .unwrap();
+    js_sys::Reflect::set(
+        &result,
+        &JsValue::from_str("sourcemap"),
+        &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
+    )
+    .unwrap();
+    result.into()
+}
+
 fn get_import_local_name<'a>(specifier: &'a ImportDeclarationSpecifier<'a>) -> &'a str {
     match specifier {
         ImportDeclarationSpecifier::ImportSpecifier(import) => import.local.name.as_str(),
@@ -631,6 +654,8 @@ pub async fn evaluate_program<'alloc>(
         react_prepass(ast_builder, program_filepath.clone(), program, false);
     }
 
+    let rewrote_merge_styles = !transformer.atomic && rewrite_merge_styles_imports(program, ast_builder);
+
     // Always run CSS transformer to extract exports, even if we'll return early
     // This is necessary for dependency tracking to know what a file exports
     let mut css_transformer = VisitorTransformer::new(
@@ -672,7 +697,10 @@ pub async fn evaluate_program<'alloc>(
         }
         
         if let Some(tx) = tx {
-            let _ = tx.send(Ok(None));
+            // files only using `mergeStyles` still need the non-atomic rewrite emitted
+            let result = (entrypoint && rewrote_merge_styles)
+                .then(|| codegen_transform_result(program, &program_filepath));
+            let _ = tx.send(Ok(result));
         }
         return;
     }
@@ -693,28 +721,8 @@ pub async fn evaluate_program<'alloc>(
         }
         insert_virtual_css_import(program, ast_builder, transformer, &program_filepath);
 
-        let options = CodegenOptions {
-            source_map_path: Some(PathBuf::from_str(&program_filepath).unwrap()),
-            ..Default::default()
-        };
-        let output_js = Codegen::new().with_options(options).build(program);
-
-        let result = js_sys::Object::new();
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from_str("code"),
-            &JsValue::from_str(&format!("// @ts-nocheck\n{}", output_js.code)),
-        )
-        .unwrap();
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from_str("sourcemap"),
-            &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
-        )
-        .unwrap();
-
         if let Some(tx) = tx {
-            let _ = tx.send(Ok(Some(result.into())));
+            let _ = tx.send(Ok(Some(codegen_transform_result(program, &program_filepath))));
         }
     }
 
@@ -997,8 +1005,8 @@ pub async fn evaluate_program<'alloc>(
 
                 let parse_result = css_parser::parse_css(css_string);
 
-                let atomic_classes: BTreeSet<String> = parse_result
-                    .atomizable
+                let atomic_classes: BTreeSet<String> =
+                    dedupe_atomic_declarations(parse_result.atomizable)
                     .into_iter()
                     .map(|decl| add_atomic(decl.as_str(), &transformer.cache_registry))
                     .filter(|s: &String| !s.is_empty())

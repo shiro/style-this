@@ -38,3 +38,24 @@ describe("atomic with global styles", () => {
     await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });
 });
+
+describe("atomic prefixes", () => {
+  test("atomic-prefixes-1", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
+  });
+});
+
+describe("styled components merge classes", () => {
+  test("styled-merge-solid-1", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
+  });
+  test("styled-merge-react-1", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
+  });
+});

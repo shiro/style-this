@@ -105,29 +105,29 @@ var isAbsolute = function(p) {
 	return _IS_ABSOLUTE_RE.test(p);
 };
 var clientViteManifest = {
-	"_HttpStatusCode-xkVL43Cg.js": {
-		"file": "_build/assets/HttpStatusCode-xkVL43Cg.js",
+	"_HttpStatusCode-BCcOJBVz.js": {
+		"file": "_build/assets/HttpStatusCode-BCcOJBVz.js",
 		"name": "HttpStatusCode",
-		"imports": ["_web-FxWejX55.js"]
+		"imports": ["_web-lT-EAg3V.js"]
 	},
-	"_dist-DhYQqEd7.js": {
-		"file": "_build/assets/dist-DhYQqEd7.js",
+	"_dist-CPkBsN0R.js": {
+		"file": "_build/assets/dist-CPkBsN0R.js",
 		"name": "dist",
-		"imports": ["_web-FxWejX55.js"]
+		"imports": ["_web-lT-EAg3V.js"]
 	},
-	"_web-FxWejX55.js": {
-		"file": "_build/assets/web-FxWejX55.js",
+	"_web-lT-EAg3V.js": {
+		"file": "_build/assets/web-lT-EAg3V.js",
 		"name": "web"
 	},
 	"src/entry-client.tsx": {
-		"file": "_build/assets/entry-client-BMIUDKTf.js",
+		"file": "_build/assets/entry-client-B2WY2skw.js",
 		"name": "entry-client",
 		"src": "src/entry-client.tsx",
 		"isEntry": true,
 		"imports": [
-			"_web-FxWejX55.js",
-			"_dist-DhYQqEd7.js",
-			"_HttpStatusCode-xkVL43Cg.js"
+			"_web-lT-EAg3V.js",
+			"_dist-CPkBsN0R.js",
+			"_HttpStatusCode-BCcOJBVz.js"
 		],
 		"dynamicImports": [
 			"src/routes/[...404].tsx?pick=default&pick=$css&lang.tsx",
@@ -137,30 +137,30 @@ var clientViteManifest = {
 		"css": ["_build/assets/entry-client-Chy68Y4K.css"]
 	},
 	"src/routes/[...404].tsx?pick=default&pick=$css&lang.tsx": {
-		"file": "_build/assets/_...404_-CFageVS6.js",
+		"file": "_build/assets/_...404_-DEBQc9Xd.js",
 		"name": "_...404_",
 		"src": "src/routes/[...404].tsx?pick=default&pick=$css&lang.tsx",
 		"isEntry": true,
 		"imports": [
-			"_web-FxWejX55.js",
-			"_dist-DhYQqEd7.js",
-			"_HttpStatusCode-xkVL43Cg.js"
+			"_web-lT-EAg3V.js",
+			"_dist-CPkBsN0R.js",
+			"_HttpStatusCode-BCcOJBVz.js"
 		]
 	},
 	"src/routes/about.tsx?pick=default&pick=$css&lang.tsx": {
-		"file": "_build/assets/about-Lm4ok2Gy.js",
+		"file": "_build/assets/about-DEF-GuGf.js",
 		"name": "about",
 		"src": "src/routes/about.tsx?pick=default&pick=$css&lang.tsx",
 		"isEntry": true,
-		"imports": ["_web-FxWejX55.js", "_dist-DhYQqEd7.js"]
+		"imports": ["_web-lT-EAg3V.js", "_dist-CPkBsN0R.js"]
 	},
 	"src/routes/index.tsx?pick=default&pick=$css&lang.tsx": {
-		"file": "_build/assets/index-C_2MxfhM.js",
+		"file": "_build/assets/index-DLlNsiG2.js",
 		"name": "index",
 		"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
 		"isEntry": true,
-		"imports": ["_web-FxWejX55.js"],
-		"css": ["_build/assets/index-Cja5MeEy.css"]
+		"imports": ["_web-lT-EAg3V.js"],
+		"css": ["_build/assets/index-DWw6TUJo.css"]
 	}
 };
 function getSsrProdManifest() {
@@ -1009,8 +1009,8 @@ var solid_start_routes_default = [
 		"page": true,
 		"$component": {
 			"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
-			"build": () => import("./index-CclXFvP6.mjs"),
-			"import": () => import("./index-CclXFvP6.mjs")
+			"build": () => import("./index-CRORUu1D.mjs"),
+			"import": () => import("./index-CRORUu1D.mjs")
 		},
 		"path": "/"
 	}

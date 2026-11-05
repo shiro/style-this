@@ -1,6 +1,6 @@
-import { css } from '@style-this/core';
-import Counter from './Counter';
-import s from "./foo.css"
+import { css, mergeStyles } from "@style-this/core";
+import Counter, { counterColor } from "./Counter";
+import s from "./foo.css";
 
 const ContainerStyle = css`
   display: flex;
@@ -9,17 +9,21 @@ const ContainerStyle = css`
 
 const colorStyle = css`
   color: coral;
+  background: ${counterColor};
 `;
 
-const MainComponent = () => {
+const highlightStyle = css`
+  color: crimson;
+`;
+
+export default function MainComponent() {
   return (
     <div className={`${ContainerStyle} Global__Main`}>
       <Counter />
       hello
-      <span className={colorStyle}>world</span>
+      <span className={mergeStyles(colorStyle, highlightStyle)}>
+        world
+      </span>
     </div>
   );
-};
-
-
-export default MainComponent;
+}

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { css } from "@style-this/core";
+	import { css, mergeStyles } from "@style-this/core";
 	import Counter from './Counter.svelte';
 
 	const ContainerStyle = css`
@@ -9,6 +9,10 @@
 
 	const colorStyle = css`
 		color: coral;
+	`;
+
+	const highlightStyle = css`
+		color: crimson;
 	`;
 
 	const _GlobalMain = css`
@@ -21,7 +25,7 @@
 <div class={`${ContainerStyle} Global__Main`}>
 	<Counter />
 	hello
-	<span class={colorStyle}>
+	<span class={mergeStyles(colorStyle, highlightStyle)}>
 		world
 	</span>
 </div>

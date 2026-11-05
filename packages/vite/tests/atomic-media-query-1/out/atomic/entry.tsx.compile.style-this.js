@@ -1,2 +1,2 @@
-export const innerStyle = "innerStyle-oty7sd gKimM vrRc6";
-export const outerStyle = "outerStyle-mvwhqz YB1lg"
+export const innerStyle = "innerStyle-oty7sd bg-gKimM p-vrRc6";
+export const outerStyle = "outerStyle-mvwhqz w-YB1lg"

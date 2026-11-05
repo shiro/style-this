@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { css, extraClass } from "@style-this/core";
 import { styled } from "@style-this/react";
+import { joinStyles as __styleThis__mergeStyles } from "@style-this/core";
 import "virtual:style-this:/entry.tsx.css";
 // extraClass at the beginning, then CSS after
 const test1 = "test1-6z85mr beginning";
@@ -13,14 +14,14 @@ const test4 = "test4-cxebwl first fourth second third";
 // Child styled component extends parent, both have extraClass
 const ParentStyled = (() => {
 	let ParentStyled = "ParentStyled-difgta parent-class";
-	let comp = (props) => <div {...props} className={props.className ? ParentStyled + (" " + props.className) : ParentStyled} />;
+	let comp = (props) => <div {...props} className={__styleThis__mergeStyles(ParentStyled, props.className)} />;
 	comp.css = ParentStyled.css;
 	comp.toString = () => ParentStyled;
 	return comp;
 })();
 const ChildStyled = (() => {
 	let ChildStyled = "ChildStyled-hyrg5m child-class";
-	let comp = (props) => <ParentStyled {...props} className={props.className ? ChildStyled + (" " + props.className) : ChildStyled} />;
+	let comp = (props) => <ParentStyled {...props} className={__styleThis__mergeStyles(ChildStyled, props.className)} />;
 	comp.css = ChildStyled.css;
 	comp.toString = () => ChildStyled;
 	return comp;
