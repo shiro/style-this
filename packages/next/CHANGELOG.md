@@ -1,5 +1,12 @@
 # @style-this/next
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @style-this/core@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

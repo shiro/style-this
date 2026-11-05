@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1
+
+### Patch Changes
+
+- Fix `@style-this/core/cssSourceMap` and `@style-this/core/atomic` exporting TypeScript sources, which broke installs from npm
+- Only transform JS/TS and Svelte files in the vite plugin, fixes builds with extension-less virtual modules (e.g. vinxi)
+- Updated dependencies
+  - @style-this/core@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

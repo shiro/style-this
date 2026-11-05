@@ -497,11 +497,11 @@ const vitePlugin = (options: Options = {}) => {
     async transform(code, filepath) {
       if (
         !filepath ||
+        filepath.startsWith("\0") ||
         filepath.includes("/node_modules/") ||
         filepath.includes("?") ||
-        filepath.endsWith(".css") ||
-        filepath.endsWith(".atomic.css") ||
-        filepath.endsWith(".style-this.js")
+        filepath.endsWith(".style-this.js") ||
+        (!/\.[mc]?[jt]sx?$/.test(filepath) && !isSvelteFile(filepath))
       ) {
         return;
       }

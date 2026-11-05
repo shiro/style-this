@@ -1,12 +1,10 @@
 {
   "name": "@style-this/core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CSS-in-JS library for the modern web - core module",
   "type": "module",
   "files": [
-    "dist",
-    "src/cssSourceMap.ts",
-    "src/atomic.ts"
+    "dist"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -24,14 +22,14 @@
       "default": "./dist/compiler.cjs"
     },
     "./cssSourceMap": {
-      "types": "./src/cssSourceMap.ts",
-      "import": "./src/cssSourceMap.ts",
-      "default": "./src/cssSourceMap.ts"
+      "types": "./dist/cssSourceMap.d.mts",
+      "import": "./dist/cssSourceMap.mjs",
+      "default": "./dist/cssSourceMap.mjs"
     },
     "./atomic": {
-      "types": "./src/atomic.ts",
-      "import": "./src/atomic.ts",
-      "default": "./src/atomic.ts"
+      "types": "./dist/atomic.d.mts",
+      "import": "./dist/atomic.mjs",
+      "default": "./dist/atomic.mjs"
     },
     "./package.json": "./package.json"
   },
