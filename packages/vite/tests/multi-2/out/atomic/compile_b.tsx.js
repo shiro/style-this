@@ -30,7 +30,7 @@ exported.css = `background: ${color};`;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"] ?? {}), color};
 
-// /packages/vite/tests/multi-2/c.tsx (/packages/vite/tests/multi-2/b.tsx): {"color", "css", "exported"}
+// /packages/vite/tests/multi-2/c.tsx (/packages/vite/tests/multi-2/b.tsx): {"color", "css", "exported"} #2
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"]['color'];

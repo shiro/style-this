@@ -1,6 +1,6 @@
 import { Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
-import { resolve as resolvePath } from "path";
+import { isAbsolute, relative, resolve as resolvePath } from "path";
 import {
   Transformer,
   initializeStyleThis,
@@ -78,8 +78,11 @@ const vitePlugin = (options: Options = {}) => {
   // Store debug virtual modules
   const debugVirtualModules = new Map<string, string>();
 
+  // the same module can be evaluated multiple times with the same key, keep every evaluation
   const onDebugVirtualModule = (name: string, code: string) => {
-    debugVirtualModules.set(name, code);
+    let key = name;
+    for (let i = 2; debugVirtualModules.has(key); i++) key = `${name} #${i}`;
+    debugVirtualModules.set(key, code);
   };
 
   // Default noop callback for non-debug mode
@@ -93,6 +96,14 @@ const vitePlugin = (options: Options = {}) => {
   let styleThis: Transformer;
   let cwd = process.cwd();
   const mocks = new Map<string, string>();
+
+  // resolved ids end up in bundle output (e.g. region comments), keep them relative to `cwd` so
+  // output and chunk hashes don't depend on the project location
+  const toVirtualId = (filepath: string) => {
+    const relativePath = relative(cwd, filepath);
+    return resolvedVirtualModulePrefix + (relativePath.startsWith("..") || isAbsolute(relativePath) ? filepath : relativePath);
+  };
+  const fromVirtualId = (id: string) => resolvePath(cwd, id.slice(resolvedVirtualModulePrefix.length));
 
   const atomicEntrypointId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
   /** Atomic CSS last served by the entrypoint, per environment. */
@@ -228,7 +239,7 @@ const vitePlugin = (options: Options = {}) => {
         let [filepath, _query] = filepathWithQuery.split("?", 2);
 
         if (filepath.startsWith(resolvedVirtualModulePrefix)) {
-          const virtualPath = filepath.slice(resolvedVirtualModulePrefix.length);
+          const virtualPath = fromVirtualId(filepath);
           const entry = cacheRegistry.getCssModule(virtualPath);
           if (entry && entry !== undefined) {
             const content = await entry;
@@ -285,11 +296,11 @@ const vitePlugin = (options: Options = {}) => {
         const importerDir = require('path').dirname(importer);
         const absoluteIdPart = require('path').resolve(importerDir, idPart);
 
-        return resolvedVirtualModulePrefix + absoluteIdPart;
+        return toVirtualId(absoluteIdPart);
       }
 
       if (importer && importer.startsWith(resolvedVirtualModulePrefix) && importer.endsWith('.style-this.js')) {
-        const virtualPath = importer.slice(resolvedVirtualModulePrefix.length);
+        const virtualPath = fromVirtualId(importer);
         const sourceFilePath = virtualPath.slice(0, -'.style-this.js'.length);
 
         if ((id.startsWith('./') || id.startsWith('../')) && sourceFilePath) {
@@ -305,9 +316,7 @@ const vitePlugin = (options: Options = {}) => {
 
       const [id, _query] = fullId.split("?", 2);
 
-      let filepath = id.slice(resolvedVirtualModulePrefix.length);
-
-      if (filepath === "__style_this_atomic_entrypoint.css") {
+      if (id === atomicEntrypointId) {
         if (atomic) {
           if (!server) {
             return { code: '' };
@@ -337,6 +346,7 @@ const vitePlugin = (options: Options = {}) => {
         }
       }
 
+      const filepath = fromVirtualId(id);
       const isAtomicProgram = filepath.endsWith('.style-this.js');
 
       let cacheKey: string;
@@ -474,10 +484,10 @@ const vitePlugin = (options: Options = {}) => {
 
         // CSS modules are self-accepting and would be requested before the re-transform, they
         // get reloaded from `transform` once ready instead
-        const cssModule = moduleGraph.getModuleById(`${resolvedVirtualModulePrefix}${filepath}.${cssExtension}`);
+        const cssModule = moduleGraph.getModuleById(toVirtualId(`${filepath}.${cssExtension}`));
         if (cssModule) moduleGraph.invalidateModule(cssModule);
 
-        const atomicModule = moduleGraph.getModuleById(`${resolvedVirtualModulePrefix}${filepath}.style-this.js`);
+        const atomicModule = moduleGraph.getModuleById(toVirtualId(`${filepath}.style-this.js`));
         if (atomicModule) result.add(atomicModule);
       }
 
@@ -544,7 +554,7 @@ const vitePlugin = (options: Options = {}) => {
         if (server && !skipCssEval) {
           for (const environment of Object.values(server.environments)) {
             if (environment.config.consumer !== "client") continue;
-            const cssModule = environment.moduleGraph.getModuleById(resolvedVirtualModulePrefix + cssFilepath);
+            const cssModule = environment.moduleGraph.getModuleById(toVirtualId(cssFilepath));
             if (cssModule?.importers.size) environment.reloadModule(cssModule);
           }
 

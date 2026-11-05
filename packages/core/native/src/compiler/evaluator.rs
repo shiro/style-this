@@ -875,7 +875,9 @@ pub async fn evaluate_program<'alloc>(
         } else {
             String::new()
         };
-        let key = format!("{program_filepath}{importer_part}: {referenced_idents:?}");
+        let mut sorted_idents = referenced_idents.iter().map(|ident| format!("{ident:?}")).collect::<Vec<_>>();
+        sorted_idents.sort();
+        let key = format!("{program_filepath}{importer_part}: {{{}}}", sorted_idents.join(", "));
 
         // Call the debug callback with the module name and code
         let args = js_sys::Array::new();

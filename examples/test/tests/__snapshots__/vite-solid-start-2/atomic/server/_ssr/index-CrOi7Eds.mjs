@@ -1,5 +1,5 @@
 import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-D3KKfjDz.js
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-CrOi7Eds.js
 var ATOMIC_PREFIXES = new Set(Object.values({
 	margin: "m",
 	"margin-top": "mt",

@@ -7154,7 +7154,7 @@ async function createPageEvent(ctx) {
 	const assets = [
 		...await manifest.getAssets("style.css"),
 		...await manifest.getAssets("./src/entry-client.tsx"),
-		...await manifest.getAssets("/home/shiro/project/style-this/examples/vite-solid-start-2/src/app.tsx")
+		...await manifest.getAssets("/examples/vite-solid-start-2/src/app.tsx")
 	];
 	return Object.assign(ctx, {
 		assets,

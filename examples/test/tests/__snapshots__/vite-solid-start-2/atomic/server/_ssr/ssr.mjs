@@ -1009,8 +1009,8 @@ var solid_start_routes_default = [
 		"page": true,
 		"$component": {
 			"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
-			"build": () => import("./index-D3KKfjDz.mjs"),
-			"import": () => import("./index-D3KKfjDz.mjs")
+			"build": () => import("./index-CrOi7Eds.mjs"),
+			"import": () => import("./index-CrOi7Eds.mjs")
 		},
 		"path": "/"
 	}
@@ -7154,7 +7154,7 @@ async function createPageEvent(ctx) {
 	const assets = [
 		...await manifest.getAssets("style.css"),
 		...await manifest.getAssets("./src/entry-client.tsx"),
-		...await manifest.getAssets("/home/shiro/project/style-this/examples/vite-solid-start-2/src/app.tsx")
+		...await manifest.getAssets("/examples/vite-solid-start-2/src/app.tsx")
 	];
 	return Object.assign(ctx, {
 		assets,

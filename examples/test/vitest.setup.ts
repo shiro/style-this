@@ -1,8 +1,10 @@
 /// <reference types="node" />
 import { execSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync, rmSync } from "fs";
-import { join, relative } from "path";
+import { join, relative, resolve } from "path";
 import { expect } from "vitest";
+
+const MONOREPO_ROOT_DIR = resolve(import.meta.dirname, "../..");
 
 export function runBuild(
   exampleDir: string,
@@ -71,6 +73,14 @@ async function walkAndAssert(
       let content: string;
       try {
         content = readFileSync(fullPath, "utf-8");
+        // frameworks (e.g. SolidStart) embed absolute paths in their output, in sourcemaps these
+        // also shift the mapping columns of the affected sources
+        if (content.includes(MONOREPO_ROOT_DIR)) {
+          if (entry.name.endsWith(".map")) {
+            content = JSON.stringify({ ...JSON.parse(content), mappings: "<depends on project path>" });
+          }
+          content = content.replaceAll(MONOREPO_ROOT_DIR, "");
+        }
       } catch {
         content = `[Binary file - ${statSync(fullPath).size} bytes]`;
       }
