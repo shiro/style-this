@@ -788,8 +788,6 @@ pub async fn evaluate_program<'alloc>(
         .build(&eval_program.borrow())
         .code;
 
-    // js_sys::eval(&format!("console.log('program', '{program_path}')",)).unwrap();
-
     // we append all exported idents we evaluated to the cache
     if !exported_idents.is_empty() {
         value_cache.extend(exported_idents.iter().cloned());
@@ -908,15 +906,6 @@ pub async fn evaluate_program<'alloc>(
             value_cache_ref,
             transformer.require_ref.as_deref(),
         );
-
-        // js_sys::eval(&format!(
-        //     "console.log('ATOMIC_PROGRAM:\\n', '{}')",
-        //     eval_program_js
-        //         .replace('\\', "\\\\")
-        //         .replace('\'', "\\'")
-        //         .replace('\n', "\\n")
-        // ))
-        // .unwrap();
 
         // Execute Stage 1 eval and get the promise
         let evaluated_promise: JsValue =

@@ -24,6 +24,7 @@ interface Options {
   cssExtension?: string;
   filter?: Filter | Filter[];
   ignoredImports?: Record<string, true | (string | typeof DefaultImport)[]>;
+  /** Logs transforms and keeps intermediate programs for inspection. @default false */
   debug?: boolean;
   atomic?: boolean;
   useRequire?: boolean;
@@ -39,9 +40,13 @@ export interface ExtraFields {
 }
 
 const vitePlugin = (options: Options = {}) => {
-  let { cssExtension = "css", filter = [], debug, atomic = false, useRequire, cacheRegistry = new CacheRegistry() } = options;
+  let { cssExtension = "css", filter = [], debug = false, atomic = false, useRequire, cacheRegistry = new CacheRegistry() } = options;
 
   if (!Array.isArray(filter)) filter = [filter];
+
+  const debugLog = (...args: unknown[]) => {
+    if (debug) console.log("[style-this]", ...args);
+  };
 
   if (options.ignoredImports) {
     for (const [key, value] of Object.entries(options.ignoredImports)) {
@@ -88,8 +93,6 @@ const vitePlugin = (options: Options = {}) => {
   let styleThis: Transformer;
   let cwd = process.cwd();
   const mocks = new Map<string, string>();
-
-  let totalTransformTime = 0;
 
   const atomicEntrypointId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
   /** Atomic CSS last served by the entrypoint, per environment. */
@@ -275,8 +278,6 @@ const vitePlugin = (options: Options = {}) => {
       }
 
       if (id.startsWith(virtualModulePrefix)) {
-        // console.log('[style-this] resolveId:', id);
-
         if (!importer)
           throw new Error(`Virtual module '${id}' must be imported from another module, not loaded directly`);
 
@@ -304,7 +305,6 @@ const vitePlugin = (options: Options = {}) => {
 
       const [id, _query] = fullId.split("?", 2);
 
-      console.log('[style-this] load:', id);
       let filepath = id.slice(resolvedVirtualModulePrefix.length);
 
       if (filepath === "__style_this_atomic_entrypoint.css") {
@@ -496,9 +496,6 @@ const vitePlugin = (options: Options = {}) => {
         return;
       }
 
-      console.log('[style-this] transform: called for:', filepath);
-
-
       if (!filterMatches(filter, filepath)) {
         return;
       }
@@ -537,14 +534,11 @@ const vitePlugin = (options: Options = {}) => {
           // differently or be disposed already
           createLoadFile(async (id, importer) => id ? (await this.resolve(id, importer))?.id : undefined),
         );
-        const endTime = performance.now();
-        const transformTime = endTime - startTime;
-        totalTransformTime += transformTime;
-
         if (!transformedResult) {
           watchedFiles.delete(filepath);
           return;
         }
+        debugLog(`transformed ${filepath} in ${(performance.now() - startTime).toFixed(1)}ms`);
         watchedFiles.add(filepath);
 
         if (server && !skipCssEval) {

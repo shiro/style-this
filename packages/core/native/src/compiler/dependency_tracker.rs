@@ -50,9 +50,6 @@ impl DependencyTracker {
         variable_name: &str,
         importer_file: &str,
     ) {
-        eprintln!("[dependency_tracker] Registering: {} imports '{}' from {}", 
-                  importer_file, variable_name, source_file);
-        
         // Forward index: source -> variable -> importers
         let mut importers = self.variable_importers.borrow_mut();
         importers
@@ -85,23 +82,16 @@ impl DependencyTracker {
         source_file: &str,
         changed_exports: &HashSet<String>,
     ) -> HashSet<String> {
-        eprintln!("[dependency_tracker] Looking for importers of changed exports from {}: {:?}", 
-                  source_file, changed_exports);
-        
         let importers_map = self.variable_importers.borrow();
         let Some(var_map) = importers_map.get(source_file) else {
-            eprintln!("[dependency_tracker] No importers found for {}", source_file);
             return HashSet::new();
         };
-        
-        eprintln!("[dependency_tracker] Variable map for {}: {:?}", source_file, var_map.keys().collect::<Vec<_>>());
         
         let mut result = HashSet::new();
         
         // Add importers of changed exports
         for export_name in changed_exports {
             if let Some(importers) = var_map.get(export_name) {
-                eprintln!("[dependency_tracker] Export '{}' has importers: {:?}", export_name, importers);
                 result.extend(importers.iter().cloned());
             }
         }
@@ -109,12 +99,10 @@ impl DependencyTracker {
         // Always add star import users when anything changes
         if !changed_exports.is_empty() {
             if let Some(star_importers) = var_map.get("__star__") {
-                eprintln!("[dependency_tracker] Star importers: {:?}", star_importers);
                 result.extend(star_importers.iter().cloned());
             }
         }
         
-        eprintln!("[dependency_tracker] Final result: {:?}", result);
         result
     }
     
@@ -160,16 +148,11 @@ impl DependencyTracker {
     /// - Added new imports
     /// - Changed which variables it imports
     pub fn clear_file_imports(&self, importer_file: &str) {
-        eprintln!("[dependency_tracker] Clearing imports for {}", importer_file);
-        
         // Remove from reverse index and get what we need to clean from forward index
         let mut imports = self.file_imports.borrow_mut();
         let Some(source_map) = imports.remove(importer_file) else {
-            eprintln!("[dependency_tracker] No imports to clear for {}", importer_file);
             return; // This file had no imports registered
         };
-        
-        eprintln!("[dependency_tracker] Cleared imports: {:?}", source_map);
         
         // Remove from forward index
         let mut importers = self.variable_importers.borrow_mut();
