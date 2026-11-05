@@ -20,7 +20,8 @@
     "lint": "eslint",
     "lint:fix": "pnpm lint --fix",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "node -e \"if (!process.env.CI) { console.error('Publishing is only allowed from CI'); process.exit(1) }\""
   },
   "dependencies": {
     "@style-this/core": "workspace:0.2.0",
