@@ -16,3 +16,4 @@
   - Map errors from the dynamic eval module back to source
   - Stop emitting empty CSS files
   - Improve debug logging
+  - Make styled component CSS variable names independent of the absolute project path

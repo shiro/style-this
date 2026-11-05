@@ -9,7 +9,7 @@ export const FancyButton = (() => {
 	let comp = (props) => {
 		const { styleProps: _styleProps, style: _style,...rest } = props;
 		return <button {...rest} className={__styleThis__mergeStyles(FancyButton, rest.className)} style={{
-			"--var1-vklyb0": (({ a }) => a)({
+			"--var1-30dyns": (({ a }) => a)({
 				...props.styleProps,
 				"props": props
 			}),

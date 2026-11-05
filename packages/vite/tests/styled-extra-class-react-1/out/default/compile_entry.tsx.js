@@ -5,7 +5,7 @@ let __styleThis_var_FancyButton_2 = new String("FancyButton-bsxab0 custom-button
 __styleThis_var_FancyButton_2.css = `background: none;
   border: 1px solid blue;
   border-radius: 2px;
-  padding: ${"var(--var1-vklyb0)"}px;
+  padding: ${"var(--var1-30dyns)"}px;
   `;
 let unrelated = new String("unrelated-l2rcte test-class");
 unrelated.css = `background: none;

@@ -1,5 +1,5 @@
 import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-CRORUu1D.js
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-gh9uYAqU.js
 new Set(Object.values({
 	margin: "m",
 	"margin-top": "mt",
@@ -186,7 +186,7 @@ var FancyButton = (() => {
 			},
 			get style() {
 				return {
-					"--var1-mv4tyz": (({ a }) => `${a}px`)({
+					"--var1-azc1aj": (({ a }) => `${a}px`)({
 						...props.styleProps,
 						"props": props
 					}),
@@ -207,15 +207,15 @@ var FancyButton2 = (() => {
 			},
 			get style() {
 				return {
-					"--var1-78dub0": (({ b }) => `${b}px`)({
+					"--var1-nspajg": (({ b }) => `${b}px`)({
 						...props.styleProps,
 						"props": props
 					}),
-					"--var2-zcx2zg": (({ b }) => `${b}px`)({
+					"--var2-k1yf81": (({ b }) => `${b}px`)({
 						...props.styleProps,
 						"props": props
 					}),
-					"--var3-sh6781": (({ props }) => props.disabled ? "red" : "green")({
+					"--var3-z85yv8": (({ props }) => props.disabled ? "red" : "green")({
 						...props.styleProps,
 						"props": props
 					}),

@@ -120,7 +120,7 @@ var clientViteManifest = {
 		"name": "web"
 	},
 	"src/entry-client.tsx": {
-		"file": "_build/assets/entry-client-B2WY2skw.js",
+		"file": "_build/assets/entry-client-BHNGbOuf.js",
 		"name": "entry-client",
 		"src": "src/entry-client.tsx",
 		"isEntry": true,
@@ -155,12 +155,12 @@ var clientViteManifest = {
 		"imports": ["_web-lT-EAg3V.js", "_dist-CPkBsN0R.js"]
 	},
 	"src/routes/index.tsx?pick=default&pick=$css&lang.tsx": {
-		"file": "_build/assets/index-DLlNsiG2.js",
+		"file": "_build/assets/index-PYOLnBYX.js",
 		"name": "index",
 		"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
 		"isEntry": true,
 		"imports": ["_web-lT-EAg3V.js"],
-		"css": ["_build/assets/index-DWw6TUJo.css"]
+		"css": ["_build/assets/index-CakwP__1.css"]
 	}
 };
 function getSsrProdManifest() {
@@ -1009,8 +1009,8 @@ var solid_start_routes_default = [
 		"page": true,
 		"$component": {
 			"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
-			"build": () => import("./index-CRORUu1D.mjs"),
-			"import": () => import("./index-CRORUu1D.mjs")
+			"build": () => import("./index-gh9uYAqU.mjs"),
+			"import": () => import("./index-gh9uYAqU.mjs")
 		},
 		"path": "/"
 	}

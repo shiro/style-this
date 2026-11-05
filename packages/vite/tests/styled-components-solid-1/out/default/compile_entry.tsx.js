@@ -5,7 +5,7 @@ let __styleThis_var_FancyButton_2 = new String("FancyButton-3slijs");
 __styleThis_var_FancyButton_2.css = `background: none;
   border: 1px solid blue;
   border-radius: 2px;
-  padding: ${"var(--var1-c5iro5)"}px;`;
+  padding: ${"var(--var1-q3ctyv)"}px;`;
 let unrelated = new String("unrelated-96jgdy");
 unrelated.css = `background: none;`;
 const cssSourcemapData = [{className:'FancyButton-3slijs',start:112,end:241},{className:'unrelated-96jgdy',start:262,end:288}];

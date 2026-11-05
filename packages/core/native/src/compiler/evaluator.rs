@@ -646,12 +646,17 @@ pub async fn evaluate_program<'alloc>(
     // We'll check return_early after running the CSS transformer to extract exports
     let should_return_early = return_early;
 
+    let relative_program_filepath = program_filepath
+        .strip_prefix(cwd)
+        .unwrap_or(&program_filepath)
+        .to_string();
+
     if solid_prepass {
-        solid_js_prepass(ast_builder, program_filepath.clone(), program, false);
+        solid_js_prepass(ast_builder, relative_program_filepath.clone(), program, false);
     }
 
     if react_prepass_enabled {
-        react_prepass(ast_builder, program_filepath.clone(), program, false);
+        react_prepass(ast_builder, relative_program_filepath, program, false);
     }
 
     let rewrote_merge_styles = !transformer.atomic && rewrite_merge_styles_imports(program, ast_builder);
