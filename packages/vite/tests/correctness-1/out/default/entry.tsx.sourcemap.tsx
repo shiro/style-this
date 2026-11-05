@@ -1,8 +1,8 @@
 // {
 //   "version": 3,
-//   "file": "/home/shiro/project/style-this/packages/vite/tests/correctness-1/entry.tsx.css",
+//   "file": "/packages/vite/tests/correctness-1/entry.tsx.css",
 //   "sources": [
-//     "/home/shiro/project/style-this/packages/vite/tests/correctness-1/entry.tsx"
+//     "/packages/vite/tests/correctness-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
 //     "import { css, style } from \"@style-this/core\";\nimport mib, * as a from \"./a\";\n\nconst mutate = (v) => v;\n\nconst a1 = () => {\n  const a2 = () => {\n    const a3 = () => {\n      return css`background: black;`;\n    };\n    return a3();\n  };\n  const wi = a2();\n  const m = css`\n    ${wi}\n  `;\n  return wi;\n};\n\nconst b = css`\n  ${a1()}\n`;\n\nconst comp = () => {\n  (\"foob\");\n\n  const b = () => {\n    const c = () => css`\n      background: blue;\n    `;\n\n    const s1 = css`\n      ${c().css}\n    `;\n  };\n\n  mutate(b);\n\n  return css`\n    @media (max-width: 500px) {\n      background: blue;\n    }\n  `;\n};\n\nconst { color } = { color: \"blue\" };\n\nconst st = style`\n  color: ${color};\n  ${mib.foo().css}\n`;\n\nconst s2 = css`\n  ${st}\n  ${comp().css}\n`;\n\nconst unrelated = css`\n  background: none;\n  ${a.foo.css}\n`;\n"

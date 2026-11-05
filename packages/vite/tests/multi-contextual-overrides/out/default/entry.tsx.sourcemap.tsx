@@ -1,8 +1,8 @@
 // {
 //   "version": 3,
-//   "file": "/home/shiro/project/style-this/packages/vite/tests/multi-contextual-overrides/entry.tsx.css",
+//   "file": "/packages/vite/tests/multi-contextual-overrides/entry.tsx.css",
 //   "sources": [
-//     "/home/shiro/project/style-this/packages/vite/tests/multi-contextual-overrides/entry.tsx"
+//     "/packages/vite/tests/multi-contextual-overrides/entry.tsx"
 //   ],
 //   "sourcesContent": [
 //     "import { css } from \"@style-this/core\";\nimport { inner } from \"./b\";\n\nconst outer = css`\n  .${inner} {\n    background: \"red\";\n  }\n`;\n"

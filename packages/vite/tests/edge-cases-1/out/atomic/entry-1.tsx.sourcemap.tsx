@@ -1,8 +1,8 @@
 // {
 //   "version": 3,
-//   "file": "/home/shiro/project/style-this/packages/vite/tests/edge-cases-1/entry-1.tsx.css",
+//   "file": "/packages/vite/tests/edge-cases-1/entry-1.tsx.css",
 //   "sources": [
-//     "/home/shiro/project/style-this/packages/vite/tests/edge-cases-1/entry-1.tsx"
+//     "/packages/vite/tests/edge-cases-1/entry-1.tsx"
 //   ],
 //   "sourcesContent": [
 //     "import { css } from \"@style-this/core\";\nimport { num } from \"./shared\";\n\nconst a = css`\n  margin: ${num}px;\n`;\n"

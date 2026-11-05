@@ -1,8 +1,8 @@
 // {
 //   "version": 3,
-//   "file": "/home/shiro/project/style-this/packages/vite/tests/styled-merge-solid-1/entry.tsx.css",
+//   "file": "/packages/vite/tests/styled-merge-solid-1/entry.tsx.css",
 //   "sources": [
-//     "/home/shiro/project/style-this/packages/vite/tests/styled-merge-solid-1/entry.tsx"
+//     "/packages/vite/tests/styled-merge-solid-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
 //     "import { styled } from \"@style-this/solid\";\nimport { css } from \"@style-this/core\";\n\nexport const Base = styled.button`\n  background: none;\n  padding: 8px;\n`;\n\n// overrides Base's padding, Base merges this component's classes last\nexport const Extended = styled(Base)`\n  padding: 16px;\n  color: red;\n`;\n\nexport const override = css`\n  background: blue;\n`;\n\nexport const App = () => <Extended class={override}>hi</Extended>;\n"

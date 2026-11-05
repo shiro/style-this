@@ -123,7 +123,7 @@ const evaluateProgramWithMode = async (
   } else if (cssRaw && typeof cssRaw === 'object') {
     cssCode = cssRaw.code || '';
     if (cssRaw.map) {
-      cssMap = JSON.stringify(cssRaw.map, null, 2);
+      cssMap = JSON.stringify(cssRaw.map, null, 2).replaceAll(MONOREPO_ROOT_DIR, "");
       // Extract source content from sourcemap
       try {
         const mapObj = cssRaw.map;
@@ -202,7 +202,7 @@ export const evaluateProgram = async (
   } else if (cssRaw && typeof cssRaw === 'object') {
     cssCode = cssRaw.code || '';
     if (cssRaw.map) {
-      cssMap = JSON.stringify(cssRaw.map, null, 2);
+      cssMap = JSON.stringify(cssRaw.map, null, 2).replaceAll(MONOREPO_ROOT_DIR, "");
       // Extract source content from sourcemap
       try {
         const mapObj = cssRaw.map;

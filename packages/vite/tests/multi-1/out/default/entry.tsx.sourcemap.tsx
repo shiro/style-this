@@ -1,8 +1,8 @@
 // {
 //   "version": 3,
-//   "file": "/home/shiro/project/style-this/packages/vite/tests/multi-1/entry.tsx.css",
+//   "file": "/packages/vite/tests/multi-1/entry.tsx.css",
 //   "sources": [
-//     "/home/shiro/project/style-this/packages/vite/tests/multi-1/entry.tsx"
+//     "/packages/vite/tests/multi-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
 //     "import { css } from \"@style-this/core\";\nimport { color } from \"./b\";\n\nconst a = css`\n  background: ${color};\n`;\n"

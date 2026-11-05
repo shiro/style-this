@@ -1,8 +1,8 @@
 // {
 //   "version": 3,
-//   "file": "/home/shiro/project/style-this/packages/vite/tests/multi-2/b.tsx.css",
+//   "file": "/packages/vite/tests/multi-2/b.tsx.css",
 //   "sources": [
-//     "/home/shiro/project/style-this/packages/vite/tests/multi-2/b.tsx"
+//     "/packages/vite/tests/multi-2/b.tsx"
 //   ],
 //   "sourcesContent": [
 //     "import { css } from \"@style-this/core\";\nimport { color as originalColor } from \"./c\";\n\nexport const color = \"hot\" + originalColor;\n\nconst exported = css`\n  background: ${color};\n`;\n"

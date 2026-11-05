@@ -1,8 +1,8 @@
 // {
 //   "version": 3,
-//   "file": "/home/shiro/project/style-this/packages/vite/tests/expressions-2/entry.tsx.css",
+//   "file": "/packages/vite/tests/expressions-2/entry.tsx.css",
 //   "sources": [
-//     "/home/shiro/project/style-this/packages/vite/tests/expressions-2/entry.tsx"
+//     "/packages/vite/tests/expressions-2/entry.tsx"
 //   ],
 //   "sourcesContent": [
 //     "import { css } from \"@style-this/core\";\n\nconst a = css`\n  margin: ${() => 99}px;\n`;\n"
