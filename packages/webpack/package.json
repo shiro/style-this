@@ -1,6 +1,6 @@
 {
   "name": "@style-this/webpack",
-  "version": "0.0.3",
+  "version": "0.2.0",
   "description": "CSS-in-JS library for the modern web - webpack plugin",
   "type": "module",
   "files": [

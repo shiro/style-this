@@ -312,7 +312,7 @@ importers:
   packages/next:
     dependencies:
       '@style-this/core':
-        specifier: workspace:0.1.4
+        specifier: workspace:0.2.0
         version: link:../core
       '@types/node':
         specifier: ^24.10.1
@@ -337,7 +337,7 @@ importers:
     dependencies:
       react:
         specifier: ^18.0.0 || ^19.0.0
-        version: 19.2.0
+        version: 19.2.8
     devDependencies:
       '@types/react':
         specifier: ^18.0.0
@@ -352,7 +352,7 @@ importers:
   packages/vite:
     dependencies:
       '@style-this/core':
-        specifier: workspace:0.1.4
+        specifier: workspace:0.2.0
         version: link:../core
       solid-js:
         specifier: '*'
@@ -3448,6 +3448,7 @@ packages:
   eslint@9.39.1:
     resolution: {integrity: sha512-BhHmn2yNOFA9H9JmmIVKJmd288g9hrVRDkdoIgRCRuSySRUHH7r/DI6aAXW9T1WwUuY3DFgrcaqB+deURBLR5g==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -4702,10 +4703,6 @@ packages:
     resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
     peerDependencies:
       react: ^19.2.8
-
-  react@19.2.0:
-    resolution: {integrity: sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==}
-    engines: {node: '>=0.10.0'}
 
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
@@ -10239,8 +10236,6 @@ snapshots:
     dependencies:
       react: 19.2.8
       scheduler: 0.27.0
-
-  react@19.2.0: {}
 
   react@19.2.8: {}
 
