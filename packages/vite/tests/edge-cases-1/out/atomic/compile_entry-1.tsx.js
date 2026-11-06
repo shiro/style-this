@@ -2,7 +2,7 @@
 "use strict";
 const num = __styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("");
+let a = new String("a-gxu385");
 a.css = `margin: ${num}px;`;
 return {
 "a": a.css
@@ -13,7 +13,7 @@ return {
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let num = Math.random();
-let shared = new String("");
+let shared = new String("shared-ar0tez");
 shared.css = `margin: ${num}px;`;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};

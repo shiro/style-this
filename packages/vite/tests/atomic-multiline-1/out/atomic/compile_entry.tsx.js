@@ -1,7 +1,7 @@
 // /packages/vite/tests/atomic-multiline-1/entry.tsx: {"css", "grid"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let grid = new String("");
+let grid = new String("grid-1ajg1y");
 grid.css = `display: grid;
   grid-template-columns:
     minmax(0, 1fr)

@@ -1,10 +1,10 @@
 // /packages/vite/tests/atomic-global-1/entry.tsx: {"_GlobalMain", "css", "mainStyle"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let mainStyle = new String("");
+let mainStyle = new String("mainStyle-74hqzc");
 mainStyle.css = `background: red;
   padding: 20px;`;
-let _GlobalMain = new String("");
+let _GlobalMain = new String("_GlobalMain");
 _GlobalMain.css = `.Global__Main {
     background: coral;
     margin: 10px;

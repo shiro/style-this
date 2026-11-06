@@ -2,7 +2,7 @@
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "blue";
-let inner = new String("");
+let inner = new String("inner-wxav4x");
 inner.css = `background: ${color};`;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"] ?? {}), color,inner};
@@ -11,7 +11,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-o
 "use strict";
 const inner = __styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-overrides/b.tsx"]["inner"];
 let { css } = require("/packages/core/dist/index.mjs");
-let outer = new String("");
+let outer = new String("outer-folqvg");
 outer.css = `.${inner} {
     background: "red";
   }`;

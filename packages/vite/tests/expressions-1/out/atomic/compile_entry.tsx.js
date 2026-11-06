@@ -5,7 +5,7 @@ let doPromise = async () => {
 	await new Promise((resolve) => setTimeout(resolve, 10));
 	return "red";
 };
-let a = new String("");
+let a = new String("a-f45qro");
 a.css = `background: ${doPromise()};`;
 return {
 "a": a.css

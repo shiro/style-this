@@ -2,7 +2,7 @@
 "use strict";
 const getNumber = __styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-library-imports/node_modules/some_lib/index.js"]["getNumber"];
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("");
+let a = new String("a-tej8d6");
 a.css = `margin: ${getNumber()};`;
 return {
 "a": a.css

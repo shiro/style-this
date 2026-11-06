@@ -1,12 +1,12 @@
 // /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"__global__export__", "__styleThis_1", "__styleThis_2", "css", "foo"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let foo = new String("");
+let foo = new String("foo-l6j05a");
 foo.css = `color: white;`;
-let __styleThis_2 = new String("");
+let __styleThis_2 = new String("__styleThis_2-wduf4d");
 __styleThis_2.css = `color: hotpink;
   `;
-let __styleThis_1 = new String("");
+let __styleThis_1 = new String("__styleThis_1-gp6rwx");
 __styleThis_1.css = `color: green;
     `;
 class __global__export__ {
@@ -23,7 +23,7 @@ const a = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a
 const mib = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
 let { css } = require("/packages/core/dist/index.mjs");
 let mutate = (v) => v;
-let __styleThis_11 = new String("");
+let __styleThis_11 = new String("__styleThis_11-abwhir");
 __styleThis_11.css = `background: black;`;
 let __styleThis_var_a2_9 = () => {
 	const a3 = () => {
@@ -32,7 +32,7 @@ let __styleThis_var_a2_9 = () => {
 	return a3();
 };
 let __styleThis_var_wi_8 = __styleThis_var_a2_9();
-let __styleThis_var_m_7 = new String("");
+let __styleThis_var_m_7 = new String("m-9ib41m");
 __styleThis_var_m_7.css = `${__styleThis_var_wi_8}
   `;
 let a1 = () => {
@@ -41,16 +41,16 @@ let a1 = () => {
 	const m = __styleThis_var_m_7;
 	return wi;
 };
-let b = new String("");
+let b = new String("b-aj4l6b");
 b.css = `${a1()}`;
-let __styleThis_6 = new String("");
+let __styleThis_6 = new String("__styleThis_6-irk5mb");
 __styleThis_6.css = `background: blue;
     `;
 let __styleThis_var_c_5 = () => __styleThis_6;
-let __styleThis_var_s1_4 = new String("");
+let __styleThis_var_s1_4 = new String("s1-gta3sx");
 __styleThis_var_s1_4.css = `${__styleThis_var_c_5().css}
     `;
-let __styleThis_3 = new String("");
+let __styleThis_3 = new String("__styleThis_3-q74xyr");
 __styleThis_3.css = `@media (max-width: 500px) {
       background: blue;
     }
@@ -68,10 +68,10 @@ let __styleThis_expression_1 = { color: "blue" };
 let { color } = __styleThis_expression_1;
 let st = `color: ${color};
   ${mib.foo().css}`;
-let s2 = new String("");
+let s2 = new String("s2-3ctqjk");
 s2.css = `${st}
   ${comp().css}`;
-let unrelated = new String("");
+let unrelated = new String("unrelated-5y7cxe");
 unrelated.css = `background: none;
   ${a.foo.css}`;
 return {

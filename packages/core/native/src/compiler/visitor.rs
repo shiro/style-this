@@ -758,14 +758,19 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         extra_classes.clone(),
                     );
 
+                    let mut full_class_list = vec![class_name.clone()];
+                    full_class_list.extend(extra_classes.iter().cloned());
+                    let full_class_string = full_class_list.join(" ");
+
                     if self.atomic {
-                        // Atomic mode: In the virtual program, we need to declare the variable
-                        // so that the `.css = ...` assignment has something to assign to
+                        // Atomic mode: In the virtual program, the variable holds the non-atomic
+                        // class so it can be used in other selectors (e.g. `.${Other} {}`), the
+                        // marker rule keeps that class in the CSS
                         let variable_declarator = ast::build_variable_declarator(
                             self.ast_builder,
                             span,
                             &resolved_variable_name,
-                            ast::build_decorated_string(self.ast_builder, span, ""),
+                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
                         );
 
                         self.insert_into_virtual_program(
@@ -804,11 +809,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         *it = member_expr;
                     } else {
                         // Non-atomic mode: inline the class name string
-                        // Build the full class list including generated class and extra classes
-                        let mut full_class_list = vec![class_name.clone()];
-                        full_class_list.extend(extra_classes.iter().cloned());
-                        let full_class_string = full_class_list.join(" ");
-
                         let variable_declarator = ast::build_variable_declarator(
                             self.ast_builder,
                             span,
@@ -938,14 +938,19 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         extra_classes.clone(),
                     );
 
+                    let mut full_class_list = vec![class_name.clone()];
+                    full_class_list.extend(extra_classes.iter().cloned());
+                    let full_class_string = full_class_list.join(" ");
+
                     if self.atomic {
-                        // Atomic mode: In the virtual program, we need to declare the variable
-                        // so that the `.css = ...` assignment has something to assign to
+                        // Atomic mode: In the virtual program, the variable holds the non-atomic
+                        // class so it can be used in other selectors (e.g. `.${Other} {}`), the
+                        // marker rule keeps that class in the CSS
                         let variable_declarator = ast::build_variable_declarator(
                             self.ast_builder,
                             span,
                             &resolved_variable_name,
-                            ast::build_decorated_string(self.ast_builder, span, ""),
+                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
                         );
 
                         self.insert_into_virtual_program(
@@ -984,10 +989,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         );
                     } else {
                         // Non-atomic mode: inline the class name string
-                        let mut full_class_list = vec![class_name.clone()];
-                        full_class_list.extend(extra_classes.iter().cloned());
-                        let full_class_string = full_class_list.join(" ");
-
                         let variable_declarator = ast::build_variable_declarator(
                             self.ast_builder,
                             span,

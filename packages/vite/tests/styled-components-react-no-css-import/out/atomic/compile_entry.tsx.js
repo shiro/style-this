@@ -1,6 +1,6 @@
 // /packages/vite/tests/styled-components-react-no-css-import/entry.tsx: {"css"}
 "use strict";
-let __styleThis_var_FancyButton_2 = new String("");
+let __styleThis_var_FancyButton_2 = new String("FancyButton-yb0pqr");
 __styleThis_var_FancyButton_2.css = `background: none;
   border: 1px solid blue;
   &:hover {
