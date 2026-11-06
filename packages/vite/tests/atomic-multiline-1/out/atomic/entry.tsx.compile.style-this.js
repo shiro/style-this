@@ -1,0 +1,1 @@
+export const grid = "grid-1ajg1y d-cSCMc grid-cols-G06EK transition-m4VtQ"

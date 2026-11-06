@@ -31,6 +31,14 @@ describe("atomic with media queries", () => {
   });
 });
 
+describe("atomic with multi-line declarations", () => {
+  test("atomic-multiline-1", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
+  });
+});
+
 describe("atomic with global styles", () => {
   test("atomic-global-1", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name}`;

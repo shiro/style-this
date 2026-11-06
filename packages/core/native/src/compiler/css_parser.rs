@@ -1,6 +1,5 @@
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, StyleSheet};
-use std::collections::HashSet;
 
 /// Result of parsing a CSS block
 #[derive(Debug, Clone)]
@@ -13,49 +12,43 @@ pub struct ParseCssResult {
 
 pub fn parse_css(css: &str) -> ParseCssResult {
     // STRATEGY:
-    // 1. Split CSS into top-level segments (declarations and blocks) by tracking brace depth
-    //    This handles multi-line declarations correctly (preserves newlines).
+    // 1. Split CSS into top-level segments (declarations and blocks) by tracking brace depth,
+    //    each segment is a slice of the original CSS, so multi-line declarations stay intact.
     // 2. For each top-level declaration, validate it with lightningcss.
-    // 3. Build atomizable/non-atomizable sets, then reconstruct non-atomizable CSS
-    //    by line-by-line filtering to preserve original formatting.
+    // 3. Join the segments that can't be atomized to get the non-atomizable CSS.
     //
     // WHY NOT use lightningcss to parse the whole wrapped CSS?
     // - lightningcss normalizes CSS: `color: red` -> `RGBA(...)`, `margin: 10px` -> `Margin { top: ... }`
     // - We need to preserve ORIGINAL TEXT for proper formatting and special values like calc()
     // - lightningcss also puts bare declarations in NestedDeclarationsRule, not declarations
-    // - POTENTIAL FUTURE: Use lightningcss's source Location (line/column) to extract ranges
-    //   from original source, but this requires mapping byte offsets carefully.
 
-    let segments = split_top_level_segments(css);
     let mut atomizable: Vec<String> = Vec::new();
-    let mut non_atomizable_ranges = Vec::new();
+    let mut non_atomizable: Vec<&str> = Vec::new();
 
-    for segment in segments {
+    for segment in split_top_level_segments(css) {
         match segment {
-            TopLevelSegment::Declaration(decl_text) => {
-                if is_valid_declaration(&decl_text) {
-                    let normalized = decl_text.trim_end_matches(';').to_string();
-                    atomizable.retain(|existing| existing != &normalized);
-                    atomizable.push(normalized);
-                } else {
-                    non_atomizable_ranges.push(decl_text);
-                }
+            TopLevelSegment::Declaration(decl_text) if is_valid_declaration(decl_text) => {
+                let normalized = decl_text.trim().trim_end_matches(';').to_string();
+                atomizable.retain(|existing| existing != &normalized);
+                atomizable.push(normalized);
             }
-            TopLevelSegment::Block(block_text) => {
-                non_atomizable_ranges.push(block_text);
+            TopLevelSegment::Declaration(text) | TopLevelSegment::Block(text) => {
+                non_atomizable.push(text);
             }
-            TopLevelSegment::Empty => {}
         }
     }
 
-    let non_atomizable = if non_atomizable_ranges.is_empty() {
-        None
-    } else {
-        Some(reconstruct_non_atomizable(
-            css,
-            &atomizable.iter().cloned().collect(),
-        ))
-    };
+    let non_atomizable = (!non_atomizable.is_empty()).then(|| {
+        let mut output = non_atomizable
+            .into_iter()
+            .map(strip_leading_lines)
+            .collect::<Vec<_>>()
+            .join("\n");
+        if css.ends_with('\n') {
+            output.push('\n');
+        }
+        output
+    });
 
     ParseCssResult {
         atomizable,
@@ -63,120 +56,74 @@ pub fn parse_css(css: &str) -> ParseCssResult {
     }
 }
 
-/// Represents a top-level CSS segment
-enum TopLevelSegment {
+/// Represents a top-level CSS segment, a slice of the original CSS
+enum TopLevelSegment<'a> {
     /// A CSS declaration (e.g., "color: red;" or multi-line)
-    Declaration(String),
-    /// A block (e.g., "@media { ... }")
-    Block(String),
-    /// Empty or whitespace-only
-    Empty,
+    Declaration(&'a str),
+    /// A block including its prelude (e.g., "@media (...) { ... }" or "&:hover { ... }")
+    Block(&'a str),
 }
 
-/// Split CSS into top-level segments (declarations and blocks) while preserving structure
-fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment> {
+/// Strips surrounding whitespace, but keeps the indentation of the first line.
+fn strip_leading_lines(text: &str) -> &str {
+    let text = text.trim_end();
+    let content_start = text.len() - text.trim_start().len();
+    let line_start = text[..content_start]
+        .rfind('\n')
+        .map(|idx| idx + 1)
+        .unwrap_or(0);
+    &text[line_start..]
+}
+
+/// Split CSS into top-level segments (declarations and blocks)
+fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     let mut segments = Vec::new();
-    let mut current_segment = String::new();
+    let mut segment_start = 0;
     let mut brace_depth = 0;
-    let mut in_declaration = false;
-    let mut in_string = false;
-    let mut string_char = ' '; // ' or "
+    let mut string_char: Option<char> = None;
+    let mut prev_char = ' ';
 
-    let chars: Vec<char> = css.chars().collect();
-    let mut i = 0;
+    for (idx, ch) in css.char_indices() {
+        let escaped = prev_char == '\\';
+        prev_char = ch;
 
-    while i < chars.len() {
-        let ch = chars[i];
-
-        // Handle string boundaries
-        if (ch == '\'' || ch == '"') && (i == 0 || chars[i - 1] != '\\') {
-            if in_string && ch == string_char {
-                in_string = false;
-            } else if !in_string {
-                in_string = true;
-                string_char = ch;
+        if let Some(quote) = string_char {
+            if ch == quote && !escaped {
+                string_char = None;
             }
-            current_segment.push(ch);
-            i += 1;
-            continue;
-        }
-
-        // Skip brace/semicolon tracking if we're inside a string
-        if in_string {
-            current_segment.push(ch);
-            i += 1;
             continue;
         }
 
         match ch {
-            '{' => {
-                brace_depth += 1;
-                current_segment.push(ch);
-
-                if brace_depth == 1 {
-                    if in_declaration
-                        && !current_segment[..current_segment.len() - 1]
-                            .trim()
-                            .is_empty()
-                    {
-                        let decl = current_segment[..current_segment.len() - 1].to_string();
-                        if !decl.trim().is_empty() {
-                            segments.push(TopLevelSegment::Declaration(decl));
-                        }
-                    }
-                    current_segment.clear();
-                    current_segment.push('{');
-                    in_declaration = false;
-                }
-            }
+            '\'' | '"' if !escaped => string_char = Some(ch),
+            '{' => brace_depth += 1,
             '}' => {
-                current_segment.push(ch);
                 brace_depth -= 1;
-
                 if brace_depth == 0 {
-                    let block = current_segment.trim().to_string();
-                    if !block.is_empty() {
-                        segments.push(TopLevelSegment::Block(block));
-                    }
-                    current_segment.clear();
+                    segments.push(TopLevelSegment::Block(&css[segment_start..=idx]));
+                    segment_start = idx + 1;
                 }
             }
-            ';' => {
-                current_segment.push(ch);
-
-                if brace_depth == 0 {
-                    let decl = current_segment.trim().to_string();
-                    if !decl.is_empty() {
-                        segments.push(TopLevelSegment::Declaration(decl));
-                    }
-                    current_segment.clear();
-                    in_declaration = false;
-                }
+            ';' if brace_depth == 0 => {
+                segments.push(TopLevelSegment::Declaration(&css[segment_start..=idx]));
+                segment_start = idx + 1;
             }
-            '\n' | '\r' => {
-                current_segment.push(ch);
-                in_declaration = brace_depth == 0;
-            }
-            _ => {
-                current_segment.push(ch);
-                if brace_depth == 0 && !ch.is_whitespace() {
-                    in_declaration = true;
-                }
-            }
-        }
-
-        i += 1;
-    }
-
-    if !current_segment.trim().is_empty() {
-        if brace_depth > 0 {
-            segments.push(TopLevelSegment::Block(current_segment.trim().to_string()));
-        } else if in_declaration {
-            segments.push(TopLevelSegment::Declaration(
-                current_segment.trim().to_string(),
-            ));
+            _ => {}
         }
     }
+
+    let rest = &css[segment_start..];
+    if brace_depth > 0 {
+        segments.push(TopLevelSegment::Block(rest));
+    } else {
+        segments.push(TopLevelSegment::Declaration(rest));
+    }
+
+    segments.retain(|segment| match segment {
+        TopLevelSegment::Declaration(text) | TopLevelSegment::Block(text) => {
+            !text.trim().is_empty()
+        }
+    });
 
     segments
 }
@@ -185,19 +132,13 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment> {
 fn is_valid_declaration(decl_text: &str) -> bool {
     let trimmed = decl_text.trim();
 
-    if !trimmed.ends_with(';') {
+    let Some(without_semi) = trimmed.strip_suffix(';') else {
         return false;
-    }
+    };
 
     if trimmed.contains("var(") {
         return false;
     }
-
-    let without_semi = if trimmed.ends_with(';') {
-        &trimmed[..trimmed.len() - 1]
-    } else {
-        trimmed
-    };
 
     let wrapped = format!("a {{ {} }}", without_semi);
 
@@ -226,77 +167,10 @@ fn is_valid_declaration(decl_text: &str) -> bool {
     }
 }
 
-fn keep_line(line: &str, brace_depth: i32, atomizable: &HashSet<String>, has_output: bool) -> bool {
-    let trimmed = line.trim();
-
-    if brace_depth > 0 {
-        true
-    } else if let Some(decl) = trimmed.strip_suffix(';') {
-        !atomizable.contains(decl)
-    } else if !trimmed.is_empty() {
-        !atomizable.iter().any(|a| a.starts_with(trimmed))
-    } else {
-        has_output
-    }
-}
-
-/// Reconstruct non-atomizable content from the original CSS, excluding atomizable declarations
-fn reconstruct_non_atomizable(css: &str, atomizable: &HashSet<String>) -> String {
-    let mut result = Vec::new();
-    let mut brace_depth = 0;
-    let mut current_line = String::new();
-    let mut in_string = false;
-    let mut string_char = ' '; // ' or "
-
-    for ch in css.chars() {
-        current_line.push(ch);
-
-        // Handle string boundaries
-        if (ch == '\'' || ch == '"') {
-            if in_string && ch == string_char {
-                in_string = false;
-            } else if !in_string {
-                in_string = true;
-                string_char = ch;
-            }
-        }
-
-        // Only track braces outside of strings
-        if !in_string {
-            if ch == '{' {
-                brace_depth += 1;
-            } else if ch == '}' {
-                brace_depth -= 1;
-            }
-        }
-
-        if ch == '\n' {
-            if keep_line(&current_line, brace_depth, atomizable, !result.is_empty()) {
-                result.push(current_line.clone());
-            }
-            current_line.clear();
-        }
-    }
-
-    // the last line has no trailing newline, it needs the same handling as any other line,
-    // otherwise the closing brace of a trailing nested rule gets dropped
-    if !current_line.trim().is_empty()
-        && keep_line(&current_line, brace_depth, atomizable, !result.is_empty())
-    {
-        result.push(current_line);
-    }
-
-    let mut output = result.join("");
-    if css.ends_with('\n') && !output.ends_with('\n') {
-        output.push('\n');
-    }
-
-    output
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
     use indoc::indoc;
 
     #[test]
@@ -368,6 +242,42 @@ mod tests {
         assert_eq!(
             result.non_atomizable.as_deref(),
             Some("@media (max-width: 500px) {\n  .a {\n    color: blue;\n  }\n}")
+        );
+    }
+
+    #[test]
+    fn multiline_declarations_next_to_blocks() {
+        let input = indoc! {"
+            grid-template-columns:
+              minmax(0, 1fr)
+              auto;
+            transition:
+              color 0.2s,
+              background 0.2s;
+            &:hover {
+              color: blue;
+            }
+            margin-top:
+              var(--mt);
+        "};
+        let result = parse_css(input);
+
+        assert_eq!(
+            result.atomizable,
+            vec![
+                "grid-template-columns:\n  minmax(0, 1fr)\n  auto".to_string(),
+                "transition:\n  color 0.2s,\n  background 0.2s".to_string(),
+            ]
+        );
+        assert_eq!(
+            result.non_atomizable.as_deref(),
+            Some(indoc! {"
+                &:hover {
+                  color: blue;
+                }
+                margin-top:
+                  var(--mt);
+            "})
         );
     }
 
