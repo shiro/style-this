@@ -226,6 +226,20 @@ fn is_valid_declaration(decl_text: &str) -> bool {
     }
 }
 
+fn keep_line(line: &str, brace_depth: i32, atomizable: &HashSet<String>, has_output: bool) -> bool {
+    let trimmed = line.trim();
+
+    if brace_depth > 0 {
+        true
+    } else if let Some(decl) = trimmed.strip_suffix(';') {
+        !atomizable.contains(decl)
+    } else if !trimmed.is_empty() {
+        !atomizable.iter().any(|a| a.starts_with(trimmed))
+    } else {
+        has_output
+    }
+}
+
 /// Reconstruct non-atomizable content from the original CSS, excluding atomizable declarations
 fn reconstruct_non_atomizable(css: &str, atomizable: &HashSet<String>) -> String {
     let mut result = Vec::new();
@@ -257,47 +271,19 @@ fn reconstruct_non_atomizable(css: &str, atomizable: &HashSet<String>) -> String
         }
 
         if ch == '\n' {
-            let trimmed = current_line.trim();
-
-            if brace_depth > 0 {
-                result.push(current_line.clone());
-            } else if trimmed.ends_with(';') {
-                let decl = if trimmed.ends_with(';') {
-                    &trimmed[..trimmed.len() - 1]
-                } else {
-                    trimmed
-                };
-
-                if !atomizable.contains(decl) {
-                    result.push(current_line.clone());
-                }
-            } else if !trimmed.is_empty() {
-                let is_in_atomizable = atomizable.iter().any(|a| a.starts_with(trimmed));
-                if !is_in_atomizable {
-                    result.push(current_line.clone());
-                }
-            } else if !result.is_empty() {
+            if keep_line(&current_line, brace_depth, atomizable, !result.is_empty()) {
                 result.push(current_line.clone());
             }
-
             current_line.clear();
         }
     }
 
-    if !current_line.is_empty() {
-        let trimmed = current_line.trim();
-        if !trimmed.is_empty() && brace_depth > 0 {
-            result.push(current_line);
-        } else if !trimmed.is_empty() && trimmed.ends_with(';') {
-            let decl = if trimmed.ends_with(';') {
-                &trimmed[..trimmed.len() - 1]
-            } else {
-                trimmed
-            };
-            if !atomizable.contains(decl) {
-                result.push(current_line);
-            }
-        }
+    // the last line has no trailing newline, it needs the same handling as any other line,
+    // otherwise the closing brace of a trailing nested rule gets dropped
+    if !current_line.trim().is_empty()
+        && keep_line(&current_line, brace_depth, atomizable, !result.is_empty())
+    {
+        result.push(current_line);
     }
 
     let mut output = result.join("");
@@ -362,6 +348,27 @@ mod tests {
 
         assert_eq!(result.non_atomizable.as_deref(), expected);
         assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
+    }
+
+    #[test]
+    fn trailing_nested_rule_keeps_closing_brace() {
+        // templates are trimmed, so the closing brace is the last character without a newline
+        let input = "color: red;\n&:hover {\n  color: blue;\n}";
+        let result = parse_css(input);
+
+        assert_eq!(result.atomizable, vec!["color: red".to_string()]);
+        assert_eq!(
+            result.non_atomizable.as_deref(),
+            Some("&:hover {\n  color: blue;\n}")
+        );
+
+        let input = "color: red;\n@media (max-width: 500px) {\n  .a {\n    color: blue;\n  }\n}";
+        let result = parse_css(input);
+
+        assert_eq!(
+            result.non_atomizable.as_deref(),
+            Some("@media (max-width: 500px) {\n  .a {\n    color: blue;\n  }\n}")
+        );
     }
 
     #[test]
