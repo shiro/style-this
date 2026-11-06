@@ -3,6 +3,4 @@ declare module "*.wasm" {
   export default wasmModule;
 }
 
-declare global {
-  var __styleThis_getAtomicCss: (((...args: unknown[]) => string) & { isAtomicMode?: boolean }) | undefined;
-}
+declare var __styleThis_getAtomicCss: (() => string) | undefined;

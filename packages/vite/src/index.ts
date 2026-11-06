@@ -36,7 +36,12 @@ interface ViteConfig extends Pick<UserConfig, "optimizeDeps" | "ssr"> { }
 export interface ExtraFields {
   cssExtension: string;
   __mocks: Map<string, string>;
-  __getTemporaryPrograms: () => Record<string, string>;
+  __getDebugVirtualModules: () => Record<string, string>;
+  getTransitiveImporters(filepath: string, changedExports: string[]): string[];
+  getFileExports(filepath: string): string[];
+  clearFileImports(filepath: string): void;
+  clearValueCache(filepath: string): void;
+  invalidateModule(filepath: string): void;
 }
 
 const vitePlugin = (options: Options = {}) => {
