@@ -495,9 +495,7 @@ fn evaluate_dependencies<'alloc>(
                     None,
                     skip_css_eval,
                 )
-                .await;
-
-                Ok(())
+                .await
             })
         };
         futures.push(future);
@@ -556,7 +554,7 @@ pub async fn evaluate_program<'alloc>(
     temporary_programs: Rc<RefCell<HashMap<String, String>>>,
     tx: Option<futures::channel::oneshot::Sender<Result<Option<JsValue>, TransformError>>>,
     skip_css_eval: bool,
-) {
+) -> Result<(), TransformError> {
     let allocator = &ast_builder.allocator;
 
     // keep values until end of function
@@ -690,10 +688,11 @@ pub async fn evaluate_program<'alloc>(
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
-        if let Some(tx) = tx {
-            let _ = tx.send(Err(error));
-        }
-        return;
+        let Some(tx) = tx else {
+            return Err(error);
+        };
+        let _ = tx.send(Err(error));
+        return Ok(());
     }
     let (
         css_variable_identifiers,
@@ -717,7 +716,7 @@ pub async fn evaluate_program<'alloc>(
                 .then(|| codegen_transform_result(program, &program_filepath));
             let _ = tx.send(Ok(result));
         }
-        return;
+        return Ok(());
     }
 
     // Transform @style-this/core/atomic imports into virtual module imports
@@ -765,15 +764,7 @@ pub async fn evaluate_program<'alloc>(
     );
 
     if let Err(err) = futures::future::try_join_all(dependency_futures).await {
-        let err = ExportedJSValue::new(err.into());
-        js_sys::eval(&format!(
-            "
-            {css_file_store_ref}.get({css_filepath})?.resolve({err});
-            {atomic_file_store_ref}.get({atomic_filepath})?.resolve({err});
-            "
-        ))
-        .unwrap();
-        return;
+        return report_error(transformer, entrypoint, &program_filepath, err);
     }
 
     // Always populate value cache with exported idents, even when skipping CSS eval
@@ -784,7 +775,7 @@ pub async fn evaluate_program<'alloc>(
 
     // After registering imports and exports, if we're skipping CSS evaluation, return early
     if skip_css_eval {
-        return;
+        return Ok(());
     }
 
     transpile_ts_to_js(allocator, &mut eval_program.borrow_mut());
@@ -802,6 +793,10 @@ pub async fn evaluate_program<'alloc>(
         .with_options(CodegenOptions::default())
         .build(&eval_program.borrow())
         .code;
+
+    // evaluated exports are only stored at the end of the program, if evaluation fails they need
+    // to be evaluated again by the next importer
+    let evaluated_exports: Vec<String> = exported_idents.iter().cloned().collect();
 
     // we append all exported idents we evaluated to the cache
     if !exported_idents.is_empty() {
@@ -936,15 +931,7 @@ pub async fn evaluate_program<'alloc>(
                 cause,
             }) {
                 Ok(v) => v,
-                Err(err) => {
-                    let err_str = ExportedJSValue::new(err.into());
-                    js_sys::eval(&format!(
-                        "global.{css_file_store_ref}.get({css_filepath})?.resolve({err_str});
-                         global.{atomic_file_store_ref}.get({atomic_filepath})?.resolve({err_str});"
-                    ))
-                    .unwrap();
-                    return;
-                }
+                Err(err) => return report_error(transformer, entrypoint, &program_filepath, err),
             };
 
         // Await the promise to get the CSS blocks
@@ -952,16 +939,13 @@ pub async fn evaluate_program<'alloc>(
         let future = wasm_bindgen_futures::JsFuture::from(promise);
         let evaluated = match future.await {
             Ok(v) => v,
-            Err(err) => {
-                let err_str = ExportedJSValue::new(err.into());
-                js_sys::eval(&format!(
-                    "
-                    global.{css_file_store_ref}.get({css_filepath})?.resolve({err_str}); 
-                    global.{atomic_file_store_ref}.get({atomic_filepath})?.resolve({err_str});
-                    "
-                ))
-                .unwrap();
-                return;
+            Err(cause) => {
+                let err = TransformError::EvaluationFailed {
+                    filepath: program_filepath.clone(),
+                    program: None,
+                    cause,
+                };
+                return report_error(transformer, entrypoint, &program_filepath, err);
             }
         };
 
@@ -1073,7 +1057,7 @@ pub async fn evaluate_program<'alloc>(
         ))
         .unwrap();
 
-        return;
+        return Ok(());
     }
 
     // wrap into promise and hide global symbols
@@ -1096,14 +1080,8 @@ pub async fn evaluate_program<'alloc>(
         }) {
             Ok(v) => v,
             Err(err) => {
-                let err = ExportedJSValue::new(err.into());
-                js_sys::eval(&format!(
-                    "
-                    {css_file_store_ref}.get({css_filepath}).resolve({err});
-                    "
-                ))
-                .unwrap();
-                return;
+                value_cache.retain(|ident| !evaluated_exports.contains(ident));
+                return report_error(transformer, entrypoint, &program_filepath, err);
             }
         };
 
@@ -1122,7 +1100,7 @@ pub async fn evaluate_program<'alloc>(
             );
         })
         .map_err(|cause| TransformError::EvaluationFailed {
-            filepath: program_filepath,
+            filepath: program_filepath.clone(),
             program: if transformer.debug {
                 Some(eval_program_js.to_string())
             } else {
@@ -1131,14 +1109,8 @@ pub async fn evaluate_program<'alloc>(
             cause,
         })
     {
-        let err = ExportedJSValue::new(err.into());
-        js_sys::eval(&format!(
-            "
-            {css_file_store_ref}.get({css_filepath}).resolve({err});
-            "
-        ))
-        .unwrap();
-        return;
+        value_cache.retain(|ident| !evaluated_exports.contains(ident));
+        return report_error(transformer, entrypoint, &program_filepath, err);
     }
 
     // entrypoints without any CSS still get their virtual modules requested, resolve them as
@@ -1152,4 +1124,32 @@ pub async fn evaluate_program<'alloc>(
         ))
         .unwrap();
     }
+
+    Ok(())
+}
+
+/// Entrypoints report errors through their virtual modules, dependencies pass them on to their
+/// importer.
+fn report_error(
+    transformer: &Transformer,
+    entrypoint: bool,
+    program_filepath: &str,
+    err: TransformError,
+) -> Result<(), TransformError> {
+    if !entrypoint {
+        return Err(err);
+    }
+
+    let css_file_store_ref = &transformer.css_file_store_ref;
+    let atomic_file_store_ref = &transformer.atomic_file_store_ref;
+    let css_extension = &transformer.css_extension;
+    let err = ExportedJSValue::new(err.into());
+    let _ = js_sys::eval(&format!(
+        "
+        {css_file_store_ref}.get('{program_filepath}.{css_extension}')?.resolve({err});
+        {atomic_file_store_ref}.get('{program_filepath}.style-this.js')?.resolve({err});
+        "
+    ));
+
+    Ok(())
 }

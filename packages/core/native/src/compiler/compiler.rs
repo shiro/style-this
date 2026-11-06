@@ -62,7 +62,8 @@ impl Transformer {
                 return;
             }
 
-            evaluate_program(
+            // entrypoints report errors through `tx` and their virtual modules
+            let _ = evaluate_program(
                 &ast_builder,
                 &_self,
                 true,
