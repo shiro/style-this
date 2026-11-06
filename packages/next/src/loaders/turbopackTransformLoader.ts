@@ -1,6 +1,6 @@
 import path from "path";
 import { initializeStyleThis } from "@style-this/core/compiler";
-import { cssFiles } from "../shared";
+import { cacheRegistry, cssFiles } from "../shared";
 import { dependencyStore } from "../shared";
 import { Transformer } from "@style-this/core/compiler";
 import type { RawLoaderDefinitionFunction } from "webpack";
@@ -14,7 +14,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 type LoaderType = RawLoaderDefinitionFunction<{}>;
 
 let styleThis: Transformer;
-const exportCache = {} as Record<string, Record<string, any>>;
 const filesContainingStyledTemplates = new Set<string>();
 const cssExtension = "css";
 const mocks = new Map<string, string>();
@@ -34,8 +33,7 @@ const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
         ignoredImports: {},
         loadFile,
         createRequire: requireFn,
-        cssCache: cssFiles,
-        valueCache: exportCache,
+        cacheRegistry,
         cssExtension,
         wrapSelectorsWithGlobal: true,
         useRequire: true,

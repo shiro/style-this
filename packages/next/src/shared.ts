@@ -1,8 +1,16 @@
-import type { CssCachEntry } from "@style-this/core/compiler";
+import type { CssCachEntry, JsCacheRegistry } from "@style-this/core/compiler";
 import { writeFileSync, mkdirSync } from "fs";
 import * as path from "path";
 
 export const cssFiles = new Map<string, CssCachEntry>();
+export const atomicFiles = new Map<string, CssCachEntry>();
+
+/** Makes the compiler resolve CSS into `cssFiles`, where the CSS loader reads it from. */
+export const cacheRegistry: JsCacheRegistry = {
+  initializeRefs(cssRef, atomicRef) {
+    Object.assign(globalThis, { [cssRef]: cssFiles, [atomicRef]: atomicFiles });
+  },
+};
 export const dependencyStore = new Map<string, string[]>();
 
 // Store CSS output so we can write it to files later

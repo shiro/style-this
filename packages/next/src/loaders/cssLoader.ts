@@ -28,7 +28,8 @@ const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
   // Handle the promise-based CSS entry
   Promise.resolve(css).then(
     (resolvedCss) => {
-      callback(null, resolvedCss);
+      if (resolvedCss instanceof Error) callback(resolvedCss);
+      else callback(null, resolvedCss);
     },
     (error) => {
       callback(error);

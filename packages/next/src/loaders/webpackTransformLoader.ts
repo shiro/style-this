@@ -1,6 +1,6 @@
 import type { RawLoaderDefinitionFunction } from "webpack";
 import { initializeStyleThis } from "@style-this/core/compiler";
-import { cssFiles } from "../shared";
+import { cacheRegistry, cssFiles } from "../shared";
 import { Transformer } from "@style-this/core/compiler";
 import { createRequire } from "node:module";
 import { makeLoadFile } from "./shared";
@@ -13,7 +13,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 type LoaderType = RawLoaderDefinitionFunction<{}>;
 
 let styleThis: Transformer;
-const exportCache = {} as Record<string, Record<string, any>>;
 const filesContainingStyledTemplates = new Set<string>();
 const cssExtension = "css";
 const mocks = new Map<string, string>();
@@ -36,8 +35,7 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
         ignoredImports: {},
         loadFile,
         createRequire: requireFn,
-        cssCache: cssFiles,
-        valueCache: exportCache,
+        cacheRegistry,
         cssExtension,
         atomic: process.env.ATOMIC === '1',
       });
@@ -61,7 +59,6 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
     const cssFilepath = `${filepath}.${cssExtension}`;
     const skipCssEval = cssFiles.has(cssFilepath);
     
-    let cssPromiseResolve: ((css: string) => void) | undefined;
     if (!skipCssEval) {
       let resolve: import("@style-this/core/compiler").CssCachEntry["resolve"] | undefined;
       const entry = new Promise((_resolve, _reject) => {
@@ -69,12 +66,8 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       }) as import("@style-this/core/compiler").CssCachEntry;
       entry.resolve = resolve!;
       entry.code = code.toString();
-      
-      // Store the resolve function so we can call it after transform
-      cssPromiseResolve = (css: string) => {
-        entry.resolve(css);
-      };
-      
+
+      // resolved by the compiler through `cacheRegistry`
       cssFiles.set(cssFilepath, entry);
     }
 
@@ -90,11 +83,6 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       return;
     }
     filesContainingStyledTemplates.add(filepath);
-
-    // If we have CSS from the transform result, resolve the CSS promise
-    if (cssPromiseResolve && transformedResult.css) {
-      cssPromiseResolve(transformedResult.css);
-    }
 
     this.callback(
       null,
