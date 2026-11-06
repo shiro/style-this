@@ -44,10 +44,13 @@ export default defineConfig({
           ]),
         ),
       },
-      plugins: [styleThisVitePlugin({ 
-        filter: /.*\.tsx/,
-        atomic: process.env.ATOMIC === '1'
-      })],
+      plugins: [
+        // vinxi uses vite 6, its plugin types are incompatible with the vite 7 ones
+        styleThisVitePlugin({
+          filter: /.*\.tsx/,
+          atomic: process.env.ATOMIC === "1",
+        }) as any,
+      ],
     };
   },
 });

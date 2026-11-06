@@ -114,7 +114,7 @@ function extractBodyContent(html: string): string {
 
 async function buildAndCaptureSolidStart2(browser: Browser, atomic: boolean): Promise<BuildOutput> {
   console.log('Building Solid Start 2 example...');
-  const env = atomic ? { ATOMIC: '1' } : {};
+  const env: Record<string, string> = atomic ? { ATOMIC: '1' } : {};
   exec('pnpm build', SOLID_START_2_EXAMPLE);
   
   let server: ChildProcess | null = null;

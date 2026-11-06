@@ -23,6 +23,6 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    clearScreen: false,
   },
+  clearScreen: false,
 });
