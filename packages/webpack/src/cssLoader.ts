@@ -3,7 +3,7 @@ import { cssFiles } from "./shared";
 type Loader = RawLoaderDefinitionFunction;
 
 const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
-  this.async();
+  const callback = this.async();
 
   // TODO remove this when done
   this.cacheable(false);
@@ -16,14 +16,16 @@ const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
   // console.log("ret is\n", ret);
 
   if (!ret) {
-    this.callback(null, code, inputSourceMap);
+    callback(null, code, inputSourceMap);
     return;
   }
 
   // this.addDependency(filepath);
 
-  // return ret;
-  this.callback(null, ret);
+  ret.then(
+    (css) => (css instanceof Error ? callback(css) : callback(null, css)),
+    (err) => callback(err),
+  );
 
   // console.log(cssFiles)
 };

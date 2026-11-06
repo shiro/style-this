@@ -1,8 +1,11 @@
 import type { RawLoaderDefinitionFunction } from "webpack";
-import { Transformer, initializeStyleThis } from "@style-this/core/compiler";
-import { cssFiles } from "./shared";
+import { Transformer, initializeStyleThis, type CssCachEntry } from "@style-this/core/compiler";
+import { cacheRegistry, cssFiles } from "./shared";
 import path from "path";
 import { readFile } from "fs/promises";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 export type LoaderOptions = {
   extension?: string;
@@ -25,7 +28,6 @@ try {
 export const NextCSSLoader = cssLoader;
 
 let styleThis: Transformer;
-const exportCache = {} as Record<string, Record<string, any>>;
 const filesContainingStyledTemplates = new Set<string>();
 const cssExtension = "style.css";
 const mocks = new Map<string, string>();
@@ -102,15 +104,25 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
     if (!styleThis) {
       await initializeStyleThis();
       styleThis = new Transformer({
+        cwd,
+        ignoredImports: {},
         loadFile,
-        cssFileStore: cssFiles,
-        exportCache,
+        cacheRegistry,
         cssExtension,
       });
     }
 
     const filepath = this.resourcePath;
     const cssFilepath = `${filepath}.${cssExtension}`;
+
+    // resolved by the compiler through `cacheRegistry`
+    let resolve: CssCachEntry["resolve"] | undefined;
+    const entry = new Promise((_resolve) => {
+      resolve = _resolve;
+    }) as CssCachEntry;
+    entry.resolve = resolve!;
+    entry.code = code.toString();
+    cssFiles.set(cssFilepath, entry);
 
     // console.log("LOAD style-this", this.resourcePath);
     // console.log(code);

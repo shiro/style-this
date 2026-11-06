@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "strict": true,
     "lib": ["ESNext", "DOM"],
+    "types": ["node"],
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
