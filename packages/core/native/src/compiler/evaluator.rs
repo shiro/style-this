@@ -651,12 +651,22 @@ pub async fn evaluate_program<'alloc>(
         .unwrap_or(&program_filepath)
         .to_string();
 
+    let mut transformed_styled_components = false;
+
     if solid_prepass {
-        solid_js_prepass(ast_builder, relative_program_filepath.clone(), program, false);
+        transformed_styled_components |=
+            solid_js_prepass(ast_builder, relative_program_filepath.clone(), program, false);
     }
 
     if react_prepass_enabled {
-        react_prepass(ast_builder, relative_program_filepath, program, false);
+        transformed_styled_components |=
+            react_prepass(ast_builder, relative_program_filepath, program, false);
+    }
+
+    // the prepasses rewrite styled templates into `css` templates, which need to be picked up even
+    // if `css` itself isn't imported
+    if transformed_styled_components && css_function_name.is_none() {
+        css_function_name = Some("css".to_string());
     }
 
     let rewrote_merge_styles = !transformer.atomic && rewrite_merge_styles_imports(program, ast_builder);
@@ -1125,6 +1135,19 @@ pub async fn evaluate_program<'alloc>(
         js_sys::eval(&format!(
             "
             {css_file_store_ref}.get({css_filepath}).resolve({err});
+            "
+        ))
+        .unwrap();
+        return;
+    }
+
+    // entrypoints without any CSS still get their virtual modules requested, resolve them as
+    // empty so they don't wait forever
+    if entrypoint && !has_css {
+        js_sys::eval(&format!(
+            "
+            {css_file_store_ref}.get({css_filepath})?.resolve('');
+            {atomic_file_store_ref}.get({atomic_filepath})?.resolve('');
             "
         ))
         .unwrap();

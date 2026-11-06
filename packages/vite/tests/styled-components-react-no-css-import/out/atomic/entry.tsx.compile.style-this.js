@@ -1,0 +1,1 @@
+export const __styleThis_var_FancyButton_2 = "FancyButton-yb0pqr b-zDIGu bg-kG3jH"

@@ -8,4 +8,11 @@ describe("styled-components-react", () => {
 
     await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });
+
+  test("styled-components-react-no-css-import", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
+  });
 });

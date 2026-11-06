@@ -1,5 +1,5 @@
 import { describe, test } from "vitest";
-import { evaluateProgramBothModesMultiFile, getResolver } from "./util/testUtil";
+import { evaluateProgramBothModes, evaluateProgramBothModesMultiFile, getResolver } from "./util/testUtil";
 import { join } from "path";
 
 describe("edge-cases", () => {
@@ -16,5 +16,12 @@ describe("edge-cases", () => {
     resolver["some_lib"] = join(testDir, "node_modules/some_lib/index.js");
 
     await evaluateProgramBothModesMultiFile(testDir, ["entry.tsx"], resolver);
+  });
+
+  test("edge-cases-unused-css-import", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });
 });

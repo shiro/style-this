@@ -1,0 +1,7 @@
+.FancyButton-yb0pqr {
+background: none;
+  border: 1px solid blue;
+  &:hover {
+    color: red;
+  }
+}

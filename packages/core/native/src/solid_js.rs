@@ -314,7 +314,7 @@ pub fn solid_js_prepass<'alloc>(
     filepath: String,
     program: &mut Program<'alloc>,
     skip_jsx: bool,
-) {
+) -> bool {
     let mut transformer = SolidStyledComponentTransformer::new(ast_builder, skip_jsx, filepath);
     transformer.visit_program(program);
 
@@ -357,4 +357,6 @@ pub fn solid_js_prepass<'alloc>(
             .body
             .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
     }
+
+    transformer.base.component_counter > 0
 }
