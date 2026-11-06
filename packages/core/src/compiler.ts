@@ -3,6 +3,14 @@ import wasm from "../native/pkg/style_this_bg.wasm";
 
 import { Transformer as _Transformer, CacheRegistry as _CacheRegistry } from "../native/pkg/style_this.js";
 
+/**
+ * JS side cache the compiler resolves CSS and atomic modules into, `initializeRefs` must store the
+ * CSS and atomic `Map`s on `globalThis` under the given names.
+ */
+export interface JsCacheRegistry {
+  initializeRefs(cssRef: string, atomicRef: string): void;
+}
+
 export interface CacheRegistry {
   css_cache_ref(): string;
   atomic_cache_ref(): string;
@@ -48,7 +56,7 @@ export const Transformer = _Transformer as unknown as new (opts: {
   loadFile: (filepath: string, importer: string) => Promise<[string, string]>;
   createRequire?: (filename: string) => NodeRequire;
 
-  cacheRegistry: CacheRegistry;
+  cacheRegistry?: JsCacheRegistry;
 
   wrapSelectorsWithGlobal?: boolean;
 
