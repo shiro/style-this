@@ -31,7 +31,7 @@ interface Options {
   cacheRegistry?: CacheRegistry;
 }
 
-interface ViteConfig extends Pick<UserConfig, "optimizeDeps"> { }
+interface ViteConfig extends Pick<UserConfig, "optimizeDeps" | "ssr"> { }
 
 export interface ExtraFields {
   cssExtension: string;
@@ -216,6 +216,19 @@ const vitePlugin = (options: Options = {}) => {
           "@style-this/core/compiler",
         ],
       };
+
+      // externalized packages are imported by node directly during SSR, skipping `resolveId`,
+      // `@style-this/core/atomic` must be resolved to the virtual atomic CSS module instead
+      const noExternal = config.ssr?.noExternal;
+      if (noExternal !== true) {
+        config.ssr = {
+          ...(config.ssr ?? {}),
+          noExternal: [
+            ...(noExternal == undefined ? [] : Array.isArray(noExternal) ? noExternal : [noExternal]),
+            "@style-this/core",
+          ],
+        };
+      }
 
       await initializeStyleThis();
 
