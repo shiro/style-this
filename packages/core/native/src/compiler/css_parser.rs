@@ -25,7 +25,9 @@ pub fn parse_css(css: &str) -> ParseCssResult {
     let mut atomizable: Vec<String> = Vec::new();
     let mut non_atomizable: Vec<&str> = Vec::new();
 
-    for segment in split_top_level_segments(css) {
+    let stripped = strip_comments(css);
+
+    for segment in split_top_level_segments(&stripped) {
         match segment {
             TopLevelSegment::Declaration(decl_text) if is_valid_declaration(decl_text) => {
                 let normalized = decl_text.trim().trim_end_matches(';').to_string();
@@ -73,6 +75,50 @@ fn strip_leading_lines(text: &str) -> &str {
         .map(|idx| idx + 1)
         .unwrap_or(0);
     &text[line_start..]
+}
+
+/// Replaces comments with whitespace, so `;` and braces inside them don't split segments.
+/// Newlines are kept so line numbers stay the same, unterminated comments run to the end.
+fn strip_comments(css: &str) -> String {
+    let mut output = String::with_capacity(css.len());
+    let mut chars = css.chars().peekable();
+    let mut string_char: Option<char> = None;
+    let mut escaped = false;
+
+    while let Some(ch) = chars.next() {
+        if let Some(quote) = string_char {
+            if ch == quote && !escaped {
+                string_char = None;
+            }
+            escaped = ch == '\\' && !escaped;
+            output.push(ch);
+            continue;
+        }
+
+        match ch {
+            '\'' | '"' if !escaped => string_char = Some(ch),
+            '/' if !escaped && chars.peek() == Some(&'*') => {
+                chars.next();
+                output.push_str("  ");
+                let mut prev = ' ';
+                for ch in chars.by_ref() {
+                    output.push(if ch == '\n' { '\n' } else { ' ' });
+                    if prev == '*' && ch == '/' {
+                        break;
+                    }
+                    prev = ch;
+                }
+                escaped = false;
+                continue;
+            }
+            _ => {}
+        }
+
+        escaped = ch == '\\' && !escaped;
+        output.push(ch);
+    }
+
+    output
 }
 
 /// Split CSS into top-level segments (declarations and blocks)
@@ -279,6 +325,36 @@ mod tests {
                   var(--mt);
             "})
         );
+    }
+
+    #[test]
+    fn comments_are_ignored() {
+        let result = parse_css("\n    /* overflow-x: scroll; */\n");
+        assert!(result.atomizable.is_empty());
+        assert_eq!(result.non_atomizable, None);
+
+        let input = indoc! {"
+            color: red; /* a; } { */
+            /* multi
+               line; */
+            &:hover {
+                /* color: green; */
+                color: blue;
+            }
+            content: '/* not a comment */';
+        "};
+        let result = parse_css(input);
+
+        assert_eq!(
+            result.atomizable,
+            vec![
+                "color: red".to_string(),
+                "content: '/* not a comment */'".to_string(),
+            ]
+        );
+        let non_atomizable = result.non_atomizable.unwrap();
+        assert!(!non_atomizable.contains("/*") && !non_atomizable.contains("*/"));
+        assert!(non_atomizable.contains("color: blue;"));
     }
 
     #[test]
