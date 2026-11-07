@@ -22,9 +22,9 @@ impl Transformer {
         skip_css_eval: bool,
         load_file: Option<js_sys::Function>,
     ) -> Result<Option<JsValue>, TransformError> {
-        // NOTE: import registrations are not cleared here, other files' evaluations register
+        // NOTE: import registrations are never cleared, other files' evaluations register
         // imports for this file too and wouldn't re-register them due to the value cache.
-        // They are cleared on HMR when this file's content changes.
+        // Outdated registrations only cause unnecessary invalidations.
         let mut _self = self.clone();
         if let Some(load_file) = load_file {
             _self.load_file = load_file;

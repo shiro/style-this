@@ -93,7 +93,7 @@ const vitePlugin = (options: Options = {}) => {
   // Default noop callback for non-debug mode
   const noopCallback = () => { };
 
-  /** Files that contain styled templates, changes cause all importers to reload. */
+  /** Files that contain styled templates. */
   const watchedFiles = new Set<string>();
   type Resolve = (id: string, importer: string) => Promise<string | undefined>;
   let createLoadFile: (resolve: Resolve) => (id: string, importer: string) => Promise<[string, string]>;
@@ -130,19 +130,20 @@ const vitePlugin = (options: Options = {}) => {
     }, 20);
   };
 
-  let hmrBatch: { key: string; files?: string[] } | undefined;
+  /** Latest update per file, `hotUpdate` is called for each environment but invalidates once. */
+  const hmrUpdates = new Map<string, { timestamp: number; files: Promise<string[] | undefined> }>();
 
-  /** Invalidates the changed file and all of its transitive importers, returns them. */
-  const invalidateForHotUpdate = (file: string, type: string) => {
-    const importers = styleThis.get_transitive_importers(file, []) as string[];
-    if (!watchedFiles.has(file) && !importers.length) return;
+  /** Invalidates the changed file and the importers affected by the change, returns them. */
+  const invalidateForHotUpdate = async (file: string, type: string, read: () => string | Promise<string>) => {
+    if (!watchedFiles.has(file) && !styleThis.has_importers(file)) return;
 
     if (type === "delete") watchedFiles.delete(file);
-    styleThis.clear_file_imports(file);
+    // unreadable files are invalidated like deleted ones
+    const code = type === "delete" ? undefined : await Promise.resolve(read()).catch(() => undefined);
+    const importers = styleThis.invalidate_file(file, code) as string[];
 
     const files = [file, ...importers];
     for (const filepath of files) {
-      styleThis.clear_value_cache(filepath);
       cacheRegistry.invalidateModule(filepath, cssExtension);
       cssSourceMapMetadata.delete(`${filepath}.${cssExtension}`);
     }
@@ -489,15 +490,19 @@ const vitePlugin = (options: Options = {}) => {
       }
     },
 
-    hotUpdate({ file, type, timestamp, modules }) {
-      const key = `${type}:${file}:${timestamp}`;
-      if (hmrBatch?.key !== key) hmrBatch = { key, files: invalidateForHotUpdate(file, type) };
-      if (!hmrBatch.files) return;
+    async hotUpdate({ file, type, timestamp, modules, read }) {
+      let update = hmrUpdates.get(file);
+      if (update?.timestamp !== timestamp) {
+        update = { timestamp, files: invalidateForHotUpdate(file, type, read) };
+        hmrUpdates.set(file, update);
+      }
+      const files = await update.files;
+      if (!files) return;
 
       const { moduleGraph } = this.environment;
       const result = new Set(modules);
 
-      for (const filepath of hmrBatch.files) {
+      for (const filepath of files) {
         for (const mod of moduleGraph.getModulesByFile(filepath) ?? []) result.add(mod);
 
         // CSS modules are self-accepting and would be requested before the re-transform, they

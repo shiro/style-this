@@ -62,8 +62,9 @@ const hotUpdate = (
       type: "update",
       timestamp,
       modules: [...environment.moduleGraph.getModulesByFile(file)],
+      read: () => readFile(file, "utf-8"),
     },
-  ) as FakeModule[] | undefined;
+  ) as Promise<FakeModule[] | undefined>;
 
 describe("HMR", () => {
   test("propagates transitive changes to all environments and the atomic entrypoint", async () => {
@@ -129,7 +130,7 @@ export const cStyle = css\`
       await writeFile(a, `export const color = "blue";\n`);
 
       for (const environment of [client, ssr]) {
-        const ids = hotUpdate(plugin, environment, a, 1)!.map((mod) => mod.id);
+        const ids = (await hotUpdate(plugin, environment, a, 1))!.map((mod) => mod.id);
         expect(ids.sort()).toEqual([a, b, c, `${VIRTUAL_PREFIX}${b}.style-this.js`, cAtomicId].sort());
         // CSS modules are self-accepting, they are only invalidated and reloaded after transform
         expect(environment.moduleGraph.invalidateModule).toHaveBeenCalledWith(

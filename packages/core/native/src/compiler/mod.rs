@@ -6,6 +6,7 @@ mod css_sourcemap;
 mod dependency_tracker;
 mod error;
 mod evaluator;
+mod invalidation;
 mod transformer;
 mod types;
 mod visitor;

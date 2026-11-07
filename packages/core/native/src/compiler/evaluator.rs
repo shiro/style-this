@@ -1,8 +1,9 @@
 use super::atomic::{insert_virtual_atomic_program_import, transform_atomic_entrypoint};
 use super::css_parser;
+use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::error::TransformError;
 use super::transformer::Transformer;
-use super::types::ExportedJSValue;
+use super::types::{CssVariableIdentifier, ExportedJSValue};
 use super::visitor::VisitorTransformer;
 use crate::compiler::atomic::{add_atomic, dedupe_atomic_declarations, rewrite_merge_styles_imports};
 use crate::error_mapping;
@@ -200,6 +201,18 @@ fn evaluate_dependencies<'alloc>(
                     .load_file(&remote_module_id, &program_filepath)
                     .await?;
 
+                // needed to find out which exports changed on HMR
+                if !code.is_empty() {
+                    transformer
+                        .cache_registry
+                        .record_module_code(&remote_filepath, &code);
+                    transformer
+                        .cache_registry
+                        .dependency_tracker()
+                        .borrow()
+                        .register_resolution(&program_filepath, &remote_module_id, &remote_filepath);
+                }
+
                 for specifier in specifiers.iter() {
                     // ignore `css` imports from us
                     if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME
@@ -337,7 +350,7 @@ fn evaluate_dependencies<'alloc>(
 
                                 (
                                     local_name,
-                                    Some("__global__export__".to_string()),
+                                    Some(DEFAULT_EXPORT.to_string()),
                                     import_default_specifier.span,
                                 )
                             }
@@ -429,7 +442,7 @@ fn evaluate_dependencies<'alloc>(
                     let var_name_for_tracking = if let Some(ref remote_name) = remote_name {
                         remote_name.as_str()
                     } else {
-                        "__star__" // Namespace import
+                        STAR_IMPORT
                     };
                     
                     transformer.cache_registry
@@ -538,41 +551,42 @@ fn insert_virtual_css_import<'alloc>(
         .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
 }
 
-/// * `skip_css_eval` - If we already have the cached CSS and just want the transformed source file, we can set
-/// this flag to skip the evaluation portion.
+/// JS expression of the object evaluated exports of `filepath` are stored in.
+fn value_store(transformer: &Transformer, filepath: &str) -> String {
+    let cache_ref = &transformer.value_cache_ref;
+    format!("global.{cache_ref}[\"{filepath}\"]")
+}
+
+pub(crate) struct ProgramSlice<'alloc> {
+    pub css_variable_identifiers: Vec<CssVariableIdentifier>,
+    /// Identifiers the slice references, including local names of imports.
+    pub referenced_idents: HashSet<String>,
+    pub namespace_imports: HashMap<String, HashSet<String>>,
+    pub exported_idents: HashSet<String>,
+    /// Program that only contains what's needed to evaluate the referenced identifiers.
+    pub tmp_program: Program<'alloc>,
+    /// The program is an entrypoint that doesn't use the library.
+    pub return_early: bool,
+    pub rewrote_merge_styles: bool,
+}
+
+/// Runs the prepasses on `program` and extracts the parts needed to evaluate
+/// `referenced_idents` and the program's CSS into a separate program.
+///
+/// Updates `CSS_CLASSNAME_CACHE` with the generated class names.
 #[allow(clippy::too_many_arguments)]
-pub async fn evaluate_program<'alloc>(
+pub(crate) fn slice_program<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
     transformer: &Transformer,
     entrypoint: bool,
     cwd: &str,
-    program_filepath: String,
-    importer_filepath: Option<&str>,
+    program_filepath: &str,
     program_code: &str,
     program: &mut Program<'alloc>,
-    mut referenced_idents: HashSet<String>,
-    temporary_programs: Rc<RefCell<HashMap<String, String>>>,
-    tx: Option<futures::channel::oneshot::Sender<Result<Option<JsValue>, TransformError>>>,
-    skip_css_eval: bool,
-) -> Result<(), TransformError> {
-    let allocator = &ast_builder.allocator;
-
-    // keep values until end of function
-    let value_cache_guard = transformer
-        .cache_registry
-        .get_or_create_value_cache(program_filepath.clone());
-
-    let mut value_cache = value_cache_guard.lock().await;
-
-    referenced_idents.retain(|ident| !value_cache.contains(ident));
-
-    // We used to return early here if !entrypoint && referenced_idents.is_empty(),
-    // but we need to continue to extract exports for dependency tracking
-    // The CSS transformer visit is fast (just an AST walk), so we'll do it even if
-    // the file doesn't use CSS
-
-    let cache_ref = &transformer.value_cache_ref;
-    let store = format!("global.{cache_ref}[\"{program_filepath}\"]");
+    referenced_idents: HashSet<String>,
+    value_cache: &mut HashSet<String>,
+) -> Result<ProgramSlice<'alloc>, TransformError> {
+    let store = value_store(transformer, program_filepath);
 
     // find "css" import or quit early if entrypoint
     let mut return_early = entrypoint;
@@ -640,13 +654,9 @@ pub async fn evaluate_program<'alloc>(
         }
     }
 
-    // Early return check happens here, but we need to handle it differently for dependency tracking
-    // We'll check return_early after running the CSS transformer to extract exports
-    let should_return_early = return_early;
-
     let relative_program_filepath = program_filepath
         .strip_prefix(cwd)
-        .unwrap_or(&program_filepath)
+        .unwrap_or(program_filepath)
         .to_string();
 
     let mut transformed_styled_components = false;
@@ -673,14 +683,14 @@ pub async fn evaluate_program<'alloc>(
     // This is necessary for dependency tracking to know what a file exports
     let mut css_transformer = VisitorTransformer::new(
         ast_builder,
-        allocator,
+        ast_builder.allocator,
         entrypoint,
         &store,
-        referenced_idents.clone(),
+        referenced_idents,
         cwd,
-        &program_filepath,
+        program_filepath,
         program_code,
-        &mut value_cache,
+        value_cache,
         css_function_name,
         style_function_name,
         extra_class_function_name,
@@ -688,19 +698,90 @@ pub async fn evaluate_program<'alloc>(
     );
     css_transformer.visit_program(program);
     if let Some(error) = css_transformer.error {
-        let Some(tx) = tx else {
-            return Err(error);
-        };
-        let _ = tx.send(Err(error));
-        return Ok(());
+        return Err(error);
     }
     let (
+        css_variable_identifiers,
+        referenced_idents,
+        namespace_imports,
+        exported_idents,
+        tmp_program,
+    ) = css_transformer.finish();
+
+    Ok(ProgramSlice {
+        css_variable_identifiers,
+        referenced_idents,
+        namespace_imports,
+        exported_idents,
+        tmp_program,
+        return_early,
+        rewrote_merge_styles,
+    })
+}
+
+/// * `skip_css_eval` - If we already have the cached CSS and just want the transformed source file, we can set
+/// this flag to skip the evaluation portion.
+#[allow(clippy::too_many_arguments)]
+pub async fn evaluate_program<'alloc>(
+    ast_builder: &'alloc AstBuilder<'alloc>,
+    transformer: &Transformer,
+    entrypoint: bool,
+    cwd: &str,
+    program_filepath: String,
+    importer_filepath: Option<&str>,
+    program_code: &str,
+    program: &mut Program<'alloc>,
+    mut referenced_idents: HashSet<String>,
+    temporary_programs: Rc<RefCell<HashMap<String, String>>>,
+    tx: Option<futures::channel::oneshot::Sender<Result<Option<JsValue>, TransformError>>>,
+    skip_css_eval: bool,
+) -> Result<(), TransformError> {
+    let allocator = &ast_builder.allocator;
+
+    // keep values until end of function
+    let value_cache_guard = transformer
+        .cache_registry
+        .get_or_create_value_cache(program_filepath.clone());
+
+    let mut value_cache = value_cache_guard.lock().await;
+
+    referenced_idents.retain(|ident| !value_cache.contains(ident));
+
+    // We used to return early here if !entrypoint && referenced_idents.is_empty(),
+    // but we need to continue to extract exports for dependency tracking
+    // The CSS transformer visit is fast (just an AST walk), so we'll do it even if
+    // the file doesn't use CSS
+
+    let store = value_store(transformer, &program_filepath);
+
+    let ProgramSlice {
         css_variable_identifiers,
         referenced_idents,
         mut namespace_imports,
         exported_idents,
         tmp_program,
-    ) = css_transformer.finish();
+        return_early: should_return_early,
+        rewrote_merge_styles,
+    } = match slice_program(
+        ast_builder,
+        transformer,
+        entrypoint,
+        cwd,
+        &program_filepath,
+        program_code,
+        program,
+        referenced_idents,
+        &mut value_cache,
+    ) {
+        Ok(slice) => slice,
+        Err(error) => {
+            let Some(tx) = tx else {
+                return Err(error);
+            };
+            let _ = tx.send(Err(error));
+            return Ok(());
+        }
+    };
 
     // Now check if we should return early (no CSS functions imported)
     // But we've already extracted exports, so dependency tracking will work

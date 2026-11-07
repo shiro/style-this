@@ -288,8 +288,16 @@ impl Transformer {
         arr
     }
 
+    pub fn has_importers(&self, filepath: &str) -> bool {
+        !self
+            .cache_registry
+            .dependency_tracker()
+            .borrow()
+            .get_all_importers(filepath)
+            .is_empty()
+    }
+
     /// Clear import registrations for a file
-    /// Call this before re-transforming a file to clear its old import records
     pub fn clear_file_imports(&self, filepath: &str) {
         self.cache_registry
             .dependency_tracker()

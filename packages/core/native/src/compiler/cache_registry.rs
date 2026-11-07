@@ -23,6 +23,8 @@ pub struct CacheRegistry {
     atomic_css_cache: Rc<RefCell<HashMap<String, String>>>,
     /// Dependency tracker for variable imports
     dependency_tracker: Rc<RefCell<DependencyTracker>>,
+    /// Source of files loaded as dependencies, as of their cached values
+    module_code: Rc<RefCell<HashMap<String, String>>>,
 }
 
 #[wasm_bindgen]
@@ -45,6 +47,7 @@ impl CacheRegistry {
             value_cache: Rc::new(RefCell::new(HashMap::new())),
             atomic_css_cache: Rc::new(RefCell::new(HashMap::new())),
             dependency_tracker: Rc::new(RefCell::new(DependencyTracker::new())),
+            module_code: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -68,6 +71,7 @@ impl CacheRegistry {
             value_cache: Rc::new(RefCell::new(HashMap::new())),
             atomic_css_cache: Rc::new(RefCell::new(HashMap::new())),
             dependency_tracker: Rc::new(RefCell::new(DependencyTracker::new())),
+            module_code: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -295,6 +299,57 @@ impl CacheRegistry {
     /// Clear value cache for a specific file
     pub fn clear_file(&self, filepath: &str) {
         self.value_cache.borrow_mut().remove(filepath);
+    }
+
+    /// Clear the given cached values of a file, `None` clears all of them
+    pub fn clear_values(&self, filepath: &str, names: Option<&HashSet<String>>) {
+        let Some(names) = names else {
+            self.clear_file(filepath);
+            return;
+        };
+        let Some(values) = self.value_cache.borrow().get(filepath).cloned() else {
+            return;
+        };
+        // a running evaluation holds the lock, it keeps its own (now detached) entry
+        match values.try_lock() {
+            Some(mut values) => values.retain(|name| !names.contains(name)),
+            None => self.clear_file(filepath),
+        }
+    }
+
+    /// Get the names of all cached values of a file, `None` while they're being evaluated
+    pub fn cached_values(&self, filepath: &str) -> Option<HashSet<String>> {
+        let Some(values) = self.value_cache.borrow().get(filepath).cloned() else {
+            return Some(HashSet::new());
+        };
+        let values = values.try_lock()?;
+        Some(values.clone())
+    }
+
+    /// Store the source of a file loaded as a dependency, unless there already is one
+    ///
+    /// Cached values are only re-evaluated once invalidated, the first loaded source is the one
+    /// they were evaluated from.
+    pub fn record_module_code(&self, filepath: &str, code: &str) {
+        self.module_code
+            .borrow_mut()
+            .entry(filepath.to_string())
+            .or_insert_with(|| code.to_string());
+    }
+
+    pub fn module_code(&self, filepath: &str) -> Option<String> {
+        self.module_code.borrow().get(filepath).cloned()
+    }
+
+    /// Update the stored source of a file after it changed (`None` if deleted), returns the
+    /// previous one
+    pub fn update_module_code(&self, filepath: &str, code: Option<String>) -> Option<String> {
+        let mut module_code = self.module_code.borrow_mut();
+        let previous = module_code.get_mut(filepath)?;
+        match code {
+            Some(code) => Some(std::mem::replace(previous, code)),
+            None => module_code.remove(filepath),
+        }
     }
     
     /// Get reference to dependency tracker

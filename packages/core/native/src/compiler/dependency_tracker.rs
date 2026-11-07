@@ -2,6 +2,11 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::cell::RefCell;
 
+/// Imported name of namespace imports
+pub(crate) const STAR_IMPORT: &str = "__star__";
+/// Imported name of default imports
+pub(crate) const DEFAULT_EXPORT: &str = "__global__export__";
+
 /// Tracks which files depend on which variables from other files.
 ///
 /// When a file changes, we can determine which importers need invalidation
@@ -21,12 +26,15 @@ use std::cell::RefCell;
 pub struct DependencyTracker {
     /// Maps: source_filepath -> (variable_name -> [list of importer filepaths])
     /// Tracks WHO imports WHAT from WHERE
-    /// Special keys: "__default__" for default imports, "__star__" for namespace imports
+    /// Special keys: "__global__export__" for default imports, "__star__" for namespace imports
     variable_importers: Rc<RefCell<HashMap<String, HashMap<String, HashSet<String>>>>>,
     
     /// Maps: importer_filepath -> (source_filepath -> [imported_variables])
     /// Reverse index for quick cleanup when an importer file changes
     file_imports: Rc<RefCell<HashMap<String, HashMap<String, HashSet<String>>>>>,
+
+    /// Maps: importer_filepath -> (module id as written in the import -> source_filepath)
+    resolved_imports: Rc<RefCell<HashMap<String, HashMap<String, String>>>>,
 }
 
 impl DependencyTracker {
@@ -35,6 +43,7 @@ impl DependencyTracker {
         Self {
             variable_importers: Rc::new(RefCell::new(HashMap::new())),
             file_imports: Rc::new(RefCell::new(HashMap::new())),
+            resolved_imports: Rc::new(RefCell::new(HashMap::new())),
         }
     }
     
@@ -69,6 +78,39 @@ impl DependencyTracker {
             .insert(variable_name.to_string());
     }
     
+    /// Register that `module_id` imported from `importer_file` resolves to `source_file`
+    pub fn register_resolution(&self, importer_file: &str, module_id: &str, source_file: &str) {
+        self.resolved_imports
+            .borrow_mut()
+            .entry(importer_file.to_string())
+            .or_default()
+            .insert(module_id.to_string(), source_file.to_string());
+    }
+
+    /// Get the file `module_id` imported from `importer_file` resolved to
+    pub fn resolve(&self, importer_file: &str, module_id: &str) -> Option<String> {
+        self.resolved_imports
+            .borrow()
+            .get(importer_file)?
+            .get(module_id)
+            .cloned()
+    }
+
+    /// Get the exports of `source_file` that other files import by name
+    pub fn get_imported_names(&self, source_file: &str) -> HashSet<String> {
+        self.variable_importers
+            .borrow()
+            .get(source_file)
+            .map(|var_map| {
+                var_map
+                    .keys()
+                    .filter(|name| *name != STAR_IMPORT)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Get files that import specific changed exports from `source_file`
     ///
     /// Only returns importers that:
@@ -98,7 +140,7 @@ impl DependencyTracker {
         
         // Always add star import users when anything changes
         if !changed_exports.is_empty() {
-            if let Some(star_importers) = var_map.get("__star__") {
+            if let Some(star_importers) = var_map.get(STAR_IMPORT) {
                 result.extend(star_importers.iter().cloned());
             }
         }
@@ -141,13 +183,9 @@ impl DependencyTracker {
     }
     
     /// Clear all import registrations for `importer_file`
-    ///
-    /// Call this when a file is about to be re-transformed, as its imports might have changed.
-    /// The file may have:
-    /// - Removed imports
-    /// - Added new imports
-    /// - Changed which variables it imports
     pub fn clear_file_imports(&self, importer_file: &str) {
+        self.resolved_imports.borrow_mut().remove(importer_file);
+
         // Remove from reverse index and get what we need to clean from forward index
         let mut imports = self.file_imports.borrow_mut();
         let Some(source_map) = imports.remove(importer_file) else {

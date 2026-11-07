@@ -1,4 +1,5 @@
 use super::cache::CSS_CLASSNAME_CACHE;
+use super::dependency_tracker::DEFAULT_EXPORT;
 use super::error::TransformError;
 use super::types::{CssVariableIdentifier, VirtualProgramInsert};
 use crate::PREFIX;
@@ -1147,7 +1148,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
-        let global_sentinel = "__global__export__";
+        let global_sentinel = DEFAULT_EXPORT;
 
         if !self
             .referenced_idents
