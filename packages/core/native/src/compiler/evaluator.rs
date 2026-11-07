@@ -868,7 +868,7 @@ pub async fn evaluate_program<'alloc>(
             eval_program_js.push_str(&formatdoc!(
                 "
                 const cssSourcemapData = [{sourcemap_data}];
-                global.{css_file_store_ref}.get({css_filepath}).resolve([\n{css}\n].join('\\n'), cssSourcemapData, {css_filepath});
+                global.{css_file_store_ref}.get({css_filepath})?.resolve([\n{css}\n].join('\\n'), cssSourcemapData, {css_filepath});
                 ",
             ));
         }
@@ -1040,22 +1040,33 @@ pub async fn evaluate_program<'alloc>(
         let css = css
             .replace('\\', "\\\\")
             .replace('\'', "\\'")
-            .replace('\n', "\\n");
-        
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
+            .replace('\u{2028}', "\\u2028")
+            .replace('\u{2029}', "\\u2029");
+
         // Escape atomic_module for use in template literal
         let atomic_module = atomic_module
             .replace('\\', "\\\\")
             .replace('`', "\\`")
             .replace("${", "\\${");
 
-        // Stage 2: Resolve .style-this.js with atomic exports and .css with non-atomizable CSS
-        js_sys::eval(&format!(
+        // Stage 2: Resolve .style-this.js with atomic exports and .css with non-atomizable CSS.
+        // Entries may have been invalidated (e.g. by HMR) while evaluating, nothing waits on those
+        // anymore so the result is dropped.
+        if let Err(cause) = js_sys::eval(&format!(
             "
-            global.{css_file_store_ref}.get({css_filepath}).resolve('{css}', [{sourcemap_data}], {css_filepath}); 
-            global.{atomic_file_store_ref}.get({atomic_filepath}).resolve(`{atomic_module}`);
+            global.{css_file_store_ref}.get({css_filepath})?.resolve('{css}', [{sourcemap_data}], {css_filepath});
+            global.{atomic_file_store_ref}.get({atomic_filepath})?.resolve(`{atomic_module}`);
             "
-        ))
-        .unwrap();
+        )) {
+            let err = TransformError::EvaluationFailed {
+                filepath: program_filepath.clone(),
+                program: None,
+                cause,
+            };
+            return report_error(transformer, entrypoint, &program_filepath, err);
+        }
 
         return Ok(());
     }
