@@ -1,4 +1,4 @@
-import { Plugin, UserConfig, ViteDevServer } from "vite";
+import { DevEnvironment, EnvironmentModuleNode, Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
 import { isAbsolute, relative, resolve as resolvePath } from "path";
 import {
@@ -14,6 +14,34 @@ import { handleTransformError } from "./util";
 import { initializeSolidMocks } from "./solid";
 import { isSvelteFile, extractSvelteScript, rewrapSvelteScript } from "./svelte";
 import { CacheRegistry } from "./cacheRegistry";
+
+/**
+ * Sends a virtual module (css) to the client as an HMR update.
+ *
+ * Don't use `environment.reloadModule` for this: it marks the module's transitive importers as HMR-updated too (their
+ * `?t=` import timestamps change) even though they're never sent to the client. When such an importer is later fetched
+ * in a batch update, it imports the source module under a new URL than the one in the update payload, so the source
+ * module executes twice and solid-refresh keeps rendering the registry that never receives further updates.
+ */
+const reloadVirtualModule = (environment: DevEnvironment, mod: EnvironmentModuleNode) => {
+  if (environment.config.server.hmr === false) return;
+  environment.moduleGraph.invalidateModule(mod);
+  const timestamp = Math.max(Date.now(), mod.lastHMRTimestamp + 1);
+  mod.lastHMRTimestamp = timestamp;
+  environment.hot.send({
+    type: "update",
+    updates: [
+      {
+        type: "js-update",
+        path: mod.url,
+        acceptedPath: mod.url,
+        timestamp,
+        explicitImportRequired: false,
+        isWithinCircularImport: false,
+      },
+    ],
+  });
+};
 
 const TIMEOUT_DURATION = 5 * 60 * 1000; // 5 minutes
 export const DefaultImport = Symbol();
@@ -124,8 +152,8 @@ const vitePlugin = (options: Options = {}) => {
       for (const environment of Object.values(server.environments)) {
         const mod = environment.moduleGraph.getModuleById(atomicEntrypointId);
         if (!mod || servedAtomicCss.get(environment.name) === atomicCss) continue;
-        environment.moduleGraph.invalidateModule(mod);
-        if (environment.config.consumer === "client") environment.reloadModule(mod);
+        if (environment.config.consumer === "client") reloadVirtualModule(environment, mod);
+        else environment.moduleGraph.invalidateModule(mod);
       }
     }, 20);
   };
@@ -578,7 +606,7 @@ const vitePlugin = (options: Options = {}) => {
           for (const environment of Object.values(server.environments)) {
             if (environment.config.consumer !== "client") continue;
             const cssModule = environment.moduleGraph.getModuleById(toVirtualId(cssFilepath));
-            if (cssModule?.importers.size) environment.reloadModule(cssModule);
+            if (cssModule?.importers.size) reloadVirtualModule(environment, cssModule);
           }
 
           if (atomic) cacheRegistry.getAtomicModule(atomicProgramFilepath)?.then(scheduleAtomicCssUpdate);

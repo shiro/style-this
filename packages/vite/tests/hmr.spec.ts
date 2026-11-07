@@ -7,14 +7,23 @@ import { join } from "path";
 const VIRTUAL_PREFIX = "\0virtual:style-this:";
 const ATOMIC_ENTRYPOINT_ID = `${VIRTUAL_PREFIX}__style_this_atomic_entrypoint.css`;
 
-type FakeModule = { id: string; file: string; importers: Set<FakeModule> };
+type FakeModule = { id: string; url: string; file: string; lastHMRTimestamp: number; importers: Set<FakeModule> };
+
+const createModule = (id: string, importers: FakeModule[] = []): FakeModule => ({
+  id,
+  url: `/@id/__x00__${id.slice(1)}`,
+  file: id,
+  lastHMRTimestamp: 0,
+  importers: new Set(importers),
+});
 
 const createEnvironment = (name: string, consumer: "client" | "server") => {
   const modules = new Map<string, FakeModule>();
   return {
     name,
-    config: { consumer },
+    config: { consumer, server: { hmr: {} } },
     reloadModule: vi.fn(),
+    hot: { send: vi.fn() },
     moduleGraph: {
       getModuleById: (id: string) => modules.get(id),
       getModulesByFile: (file: string) =>
@@ -23,16 +32,16 @@ const createEnvironment = (name: string, consumer: "client" | "server") => {
     },
     /** Adds a source file with its virtual modules, the way vite would after loading it. */
     addSourceFile(file: string, atomic: boolean) {
-      const source: FakeModule = { id: file, file, importers: new Set() };
+      const source = createModule(file);
       modules.set(file, source);
       for (const ext of atomic ? ["css", "style-this.js"] : ["css"]) {
         const id = `${VIRTUAL_PREFIX}${file}.${ext}`;
-        modules.set(id, { id, file: id, importers: new Set([source]) });
+        modules.set(id, createModule(id, [source]));
       }
       return source;
     },
     addModule(id: string) {
-      const mod: FakeModule = { id, file: id, importers: new Set() };
+      const mod = createModule(id);
       modules.set(id, mod);
       return mod;
     },
@@ -140,22 +149,37 @@ export const cStyle = css\`
 
       // the entrypoint may be requested before the affected files are re-transformed
       expect(await loadCode(plugin, ATOMIC_ENTRYPOINT_ID)).not.toContain("color: darkblue");
-      client.reloadModule.mockClear();
+      client.hot.send.mockClear();
+      const timestampOf = (mod: FakeModule) => mod.lastHMRTimestamp;
+      const importersBefore = [b, c].map((file) => timestampOf(client.moduleGraph.getModuleById(file)!));
 
       await transformFile(plugin, c);
       await transformFile(plugin, b);
 
-      expect(client.reloadModule).toHaveBeenCalledWith(
-        client.moduleGraph.getModuleById(`${VIRTUAL_PREFIX}${c}.css`),
-      );
-      expect(ssr.reloadModule).not.toHaveBeenCalled();
+      // the CSS module is sent to the client as an update of its own ...
+      const cssModule = client.moduleGraph.getModuleById(`${VIRTUAL_PREFIX}${c}.css`)!;
+      expect(client.hot.send).toHaveBeenCalledWith({
+        type: "update",
+        updates: [expect.objectContaining({ type: "js-update", path: cssModule.url, acceptedPath: cssModule.url })],
+      });
+      expect(ssr.hot.send).not.toHaveBeenCalled();
+      // ... without marking its importers as HMR-updated, they would get fetched under a different URL than the
+      // update payload (a duplicate module instance that solid-refresh never patches)
+      expect(client.reloadModule).not.toHaveBeenCalled();
+      expect([b, c].map((file) => timestampOf(client.moduleGraph.getModuleById(file)!))).toEqual(importersBefore);
 
       const cAtomic = await loadCode(plugin, cAtomicId);
       const [, atomicClass] = cAtomic.match(/cStyle = "cStyle-\S+ (\S+)"/)!;
 
       // once the atomic module resolves, the outdated entrypoint gets reloaded everywhere
-      const clientEntrypoint = client.moduleGraph.getModuleById(ATOMIC_ENTRYPOINT_ID);
-      await vi.waitFor(() => expect(client.reloadModule).toHaveBeenCalledWith(clientEntrypoint));
+      const clientEntrypoint = client.moduleGraph.getModuleById(ATOMIC_ENTRYPOINT_ID)!;
+      await vi.waitFor(() =>
+        expect(client.hot.send).toHaveBeenCalledWith({
+          type: "update",
+          updates: [expect.objectContaining({ path: clientEntrypoint.url })],
+        }),
+      );
+      expect(client.reloadModule).not.toHaveBeenCalled();
       expect(ssr.moduleGraph.invalidateModule).toHaveBeenCalledWith(
         ssr.moduleGraph.getModuleById(ATOMIC_ENTRYPOINT_ID),
       );

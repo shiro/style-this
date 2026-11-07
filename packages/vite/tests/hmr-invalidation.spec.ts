@@ -117,11 +117,12 @@ const entrypoints = [
 ];
 
 const createEnvironment = (name = "client") => {
-  const modules = new Map<string, { id: string; file: string; importers: Set<unknown> }>();
+  const modules = new Map<string, { id: string; url: string; file: string; lastHMRTimestamp: number; importers: Set<unknown> }>();
   return {
     name,
-    config: { consumer: "client" },
+    config: { consumer: "client", server: { hmr: {} } },
     reloadModule: vi.fn(),
+    hot: { send: vi.fn() },
     moduleGraph: {
       getModuleById: (id: string) => modules.get(id),
       getModulesByFile: (file: string) =>
@@ -129,7 +130,7 @@ const createEnvironment = (name = "client") => {
       invalidateModule: vi.fn(),
     },
     addModule(id: string) {
-      modules.set(id, { id, file: id, importers: new Set() });
+      modules.set(id, { id, url: id, file: id, lastHMRTimestamp: 0, importers: new Set() });
     },
   };
 };
