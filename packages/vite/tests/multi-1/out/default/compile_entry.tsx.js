@@ -14,7 +14,7 @@ let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-8pm3ch");
 a.css = `background: ${color};`;
 const cssSourcemapData = [{className:'a-8pm3ch',start:80,end:110}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.css')?.resolve([
 `.a-8pm3ch {
 ${a.css}
 }`

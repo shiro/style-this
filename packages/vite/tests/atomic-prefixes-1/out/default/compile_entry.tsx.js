@@ -16,7 +16,7 @@ shorthands.css = `margin-top: 4px;
 let sameDeclaration = new String("sameDeclaration-v4pm30");
 sameDeclaration.css = `margin: 8px;`;
 const cssSourcemapData = [{className:'duplicates-bcdq7s',start:177,end:255},{className:'shorthands-rc1qzs',start:324,end:452},{className:'sameDeclaration-v4pm30',start:532,end:553}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/atomic-prefixes-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/atomic-prefixes-1/entry.tsx.css')?.resolve([
 `.duplicates-bcdq7s {
 ${duplicates.css}
 }`,

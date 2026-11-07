@@ -15,7 +15,7 @@ outerStyle.css = `width: 100%;
     }
   }`;
 const cssSourcemapData = [{className:'innerStyle-oty7sd',start:130,end:172},{className:'outerStyle-mvwhqz',start:308,end:460}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/atomic-media-query-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/atomic-media-query-1/entry.tsx.css')?.resolve([
 `.innerStyle-oty7sd {
 ${innerStyle.css}
 }`,

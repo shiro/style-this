@@ -7,7 +7,7 @@ __styleThis_var_FancyButton_2.css = `background: none;
     color: red;
   }`;
 const cssSourcemapData = [{className:'FancyButton-izw5mn',start:72,end:166}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/styled-components-solid-no-css-import/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/styled-components-solid-no-css-import/entry.tsx.css')?.resolve([
 `.FancyButton-izw5mn {
 ${__styleThis_var_FancyButton_2.css}
 }`

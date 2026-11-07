@@ -5,7 +5,7 @@ let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-gxu385");
 a.css = `margin: ${num}px;`;
 const cssSourcemapData = [{className:'a-gxu385',start:83,end:109}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.css')?.resolve([
 `.a-gxu385 {
 ${a.css}
 }`
@@ -19,7 +19,7 @@ let { css } = require("/packages/core/dist/index.mjs");
 let b = new String("b-w56741");
 b.css = `margin: ${num}px;`;
 const cssSourcemapData = [{className:'b-w56741',start:83,end:109}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-2.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-2.tsx.css')?.resolve([
 `.b-w56741 {
 ${b.css}
 }`
@@ -52,7 +52,7 @@ let shared = new String("shared-ar0tez");
 shared.css = `margin: ${num}px;`;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};const cssSourcemapData = [{className:'shared-ar0tez',start:91,end:117}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.css')?.resolve([
 `.shared-ar0tez {
 ${shared.css}
 }`

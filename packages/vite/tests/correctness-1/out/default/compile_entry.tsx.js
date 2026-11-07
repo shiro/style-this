@@ -75,7 +75,7 @@ let unrelated = new String("unrelated-5y7cxe");
 unrelated.css = `background: none;
   ${a.foo.css}`;
 const cssSourcemapData = [{className:'__styleThis_11-abwhir',start:181,end:204},{className:'m-9ib41m',start:266,end:284},{className:'b-aj4l6b',start:313,end:329},{className:'__styleThis_6-irk5mb',start:406,end:440},{className:'s1-gta3sx',start:458,end:485},{className:'__styleThis_3-q74xyr',start:516,end:586},{className:'s2-3ctqjk',start:701,end:731},{className:'unrelated-5y7cxe',start:752,end:793}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/correctness-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/correctness-1/entry.tsx.css')?.resolve([
 `.__styleThis_11-abwhir {
 ${__styleThis_11.css}
 }`,

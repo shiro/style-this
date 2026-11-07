@@ -38,7 +38,7 @@ let test7 = new String("test7-ijc9m3");
 test7.css = `background: pink;
   `;
 const cssSourcemapData = [{className:'test1-6z85mr',start:158,end:228},{className:'test2-rkpq3k',start:281,end:349},{className:'test3-mvkpe7',start:415,end:451},{className:'test4-cxebwl',start:516,end:658},{className:'ParentStyled-difgta',start:745,end:829},{className:'ChildStyled-hyrg5m',start:852,end:950},{className:'test5-9ibg5y',start:1008,end:1143},{className:'test6-9e3s16',start:1180,end:1244},{className:'test7-ijc9m3',start:1276,end:1325}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/extra-class-edge-cases/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/extra-class-edge-cases/entry.tsx.css')?.resolve([
 `.test1-6z85mr {
 ${test1.css}
 }`,

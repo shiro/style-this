@@ -24,7 +24,7 @@ let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-k1mv0l");
 a.css = `background: ${color};`;
 const cssSourcemapData = [{className:'a-k1mv0l',start:80,end:110}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-2/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-2/entry.tsx.css')?.resolve([
 `.a-k1mv0l {
 ${a.css}
 }`

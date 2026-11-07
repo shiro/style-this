@@ -8,7 +8,7 @@ let doPromise = async () => {
 let a = new String("a-f45qro");
 a.css = `background: ${doPromise()};`;
 const cssSourcemapData = [{className:'a-f45qro',start:162,end:198}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/expressions-1/entry.tsx.css')?.resolve([
 `.a-f45qro {
 ${a.css}
 }`

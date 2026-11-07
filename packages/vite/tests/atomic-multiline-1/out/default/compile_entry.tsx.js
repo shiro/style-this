@@ -13,7 +13,7 @@ grid.css = `display: grid;
     color: blue;
   }`;
 const cssSourcemapData = [{className:'grid-1ajg1y',start:95,end:256}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/atomic-multiline-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/atomic-multiline-1/entry.tsx.css')?.resolve([
 `.grid-1ajg1y {
 ${grid.css}
 }`

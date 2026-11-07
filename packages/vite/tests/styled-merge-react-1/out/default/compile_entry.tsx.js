@@ -10,7 +10,7 @@ __styleThis_var_Extended_2.css = `padding: 16px;
 let override = new String("override-w9ezgl");
 override.css = `background: blue;`;
 const cssSourcemapData = [{className:'Base-ajwd67',start:105,end:157},{className:'Extended-ir85yz',start:255,end:301},{className:'override-w9ezgl',start:328,end:354}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/styled-merge-react-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/styled-merge-react-1/entry.tsx.css')?.resolve([
 `.Base-ajwd67 {
 ${__styleThis_var_Base_4.css}
 }`,

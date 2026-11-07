@@ -15,7 +15,7 @@ let exported = new String("exported-w5y7wh");
 exported.css = `background: ${color};`;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-1/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-1/b.tsx"] ?? {}), color};const cssSourcemapData = [{className:'exported-w5y7wh',start:87,end:117}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-1/b.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-1/b.tsx.css')?.resolve([
 `.exported-w5y7wh {
 ${exported.css}
 }`
@@ -29,7 +29,7 @@ let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-8pm3ch");
 a.css = `background: ${color};`;
 const cssSourcemapData = [{className:'a-8pm3ch',start:80,end:110}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-1/entry.tsx.css')?.resolve([
 `.a-8pm3ch {
 ${a.css}
 }`

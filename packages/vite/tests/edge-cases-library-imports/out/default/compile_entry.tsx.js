@@ -5,7 +5,7 @@ let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-tej8d6");
 a.css = `margin: ${getNumber()};`;
 const cssSourcemapData = [{className:'a-tej8d6',start:627,end:659}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-library-imports/entry.tsx.css').resolve([
+global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-library-imports/entry.tsx.css')?.resolve([
 `.a-tej8d6 {
 ${a.css}
 }`
