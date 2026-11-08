@@ -512,18 +512,26 @@ const vitePlugin = (options: Options = {}) => {
 
       const finalAtomicCss = styleThis.get_atomic_css();
 
-      let cssAsset = null;
-      let cssFileName = null;
+      const chunks = Object.values(bundle).filter((output) => output.type === 'chunk');
+      const getImportedCss = (chunk: (typeof chunks)[number]): string[] =>
+        [...((chunk as any).viteMetadata?.importedCss ?? [])].filter((fileName: string) => fileName.endsWith('.css'));
 
-      for (const [fileName, asset] of Object.entries(bundle)) {
-        if (asset.type === 'asset' && fileName.endsWith('.css')) {
-          cssAsset = asset;
-          cssFileName = fileName;
-          break;
-        }
-      }
+      // the atomic CSS belongs to the stylesheet of the chunk importing `@style-this/core/atomic`,
+      // falling back to the entry chunks' stylesheets, then to any stylesheet
+      const containsAtomicEntrypoint = (chunk: (typeof chunks)[number]) =>
+        [...(chunk.moduleIds ?? []), ...Object.keys(chunk.modules ?? {})].some(
+          (id) => id.split('?', 1)[0] === atomicEntrypointId,
+        );
+      const candidates = [
+        ...chunks.filter(containsAtomicEntrypoint).flatMap(getImportedCss),
+        ...chunks.filter((chunk) => chunk.isEntry).flatMap(getImportedCss),
+        ...Object.keys(bundle).filter((fileName) => fileName.endsWith('.css')),
+      ];
 
-      if (cssAsset && cssFileName) {
+      const cssFileName = candidates.find((fileName) => bundle[fileName]?.type === 'asset');
+      const cssAsset = cssFileName ? bundle[cssFileName] : undefined;
+
+      if (cssAsset?.type === 'asset') {
         const existingCss = typeof cssAsset.source === 'string' ? cssAsset.source : cssAsset.source.toString();
         cssAsset.source = `${existingCss}\n${finalAtomicCss}`;
       } else {
