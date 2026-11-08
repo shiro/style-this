@@ -324,6 +324,8 @@ export const setupPlugin = async (
   resolver: Record<string, string>,
   options?: Record<string, unknown>,
 ) => {
+  // class name hashes depend on paths relative to cwd, pin it so output doesn't depend on where tests run from
+  const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(MONOREPO_ROOT_DIR);
   const pluginOptions = { useRequire: true, debug: true, ...(options || {}) };
   const plugin = vitePlugin(pluginOptions as Parameters<typeof vitePlugin>[0]);
 
@@ -353,11 +355,15 @@ export const setupPlugin = async (
   } as unknown as Parameters<typeof plugin.config>[0];
 
   const config = plugin.config.bind(ctx);
-  await config({});
+  try {
+    await config({});
 
-  // Call buildStart to initialize atomic mode globals
-  if (plugin.buildStart) {
-    await plugin.buildStart.call(ctx, {});
+    // Call buildStart to initialize atomic mode globals
+    if (plugin.buildStart) {
+      await plugin.buildStart.call(ctx, {});
+    }
+  } finally {
+    cwdSpy.mockRestore();
   }
 
   return {
