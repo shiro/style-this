@@ -1,5 +1,28 @@
 # @style-this/webpack
 
+## 0.3.0
+
+### Minor Changes
+
+- Lockstep release of all packages.
+  - Only invalidate importers whose used exports changed on HMR, instead of every importer
+  - Don't mark importers of reloaded virtual modules as updated during HMR
+  - Report evaluation errors in imported modules instead of crashing
+  - Extract CSS of styled components in files without a `css` import
+  - Don't externalize `@style-this/core` during SSR in the vite plugin
+  - Fix class references in selectors in atomic mode
+  - Fix multi-line declarations leaving invalid CSS in atomic mode
+  - Keep the closing brace of trailing nested rules in atomic mode
+  - Ignore comments when splitting CSS into declarations
+  - Tolerate invalidated store entries when resolving evaluated CSS
+  - Pass the CSS cache to the compiler in the Next.js loaders
+  - Fix TypeScript type errors in core, vite and webpack packages
+
+### Patch Changes
+
+- Updated dependencies
+  - @style-this/core@0.3.0
+
 ## 0.2.1
 
 ### Patch Changes
