@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+### Minor Changes
+
+- Lockstep release of all packages.
+  - Append the atomic CSS to the stylesheet of the chunk importing `@style-this/core/atomic` in builds, instead of the first stylesheet in the bundle
+  - Invalidate query variants of the atomic entrypoint (e.g. `?inline`) on atomic CSS changes during HMR
+
+### Patch Changes
+
+- Updated dependencies
+  - @style-this/core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
