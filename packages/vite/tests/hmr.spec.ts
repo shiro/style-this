@@ -190,6 +190,51 @@ export const cStyle = css\`
     }
   }, 30000);
 
+  test("invalidates query variants of the atomic entrypoint once new atomic CSS appears", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
+    try {
+      const a = join(dir, "a.tsx");
+      const b = join(dir, "b.tsx");
+      const source = (color: string) => `import { css } from "@style-this/core";
+
+export const style = css\`
+  color: ${color};
+\`;
+`;
+      await writeFile(a, source("red"));
+      await writeFile(b, source("blue"));
+
+      const plugin = await setupPlugin({ "@style-this/core": "" }, { atomic: true, debug: false });
+      const client = createEnvironment("client", "client");
+      const ssr = createEnvironment("ssr", "server");
+      (plugin.configureServer as Function)({ environments: { client, ssr } });
+
+      // e.g. SolidStart inlines SSR styles in dev with `import("<id>?inline")`, plugin.load is bound to the
+      // (client) test context
+      const inlineId = `${ATOMIC_ENTRYPOINT_ID}?inline`;
+      const inlineModule = client.addModule(inlineId);
+      const plainModule = client.addModule(ATOMIC_ENTRYPOINT_ID);
+
+      await transformFile(plugin, a);
+      await loadCode(plugin, `${VIRTUAL_PREFIX}${a}.style-this.js`);
+      expect(await loadCode(plugin, inlineId)).not.toContain("color: blue");
+      // a fresh plain variant must not hide the outdated inline one
+      await transformFile(plugin, b);
+      await loadCode(plugin, `${VIRTUAL_PREFIX}${b}.style-this.js`);
+      expect(await loadCode(plugin, ATOMIC_ENTRYPOINT_ID)).toContain("color: blue");
+
+      await vi.waitFor(() => expect(client.moduleGraph.invalidateModule).toHaveBeenCalledWith(inlineModule));
+      // query variants aren't HMR-accepting, they are only invalidated
+      expect(client.hot.send).not.toHaveBeenCalledWith({
+        type: "update",
+        updates: [expect.objectContaining({ path: inlineModule.url })],
+      });
+      expect(plainModule.lastHMRTimestamp).toBe(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 30000);
+
   test("unresolvable imports report an error instead of crashing", async () => {
     const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
     try {

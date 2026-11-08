@@ -139,8 +139,13 @@ const vitePlugin = (options: Options = {}) => {
   const fromVirtualId = (id: string) => resolvePath(cwd, id.slice(resolvedVirtualModulePrefix.length));
 
   const atomicEntrypointId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
-  /** Atomic CSS last served by the entrypoint, per environment. */
-  const servedAtomicCss = new Map<string, string>();
+  /**
+   * Atomic CSS last served by the entrypoint, per environment and module id.
+   *
+   * The entrypoint can be loaded under several ids, e.g. SolidStart inlines SSR styles in dev by importing
+   * `<id>?inline`. Each variant is a separate module that has to be invalidated on its own.
+   */
+  const servedAtomicCss = new Map<string, Map<string, string>>();
   let atomicCssUpdateTimer: NodeJS.Timeout | undefined;
 
   /** Reloads the atomic entrypoint in every environment that has served outdated atomic CSS. */
@@ -150,10 +155,19 @@ const vitePlugin = (options: Options = {}) => {
       if (!server) return;
       const atomicCss = styleThis.get_atomic_css();
       for (const environment of Object.values(server.environments)) {
-        const mod = environment.moduleGraph.getModuleById(atomicEntrypointId);
-        if (!mod || servedAtomicCss.get(environment.name) === atomicCss) continue;
-        if (environment.config.consumer === "client") reloadVirtualModule(environment, mod);
-        else environment.moduleGraph.invalidateModule(mod);
+        const served = servedAtomicCss.get(environment.name);
+        for (const id of new Set([atomicEntrypointId, ...(served?.keys() ?? [])])) {
+          if (served?.get(id) === atomicCss) continue;
+          const mod = environment.moduleGraph.getModuleById(id);
+          if (!mod) {
+            served?.delete(id);
+            continue;
+          }
+          // only the plain CSS module is HMR-accepting in the browser, query variants (`?inline`, ...) are
+          // re-fetched on their next import
+          if (environment.config.consumer === "client" && id === atomicEntrypointId) reloadVirtualModule(environment, mod);
+          else environment.moduleGraph.invalidateModule(mod);
+        }
       }
     }, 20);
   };
@@ -381,7 +395,10 @@ const vitePlugin = (options: Options = {}) => {
             throw new Error(`Unexpected atomic CSS type: ${typeof atomicCss}`);
           }
 
-          servedAtomicCss.set(this.environment?.name ?? "client", atomicCss);
+          const environmentName = this.environment?.name ?? "client";
+          let served = servedAtomicCss.get(environmentName);
+          if (!served) servedAtomicCss.set(environmentName, (served = new Map()));
+          served.set(fullId, atomicCss);
 
           return {
             code: atomicCss,
