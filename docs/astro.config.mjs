@@ -4,6 +4,7 @@ import starlight from '@astrojs/starlight';
 import starlightVersions from 'starlight-versions';
 
 export default defineConfig({
+	site: 'https://style-this.usagi.io',
 	integrations: [
 		starlight({
 			title: 'style-this',
