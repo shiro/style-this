@@ -1,0 +1,110 @@
+---
+title: style-this
+description: Zero-runtime CSS-in-JS for the modern web, compiled by a Rust core.
+template: splash
+hero:
+  tagline: Zero-runtime CSS-in-JS. Write styles next to your components, ship plain CSS.
+  actions:
+    - text: Get started
+      link: /getting-started/installation/
+      icon: right-arrow
+    - text: Examples
+      link: /examples/counter/
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/shiro/style-this
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+<Tabs syncKey="framework">
+<TabItem label="React">
+```tsx
+import { css } from "@style-this/core";
+import { styled } from "@style-this/react";
+
+const spacing = 16;
+
+const card = css`
+  padding: ${spacing}px;
+  border-radius: ${spacing / 2}px;
+`;
+
+const Button = styled.button<{ size: number }>`
+  padding: ${({ size }) => `${size}px`};
+  background: ${({ props }) => (props.disabled ? "gray" : "green")};
+`;
+
+export const Card = () => (
+  <div className={card}>
+    <Button styleProps={{ size: 8 }}>Click me</Button>
+  </div>
+);
+```
+</TabItem>
+<TabItem label="Solid">
+```tsx
+import { css } from "@style-this/core";
+import { styled } from "@style-this/solid";
+
+const spacing = 16;
+
+const card = css`
+  padding: ${spacing}px;
+  border-radius: ${spacing / 2}px;
+`;
+
+const Button = styled.button<{ size: number }>`
+  padding: ${({ size }) => `${size}px`};
+  background: ${({ props }) => (props.disabled ? "gray" : "green")};
+`;
+
+export const Card = () => (
+  <div class={card}>
+    <Button styleProps={{ size: 8 }}>Click me</Button>
+  </div>
+);
+```
+</TabItem>
+<TabItem label="Svelte">
+```svelte
+<script lang="ts">
+  import { css } from "@style-this/core";
+
+  const spacing = 16;
+
+  const card = css`
+    padding: ${spacing}px;
+    border-radius: ${spacing / 2}px;
+  `;
+</script>
+
+<div class={card}>Hello</div>
+```
+</TabItem>
+</Tabs>
+
+<CardGrid stagger>
+	<Card title="Zero runtime" icon="rocket">
+		Styles are evaluated at build time and extracted to real CSS files. `css` compiles to a class
+		name string.
+	</Card>
+	<Card title="Rust core" icon="setting">
+		The transform is written in Rust and shipped as WebAssembly, no native binaries to install.
+	</Card>
+	<Card title="Atomic mode" icon="puzzle">
+		Opt in to atomic CSS output, one class per declaration, deduplicated across your whole app.
+	</Card>
+	<Card title="Framework support" icon="laptop">
+		Styled components for React and SolidJS, plain `css` for Svelte and anything else. Works with
+		Vite, SolidStart, SvelteKit and Next.js.
+	</Card>
+	<Card title="Great DX" icon="star">
+		Cross-file HMR with dependency tracking, and CSS source maps pointing to your original source.
+	</Card>
+	<Card title="Just CSS" icon="pencil">
+		Nesting, media queries, selectors referencing other styles. Anything your CSS pipeline handles.
+	</Card>
+</CardGrid>

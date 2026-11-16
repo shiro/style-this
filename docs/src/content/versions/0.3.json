@@ -1,0 +1,72 @@
+{
+  "sidebar": [
+    {
+      "label": "Getting started",
+      "items": [
+        {
+          "autogenerate": {
+            "directory": "getting-started"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Guides",
+      "items": [
+        {
+          "autogenerate": {
+            "directory": "guides"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Frameworks",
+      "items": [
+        {
+          "autogenerate": {
+            "directory": "frameworks"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Examples",
+      "items": [
+        {
+          "autogenerate": {
+            "directory": "examples"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Reference",
+      "items": [
+        {
+          "autogenerate": {
+            "directory": "reference"
+          }
+        }
+      ]
+    },
+    {
+      "label": "Troubleshooting",
+      "slug": "troubleshooting"
+    },
+    {
+      "label": "Releases",
+      "items": [
+        {
+          "autogenerate": {
+            "directory": "releases"
+          }
+        }
+      ]
+    }
+  ],
+  "excluded": [
+    "releases/changelog",
+    "releases/versioning-the-docs"
+  ]
+}
