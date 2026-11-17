@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+### Minor Changes
+
+- Lockstep release of all packages.
+  - Wrap atomic CSS in `@layer utilities` after a default `@layer theme, base, components, utilities;` order, so dev and build share the same cascade. Override the order by declaring your own `@layer` statement before `@style-this/core/atomic` is imported. Unlayered CSS (including non-atomic component CSS) now takes precedence over atomic CSS
+
 ## 0.4.0
 
 ### Minor Changes

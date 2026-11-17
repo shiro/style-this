@@ -1,4 +1,4 @@
-.CounterStyle-zodu74 { /* marker */ }
+@layer theme, base, components, utilities;.CounterStyle-zodu74 { /* marker */ }
 .FancyButton-otinw9 {   padding: var(--var1-enc92j); }
 .FancyButton2-wtirkd { margin: var(--var1-1mjodu);
   min-height: var(--var2-spq7g9);
@@ -8,6 +8,8 @@
 .Global__Main {
     background: lightyellow;
   }
+@layer theme, base, components, utilities;
+@layer utilities {
 .b-zDIGu { border: 1px solid blue }
 .bg-BZ0hD { background: lightyellow }
 .bg-LVc4W { background: white }
@@ -23,3 +25,4 @@
 .items-ib2Uw { align-items: center }
 .r-KyVot { border-radius: 8px }
 .r-T5iL9 { border-radius: 2px }
+}
