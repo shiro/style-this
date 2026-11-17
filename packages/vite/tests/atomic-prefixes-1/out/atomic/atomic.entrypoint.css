@@ -1,3 +1,5 @@
+@layer theme, base, components, utilities;
+@layer utilities {
 .b-ylAIn { border: 0 }
 .bg-kG3jH { background: none }
 .c-tMpWo { color: red }
@@ -7,3 +9,4 @@
 .bt-OOpe0 { border-top: 1px solid red }
 .mt-DB_jf { margin-top: 4px }
 .rKMWO { -webkit-line-clamp: 2 }
+}

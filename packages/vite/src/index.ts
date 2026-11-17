@@ -140,6 +140,13 @@ const vitePlugin = (options: Options = {}) => {
 
   const atomicEntrypointId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
   /**
+   * Atomic CSS goes into the `utilities` layer, after a default Tailwind-like layer order. Users can override the
+   * order by declaring their own `@layer` statement before the atomic entrypoint is imported. The order statement is
+   * repeated before the appended atomic CSS in builds, it's a no-op once the layers are declared.
+   */
+  const atomicLayerOrder = "@layer theme, base, components, utilities;";
+  const wrapAtomicCss = (css: string) => `${atomicLayerOrder}\n@layer utilities {\n${css}\n}`;
+  /**
    * Atomic CSS last served by the entrypoint, per environment and module id.
    *
    * The entrypoint can be loaded under several ids, e.g. SolidStart inlines SSR styles in dev by importing
@@ -379,8 +386,10 @@ const vitePlugin = (options: Options = {}) => {
 
       if (id === atomicEntrypointId) {
         if (atomic) {
+          // the atomic CSS is appended in `generateBundle`, the order statement fixes the layer order at the
+          // import position like in dev
           if (!server) {
-            return { code: '' };
+            return { code: atomicLayerOrder };
           }
 
           // wait for pending atomic modules, ones that aren't transformed yet trigger a reload once
@@ -401,7 +410,7 @@ const vitePlugin = (options: Options = {}) => {
           served.set(fullId, atomicCss);
 
           return {
-            code: atomicCss,
+            code: wrapAtomicCss(atomicCss),
           };
         } else {
           return {
@@ -510,7 +519,7 @@ const vitePlugin = (options: Options = {}) => {
     async generateBundle(_outputOptions, bundle) {
       if (!atomic) return;
 
-      const finalAtomicCss = styleThis.get_atomic_css();
+      const finalAtomicCss = wrapAtomicCss(styleThis.get_atomic_css());
 
       const chunks = Object.values(bundle).filter((output) => output.type === 'chunk');
       const getImportedCss = (chunk: (typeof chunks)[number]): string[] =>

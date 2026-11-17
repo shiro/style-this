@@ -1,2 +1,5 @@
+@layer theme, base, components, utilities;
+@layer utilities {
 .bg-EcIBn { background: pink }
 .bg-oHX3i { background: hotpink }
+}

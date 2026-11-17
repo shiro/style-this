@@ -1,5 +1,8 @@
+@layer theme, base, components, utilities;
+@layer utilities {
 .bg-dPvTW { background: black }
 .bg-i1jU1 { background: blue }
 .bg-kG3jH { background: none }
 .c-aJx1V { color: white }
 .c-aUM_I { color: green }
+}

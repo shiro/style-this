@@ -1,2 +1,5 @@
+@layer theme, base, components, utilities;
+@layer utilities {
 .bg-gKimM { background: red }
 .p-tQ4Gf { padding: 20px }
+}

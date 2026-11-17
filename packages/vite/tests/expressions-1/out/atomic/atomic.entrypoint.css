@@ -1,1 +1,4 @@
+@layer theme, base, components, utilities;
+@layer utilities {
 .bg-iNoat { background: [object Promise] }
+}

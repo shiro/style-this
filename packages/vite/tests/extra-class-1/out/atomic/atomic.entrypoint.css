@@ -1,2 +1,5 @@
+@layer theme, base, components, utilities;
+@layer utilities {
 .bg-gKimM { background: red }
 .c-eceDU { color: blue }
+}

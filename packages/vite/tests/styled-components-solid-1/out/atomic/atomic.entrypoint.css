@@ -1,3 +1,6 @@
+@layer theme, base, components, utilities;
+@layer utilities {
 .b-zDIGu { border: 1px solid blue }
 .bg-kG3jH { background: none }
 .r-T5iL9 { border-radius: 2px }
+}
