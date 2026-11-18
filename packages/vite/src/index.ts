@@ -179,7 +179,13 @@ const vitePlugin = (options: Options = {}) => {
     }, 20);
   };
 
-  /** Latest update per file, `hotUpdate` is called for each environment but invalidates once. */
+  /**
+   * Updates per timestamp and file, `hotUpdate` is called for each environment but invalidates once,
+   * invalidating again would compare the file to itself and miss the affected importers.
+   * Environments may handle interleaved updates (or be skipped through `applyToEnvironment`), so
+   * entries can't be dropped once consumed, they're dropped once outdated instead.
+   */
+  const HMR_UPDATE_TTL = 60_000;
   const hmrUpdates = new Map<string, { timestamp: number; files: Promise<string[] | undefined> }>();
 
   /** Invalidates the changed file and the importers affected by the change, returns them. */
@@ -560,10 +566,16 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     async hotUpdate({ file, type, timestamp, modules, read }) {
-      let update = hmrUpdates.get(file);
-      if (update?.timestamp !== timestamp) {
+      const key = `${timestamp}:${file}`;
+      let update = hmrUpdates.get(key);
+      if (!update) {
+        // entries are inserted in about timestamp order, outdated ones left behind are dropped later
+        for (const [outdatedKey, outdated] of hmrUpdates) {
+          if (outdated.timestamp >= timestamp - HMR_UPDATE_TTL) break;
+          hmrUpdates.delete(outdatedKey);
+        }
         update = { timestamp, files: invalidateForHotUpdate(file, type, read) };
-        hmrUpdates.set(file, update);
+        hmrUpdates.set(key, update);
       }
       const files = await update.files;
       if (!files) return;

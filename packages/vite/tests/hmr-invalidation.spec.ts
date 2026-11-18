@@ -303,6 +303,48 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
     expect(await hotUpdate("q.ts", { timestamp: 101, env: ssr })).toEqual(["pq.ts", "q.ts", "w.tsx"]);
   });
 
+  test("every environment gets the affected files of large interleaved updates", async () => {
+    const ssr = createEnvironment("ssr");
+    for (const name of Object.keys(files)) ssr.addModule(path(name));
+
+    await writeFile(path("a.ts"), files["a.ts"].replace(`"red"`, `"blue"`));
+
+    // e.g. a branch switch, the client handles all updates before the other environments
+    const others = Array.from({ length: 200 }, (_, idx) => `other-${idx}.ts`);
+    const expected = ["a.ts", "b.tsx", "c.tsx", "e.tsx", "i.tsx"];
+    expect(await hotUpdate("a.ts", { timestamp: 100 })).toEqual(expected);
+    for (const [idx, name] of others.entries()) await hotUpdate(name, { timestamp: 101 + idx });
+    expect(await hotUpdate("a.ts", { timestamp: 100, env: ssr })).toEqual(expected);
+  });
+
+  test("every environment gets the affected files of consecutive updates to the same file", async () => {
+    const ssr = createEnvironment("ssr");
+    for (const name of Object.keys(files)) ssr.addModule(path(name));
+
+    const expected = ["a.ts", "b.tsx", "c.tsx", "e.tsx", "i.tsx"];
+    await writeFile(path("a.ts"), files["a.ts"].replace(`"red"`, `"blue"`));
+    expect(await hotUpdate("a.ts", { timestamp: 100 })).toEqual(expected);
+    await writeFile(path("a.ts"), files["a.ts"].replace(`"red"`, `"green"`));
+    expect(await hotUpdate("a.ts", { timestamp: 101 })).toEqual(expected);
+
+    expect(await hotUpdate("a.ts", { timestamp: 100, env: ssr })).toEqual(expected);
+    expect(await hotUpdate("a.ts", { timestamp: 101, env: ssr })).toEqual(expected);
+  });
+
+  test("outdated updates are dropped", async () => {
+    const ssr = createEnvironment("ssr");
+    const read = vi.fn(() => readFile(path("a.ts"), "utf-8"));
+
+    await hotUpdate("a.ts", { timestamp: 100, read });
+    await hotUpdate("a.ts", { timestamp: 100, read, env: ssr });
+    expect(read).toHaveBeenCalledTimes(1);
+
+    await hotUpdate("q.ts", { timestamp: 100 + 10 * 60_000 });
+    // not kept anymore, invalidated again
+    await hotUpdate("a.ts", { timestamp: 100, read, env: ssr });
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
   test("changed imports of exports invalidate their importers", async () => {
     await writeFile(path("a2.ts"), `export const color = "red";\n`);
     expect(
