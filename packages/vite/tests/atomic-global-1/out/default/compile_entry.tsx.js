@@ -15,11 +15,10 @@ _GlobalMain.css = `.Global__Main {
       background: blue;
     }
   }`;
-const cssSourcemapData = [{className:'mainStyle-74hqzc',start:110,end:152},{className:'_GlobalMain',start:211,end:367}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/atomic-global-1/entry.tsx.css')?.resolve([
+return [
 `.mainStyle-74hqzc {
 ${mainStyle.css}
 }`,
 `${_GlobalMain.css}
 `
-].join('\n'), cssSourcemapData, '/packages/vite/tests/atomic-global-1/entry.tsx.css');
+].join('\n');

@@ -4,12 +4,11 @@ const getNumber = __styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-ca
 let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-tej8d6");
 a.css = `margin: ${getNumber()};`;
-const cssSourcemapData = [{className:'a-tej8d6',start:627,end:659}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-library-imports/entry.tsx.css')?.resolve([
+return [
 `.a-tej8d6 {
 ${a.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-library-imports/entry.tsx.css');
+].join('\n');
 
 
 // /packages/vite/tests/edge-cases-library-imports/node_modules/some_lib/index.js (/packages/vite/tests/edge-cases-library-imports/entry.tsx): {"getNumber"}

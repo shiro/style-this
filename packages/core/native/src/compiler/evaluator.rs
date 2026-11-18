@@ -3,7 +3,7 @@ use super::css_parser;
 use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::error::TransformError;
 use super::transformer::Transformer;
-use super::types::{CssVariableIdentifier, ExportedJSValue};
+use super::types::CssVariableIdentifier;
 use super::visitor::VisitorTransformer;
 use crate::compiler::atomic::{add_atomic, dedupe_atomic_declarations, rewrite_merge_styles_imports};
 use crate::error_mapping;
@@ -738,7 +738,8 @@ pub async fn evaluate_program<'alloc>(
 ) -> Result<(), TransformError> {
     let allocator = &ast_builder.allocator;
 
-    // keep values until end of function
+    let entries = entrypoint.then(|| VirtualModuleEntries::capture(transformer, &program_filepath));
+
     let value_cache_guard = transformer
         .cache_registry
         .get_or_create_value_cache(program_filepath.clone());
@@ -827,9 +828,6 @@ pub async fn evaluate_program<'alloc>(
     let eval_program = Rc::new(RefCell::new(tmp_program));
 
     let css_file_store_ref = &transformer.css_file_store_ref;
-    let atomic_file_store_ref = &transformer.atomic_file_store_ref;
-    let css_filepath = format!("'{program_filepath}.{}'", transformer.css_extension);
-    let atomic_filepath = format!("'{program_filepath}.style-this.js'");
 
     let dependency_futures = evaluate_dependencies(
         program,
@@ -845,7 +843,7 @@ pub async fn evaluate_program<'alloc>(
     );
 
     if let Err(err) = futures::future::try_join_all(dependency_futures).await {
-        return report_error(transformer, entrypoint, &program_filepath, err);
+        return report_error(entries.as_ref(), err);
     }
 
     // Always populate value cache with exported idents, even when skipping CSS eval
@@ -912,22 +910,6 @@ pub async fn evaluate_program<'alloc>(
         } else {
             // ===== NON-ATOMIC MODE =====
             // Keep existing behavior: inline CSS resolution
-
-            let sourcemap_data = css_variable_identifiers
-                .iter()
-                .map(|css_var| {
-                    let line = css_var.span.start;
-                    let end_line = css_var.span.end;
-                    format!(
-                        "{{className:'{}',start:{},end:{}}}",
-                        css_var.classname.replace('\'', "\\'"),
-                        line,
-                        end_line
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-
             let css = css_variable_identifiers
                 .iter()
                 .map(|css_var| {
@@ -948,8 +930,7 @@ pub async fn evaluate_program<'alloc>(
 
             eval_program_js.push_str(&formatdoc!(
                 "
-                const cssSourcemapData = [{sourcemap_data}];
-                global.{css_file_store_ref}.get({css_filepath})?.resolve([\n{css}\n].join('\\n'), cssSourcemapData, {css_filepath});
+                return [\n{css}\n].join('\\n');
                 ",
             ));
         }
@@ -1012,7 +993,7 @@ pub async fn evaluate_program<'alloc>(
                 cause,
             }) {
                 Ok(v) => v,
-                Err(err) => return report_error(transformer, entrypoint, &program_filepath, err),
+                Err(err) => return report_error(entries.as_ref(), err),
             };
 
         // Await the promise to get the CSS blocks
@@ -1026,7 +1007,7 @@ pub async fn evaluate_program<'alloc>(
                     program: None,
                     cause,
                 };
-                return report_error(transformer, entrypoint, &program_filepath, err);
+                return report_error(entries.as_ref(), err);
             }
         };
 
@@ -1047,22 +1028,6 @@ pub async fn evaluate_program<'alloc>(
         // Parse each CSS block into atomic + non-atomic classes
         let mut variable_to_atomics: HashMap<String, BTreeSet<String>> = HashMap::new();
         let mut module_css = String::new();
-
-        // Build sourcemap data for module CSS
-        let sourcemap_data = css_variable_identifiers
-            .iter()
-            .map(|css_var| {
-                let line = css_var.span.start;
-                let end_line = css_var.span.end;
-                format!(
-                    "{{className:'{}',start:{},end:{}}}",
-                    css_var.classname.replace('\'', "\\'"),
-                    line,
-                    end_line
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(",");
 
         for css_var in css_variable_identifiers.iter() {
             if let Some(css_string) = css_blocks.get(&css_var.variable_name) {
@@ -1118,35 +1083,10 @@ pub async fn evaluate_program<'alloc>(
         // CSS string already contains all non-atomizable CSS, trim trailing newline
         let css = module_css.trim_end();
 
-        let css = css
-            .replace('\\', "\\\\")
-            .replace('\'', "\\'")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\u{2028}', "\\u2028")
-            .replace('\u{2029}', "\\u2029");
-
-        // Escape atomic_module for use in template literal
-        let atomic_module = atomic_module
-            .replace('\\', "\\\\")
-            .replace('`', "\\`")
-            .replace("${", "\\${");
-
         // Stage 2: Resolve .style-this.js with atomic exports and .css with non-atomizable CSS.
-        // Entries may have been invalidated (e.g. by HMR) while evaluating, nothing waits on those
-        // anymore so the result is dropped.
-        if let Err(cause) = js_sys::eval(&format!(
-            "
-            global.{css_file_store_ref}.get({css_filepath})?.resolve('{css}', [{sourcemap_data}], {css_filepath});
-            global.{atomic_file_store_ref}.get({atomic_filepath})?.resolve(`{atomic_module}`);
-            "
-        )) {
-            let err = TransformError::EvaluationFailed {
-                filepath: program_filepath.clone(),
-                program: None,
-                cause,
-            };
-            return report_error(transformer, entrypoint, &program_filepath, err);
+        if let Some(entries) = &entries {
+            entries.resolve_css(&css.into(), &css_variable_identifiers);
+            entries.resolve_atomic(&atomic_module.into());
         }
 
         return Ok(());
@@ -1173,13 +1113,13 @@ pub async fn evaluate_program<'alloc>(
             Ok(v) => v,
             Err(err) => {
                 value_cache.retain(|ident| !evaluated_exports.contains(ident));
-                return report_error(transformer, entrypoint, &program_filepath, err);
+                return report_error(entries.as_ref(), err);
             }
         };
 
     let promise = js_sys::Promise::from(evaluated);
     let future = wasm_bindgen_futures::JsFuture::from(promise);
-    if let Err(err) = future
+    let evaluated = match future
         .await
         .inspect_err(|err| {
             error_mapping::resolve_err(
@@ -1199,49 +1139,105 @@ pub async fn evaluate_program<'alloc>(
                 None
             },
             cause,
-        })
-    {
-        value_cache.retain(|ident| !evaluated_exports.contains(ident));
-        return report_error(transformer, entrypoint, &program_filepath, err);
-    }
+        }) {
+        Ok(v) => v,
+        Err(err) => {
+            value_cache.retain(|ident| !evaluated_exports.contains(ident));
+            return report_error(entries.as_ref(), err);
+        }
+    };
 
-    // entrypoints without any CSS still get their virtual modules requested, resolve them as
-    // empty so they don't wait forever
-    if entrypoint && !has_css {
-        js_sys::eval(&format!(
-            "
-            {css_file_store_ref}.get({css_filepath})?.resolve('');
-            {atomic_file_store_ref}.get({atomic_filepath})?.resolve('');
-            "
-        ))
-        .unwrap();
+    if let Some(entries) = &entries {
+        if has_css {
+            // non-atomic entrypoints return their CSS
+            entries.resolve_css(&evaluated, &css_variable_identifiers);
+        } else {
+            // entrypoints without any CSS still get their virtual modules requested, resolve them
+            // as empty so they don't wait forever
+            entries.resolve_all(&"".into());
+        }
     }
 
     Ok(())
 }
 
+/// Virtual module entries of an entrypoint, captured when its evaluation starts. Edits during the
+/// evaluation replace the entries in the stores, the stale result must only resolve the old ones.
+struct VirtualModuleEntries {
+    css: JsValue,
+    css_filepath: String,
+    atomic: JsValue,
+}
+
+impl VirtualModuleEntries {
+    fn capture(transformer: &Transformer, program_filepath: &str) -> Self {
+        let get = |store_ref: &str, key: &str| {
+            js_sys::Reflect::get(&js_sys::global(), &JsValue::from_str(store_ref))
+                .ok()
+                .and_then(|store| store.dyn_into::<js_sys::Map>().ok())
+                .map(|store| store.get(&JsValue::from_str(key)))
+                .unwrap_or(JsValue::UNDEFINED)
+        };
+
+        let css_filepath = format!("{program_filepath}.{}", transformer.css_extension);
+        Self {
+            css: get(&transformer.css_file_store_ref, &css_filepath),
+            atomic: get(
+                &transformer.atomic_file_store_ref,
+                &format!("{program_filepath}.style-this.js"),
+            ),
+            css_filepath,
+        }
+    }
+
+    fn resolve(entry: &JsValue, args: &js_sys::Array) {
+        if let Ok(resolve) = js_sys::Reflect::get(entry, &JsValue::from_str("resolve"))
+            && let Ok(resolve) = resolve.dyn_into::<js_sys::Function>()
+        {
+            let _ = resolve.apply(entry, args);
+        }
+    }
+
+    fn resolve_css(&self, css: &JsValue, css_variable_identifiers: &[CssVariableIdentifier]) {
+        let sourcemap_data = css_variable_identifiers
+            .iter()
+            .map(|css_var| {
+                let data = js_sys::Object::new();
+                let set = |key: &str, value: JsValue| {
+                    js_sys::Reflect::set(&data, &JsValue::from_str(key), &value).unwrap();
+                };
+                set("className", JsValue::from_str(&css_var.classname));
+                set("start", css_var.span.start.into());
+                set("end", css_var.span.end.into());
+                data
+            })
+            .collect::<js_sys::Array>();
+
+        let args = js_sys::Array::of3(css, &sourcemap_data, &JsValue::from_str(&self.css_filepath));
+        Self::resolve(&self.css, &args);
+    }
+
+    fn resolve_atomic(&self, value: &JsValue) {
+        Self::resolve(&self.atomic, &js_sys::Array::of1(value));
+    }
+
+    fn resolve_all(&self, value: &JsValue) {
+        let args = js_sys::Array::of1(value);
+        Self::resolve(&self.css, &args);
+        Self::resolve(&self.atomic, &args);
+    }
+}
+
 /// Entrypoints report errors through their virtual modules, dependencies pass them on to their
 /// importer.
 fn report_error(
-    transformer: &Transformer,
-    entrypoint: bool,
-    program_filepath: &str,
+    entries: Option<&VirtualModuleEntries>,
     err: TransformError,
 ) -> Result<(), TransformError> {
-    if !entrypoint {
+    let Some(entries) = entries else {
         return Err(err);
-    }
+    };
 
-    let css_file_store_ref = &transformer.css_file_store_ref;
-    let atomic_file_store_ref = &transformer.atomic_file_store_ref;
-    let css_extension = &transformer.css_extension;
-    let err = ExportedJSValue::new(err.into());
-    let _ = js_sys::eval(&format!(
-        "
-        {css_file_store_ref}.get('{program_filepath}.{css_extension}')?.resolve({err});
-        {atomic_file_store_ref}.get('{program_filepath}.style-this.js')?.resolve({err});
-        "
-    ));
-
+    entries.resolve_all(&err.into());
     Ok(())
 }

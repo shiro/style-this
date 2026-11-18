@@ -4,12 +4,11 @@ const num = __styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/
 let { css } = require("/packages/core/dist/index.mjs");
 let a = new String("a-gxu385");
 a.css = `margin: ${num}px;`;
-const cssSourcemapData = [{className:'a-gxu385',start:83,end:109}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/entry-1.tsx.css')?.resolve([
+return [
 `.a-gxu385 {
 ${a.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/entry-1.tsx.css');
+].join('\n');
 
 
 // /packages/vite/tests/edge-cases-1/shared.tsx (/packages/vite/tests/edge-cases-1/entry-1.tsx): {"Math", "css", "num", "shared"}
@@ -28,9 +27,8 @@ let num = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cas
 let shared = new String("shared-ar0tez");
 shared.css = `margin: ${num}px;`;
 
-global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};const cssSourcemapData = [{className:'shared-ar0tez',start:91,end:117}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/edge-cases-1/shared.tsx.css')?.resolve([
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"] ?? {}), num};return [
 `.shared-ar0tez {
 ${shared.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/edge-cases-1/shared.tsx.css');
+].join('\n');

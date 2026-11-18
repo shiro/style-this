@@ -10,12 +10,11 @@ __styleThis_var_FancyButton_2.css = `background: none;
 let unrelated = new String("unrelated-l2rcte test-class");
 unrelated.css = `background: none;
   `;
-const cssSourcemapData = [{className:'FancyButton-bsxab0',start:124,end:294},{className:'unrelated-l2rcte',start:315,end:371}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/styled-extra-class-react-1/entry.tsx.css')?.resolve([
+return [
 `.FancyButton-bsxab0 {
 ${__styleThis_var_FancyButton_2.css}
 }`,
 `.unrelated-l2rcte {
 ${unrelated.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/styled-extra-class-react-1/entry.tsx.css');
+].join('\n');

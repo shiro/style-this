@@ -201,12 +201,17 @@ const vitePlugin = (options: Options = {}) => {
 
   const createCachePromise = (originalSource: string): CssCachEntry => {
     let resolve: CssCachEntry["resolve"] | undefined;
+    let settled = false;
     const entry = new Promise((_resolve, _reject) => {
       resolve = (
         css: string | Error,
         sourcemapData?: CssSourceMapData,
         filepath?: string,
       ) => {
+        // invalidated entries are resolved early, the metadata of their outdated evaluations
+        // must not replace the current one
+        if (settled) return;
+        settled = true;
         // Store source map metadata if provided
         if (
           !(css instanceof Error) &&

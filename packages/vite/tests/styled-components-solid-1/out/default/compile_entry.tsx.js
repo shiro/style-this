@@ -8,12 +8,11 @@ __styleThis_var_FancyButton_2.css = `background: none;
   padding: ${"var(--var1-q3ctyv)"}px;`;
 let unrelated = new String("unrelated-96jgdy");
 unrelated.css = `background: none;`;
-const cssSourcemapData = [{className:'FancyButton-3slijs',start:112,end:241},{className:'unrelated-96jgdy',start:262,end:288}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/styled-components-solid-1/entry.tsx.css')?.resolve([
+return [
 `.FancyButton-3slijs {
 ${__styleThis_var_FancyButton_2.css}
 }`,
 `.unrelated-96jgdy {
 ${unrelated.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/styled-components-solid-1/entry.tsx.css');
+].join('\n');

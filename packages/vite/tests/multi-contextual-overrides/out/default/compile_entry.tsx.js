@@ -15,9 +15,8 @@ let outer = new String("outer-folqvg");
 outer.css = `.${inner} {
     background: "red";
   }`;
-const cssSourcemapData = [{className:'outer-folqvg',start:84,end:131}];
-global.__styleThis_css_cache_aabbbccc.get('/packages/vite/tests/multi-contextual-overrides/entry.tsx.css')?.resolve([
+return [
 `.outer-folqvg {
 ${outer.css}
 }`
-].join('\n'), cssSourcemapData, '/packages/vite/tests/multi-contextual-overrides/entry.tsx.css');
+].join('\n');
