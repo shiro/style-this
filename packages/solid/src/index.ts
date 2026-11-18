@@ -41,7 +41,7 @@ type StyledProxy =
       baseComponent: Component<P> | keyof JSX.IntrinsicElements,
     ) => StyledTemplateFn<Component<P>>);
 
-export const styled = new Proxy({} as StyledProxy, {
+export const styled = new Proxy((() => {}) as unknown as StyledProxy, {
   apply<BaseComponent extends Component<any>>(
     _target: StyledProxy,
     _thisArg: {},

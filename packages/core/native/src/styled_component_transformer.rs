@@ -8,21 +8,38 @@ pub fn insert_merge_styles_import<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     program: &mut Program<'alloc>,
 ) {
+    insert_named_import(
+        ast_builder,
+        program,
+        "mergeStyles",
+        MERGE_STYLES_LOCAL_NAME,
+        LIBRARY_CORE_IMPORT_NAME,
+    );
+}
+
+/// Inserts `import { imported as local } from "source"` after the last import.
+pub fn insert_named_import<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    program: &mut Program<'alloc>,
+    imported: &str,
+    local: &str,
+    source: &str,
+) {
     use oxc_ast::ast::{ImportDeclarationSpecifier, ImportOrExportKind, ImportSpecifier, ModuleExportName};
 
     let import_spec = ast_builder.alloc(ImportSpecifier {
         span: program.span,
         imported: ModuleExportName::IdentifierName(
-            ast_builder.identifier_name(program.span, ast_builder.atom("mergeStyles")),
+            ast_builder.identifier_name(program.span, ast_builder.atom(imported)),
         ),
-        local: ast_builder.binding_identifier(program.span, ast_builder.atom(MERGE_STYLES_LOCAL_NAME)),
+        local: ast_builder.binding_identifier(program.span, ast_builder.atom(local)),
         import_kind: ImportOrExportKind::Value,
     });
 
     let import_declaration = ast_builder.alloc_import_declaration(
         program.span,
         Some(ast_builder.vec1(ImportDeclarationSpecifier::ImportSpecifier(import_spec))),
-        ast_builder.string_literal(program.span, ast_builder.atom(LIBRARY_CORE_IMPORT_NAME), None),
+        ast_builder.string_literal(program.span, ast_builder.atom(source), None),
         None,
         None::<oxc_allocator::Box<oxc_ast::ast::WithClause>>,
         ImportOrExportKind::Value,

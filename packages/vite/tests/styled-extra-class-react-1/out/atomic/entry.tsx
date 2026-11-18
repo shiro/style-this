@@ -2,20 +2,21 @@
 import { styled } from "@style-this/react";
 import { css, extraClass } from "@style-this/core";
 import { mergeStyles as __styleThis__mergeStyles } from "@style-this/core";
+import { forwardRef as __styleThis__forwardRef } from "react";
 import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
 import "virtual:style-this:/entry.tsx.css";
 export const FancyButton = (() => {
 	let FancyButton = _styleThisClasses.__styleThis_var_FancyButton_2;
-	let comp = (props) => {
+	let comp = __styleThis__forwardRef((props, ref) => {
 		const { styleProps: _styleProps, style: _style,...rest } = props;
-		return <button {...rest} className={__styleThis__mergeStyles(FancyButton, rest.className)} style={{
+		return <button {...rest} ref={ref} className={__styleThis__mergeStyles(FancyButton, rest.className)} style={{
 			"--var1-30dyns": (({ a }) => a)({
 				...props.styleProps,
 				"props": props
 			}),
 			...props.style ?? {}
 		}} />;
-	};
+	});
 	comp.toString = () => FancyButton;
 	return comp;
 })();

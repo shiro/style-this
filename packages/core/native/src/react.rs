@@ -1,4 +1,7 @@
 use crate::{styled_component_transformer::*, *};
+use oxc_ast::ast::JSXExpression;
+
+const FORWARD_REF_LOCAL_NAME: &str = "__styleThis__forwardRef";
 
 struct ReactStyledComponentTransformer<'a, 'alloc> {
     base: StyledComponentTransformer<'a, 'alloc>,
@@ -155,6 +158,19 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                         .alloc_identifier_reference(span, self.base.ast_builder.atom(spread_identifier)),
                 ),
             ),
+            // ref={ref}
+            self.base.ast_builder.jsx_attribute_item_attribute(
+                span,
+                self.base.ast_builder
+                    .jsx_attribute_name_identifier(span, self.base.ast_builder.atom("ref")),
+                Some(self.base.ast_builder.jsx_attribute_value_expression_container(
+                    span,
+                    JSXExpression::Identifier(self.base.ast_builder.alloc_identifier_reference(
+                        span,
+                        self.base.ast_builder.atom("ref"),
+                    )),
+                )),
+            ),
             self.base.build_class_attribute(span, &class_variable_name, spread_identifier),
         ];
 
@@ -202,42 +218,58 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                             None as Option<oxc_allocator::Box<_>>,
                             false,
                         ),
-                        Some(Expression::ArrowFunctionExpression(
-                            self.base.ast_builder.alloc_arrow_function_expression(
+                        // forwardRef((props, ref) => ...)
+                        Some(Expression::CallExpression(self.base.ast_builder.alloc_call_expression(
+                            span,
+                            Expression::Identifier(self.base.ast_builder.alloc_identifier_reference(
                                 span,
-                                !should_filter_props,  // expression = true only when no filtering (inline JSX)
-                                false,
-                                None as Option<oxc_allocator::Box<_>>,
-                                self.base.ast_builder.alloc_formal_parameters(
-                                    span,
-                                    oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-                                    self.base.ast_builder.vec1(self.base.ast_builder.formal_parameter(
+                                self.base.ast_builder.atom(FORWARD_REF_LOCAL_NAME),
+                            )),
+                            None as Option<oxc_allocator::Box<_>>,
+                            self.base.ast_builder.vec1(oxc_ast::ast::Argument::from(
+                                Expression::ArrowFunctionExpression(
+                                    self.base.ast_builder.alloc_arrow_function_expression(
                                         span,
-                                        self.base.ast_builder.vec(),
-                                        self.base.ast_builder.binding_pattern(
-                                            BindingPatternKind::BindingIdentifier(
-                                                self.base.ast_builder.alloc_binding_identifier(
-                                                    span,
-                                                    self.base.ast_builder.atom("props"),
-                                                ),
+                                        !should_filter_props, // expression = true only when no filtering (inline JSX)
+                                        false,
+                                        None as Option<oxc_allocator::Box<_>>,
+                                        self.base.ast_builder.alloc_formal_parameters(
+                                            span,
+                                            oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
+                                            self.base.ast_builder.vec_from_iter(
+                                                ["props", "ref"].map(|name| {
+                                                    self.base.ast_builder.formal_parameter(
+                                                        span,
+                                                        self.base.ast_builder.vec(),
+                                                        self.base.ast_builder.binding_pattern(
+                                                            BindingPatternKind::BindingIdentifier(
+                                                                self.base.ast_builder.alloc_binding_identifier(
+                                                                    span,
+                                                                    self.base.ast_builder.atom(name),
+                                                                ),
+                                                            ),
+                                                            None as Option<oxc_allocator::Box<_>>,
+                                                            false,
+                                                        ),
+                                                        None,
+                                                        false,
+                                                        false,
+                                                    )
+                                                }),
                                             ),
                                             None as Option<oxc_allocator::Box<_>>,
-                                            false,
                                         ),
-                                        None,
-                                        false,
-                                        false,
-                                    )),
-                                    None as Option<oxc_allocator::Box<_>>,
+                                        None as Option<oxc_allocator::Box<_>>,
+                                        self.base.ast_builder.function_body(
+                                            span,
+                                            self.base.ast_builder.vec(),
+                                            self.base.ast_builder.vec_from_iter(component_body_statements),
+                                        ),
+                                    ),
                                 ),
-                                None as Option<oxc_allocator::Box<_>>,
-                                self.base.ast_builder.function_body(
-                                    span,
-                                    self.base.ast_builder.vec(),
-                                    self.base.ast_builder.vec_from_iter(component_body_statements),
-                                ),
-                            ),
-                        )),
+                            )),
+                            false,
+                        ))),
                         false,
                     ),
                 ),
@@ -328,6 +360,7 @@ pub fn react_prepass<'alloc>(
 
     if transformer.base.component_counter > 0 && !transformer.base.skip_jsx {
         insert_merge_styles_import(ast_builder, program);
+        insert_named_import(ast_builder, program, "forwardRef", FORWARD_REF_LOCAL_NAME, "react");
     }
 
     transformer.base.component_counter > 0
