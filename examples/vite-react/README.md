@@ -1,27 +1,20 @@
 # vite-react
 
-React example using `@style-this/react` with Vite.
+Vite + React example using `@style-this/vite` and `@style-this/react`.
 
-## Features
-
-- ✅ Styled components with `styled.button` syntax
-- ✅ Component composition with `styled(BaseComponent)`
-- ✅ Dynamic styles with arrow functions and CSS variables
-- ✅ Static CSS with `css` template tag
-
-## Getting Started
+Build the packages from the repository root first (`pnpm install && pnpm build`), then:
 
 ```bash
-pnpm install
-pnpm dev
+pnpm dev                   # dev server
+pnpm dev:atomic            # dev server, atomic mode
+pnpm build                 # production build
+pnpm build:atomic          # production build, atomic mode
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser.
+Open http://localhost:3000.
 
-## Example Usage
+- `src/Counter.tsx`: `css`, `extraClass`, `styled`, `styleProps`, extending styled components
+- `src/MainComponent.tsx`: `mergeStyles`, global styles, values imported across files (`a.ts` → `b.tsx`)
+- `src/App.tsx`: the `@style-this/core/atomic` entrypoint
 
-See `src/Counter.tsx` for examples of:
-- Creating styled components
-- Using dynamic props with `styleProps`
-- Composing styled components
-- Accessing component props in styles
+See the [docs](https://style-this.usagi.io) for an explanation of the APIs used here.

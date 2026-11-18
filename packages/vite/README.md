@@ -1,34 +1,21 @@
 # @style-this/vite
 
-Vite plugin for the style-this library.
-
-## Installation
+Vite plugin for [style-this](https://style-this.usagi.io), zero-runtime CSS-in-JS. Works with plain Vite, SolidStart and
+SvelteKit.
 
 ```bash
+pnpm add @style-this/core
 pnpm add -D @style-this/vite
 ```
 
-## Usage
-
-```typescript
+```ts
 // vite.config.ts
-import { defineConfig } from 'vite';
-import styleThis from '@style-this/vite';
+import { defineConfig } from "vite";
+import styleThis from "@style-this/vite";
 
 export default defineConfig({
-  plugins: [
-    styleThis()
-  ]
+  plugins: [styleThis({ filter: /\.tsx$/ })],
 });
 ```
 
-## Development
-
-```bash
-# Build the package
-pnpm build
-
-# Watch mode for development
-pnpm dev
-```
-
+Documentation: [style-this.usagi.io/reference/vite/](https://style-this.usagi.io/reference/vite/)

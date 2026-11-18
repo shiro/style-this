@@ -1,26 +1,16 @@
-# SvelteKit v5 Example
+# sveltekit-3
 
-This is a SvelteKit v5 example project with style-this support.
+SvelteKit example using `@style-this/vite` with `css` in Svelte components.
 
-## Getting Started
+Build the packages from the repository root first (`pnpm install && pnpm build`), then:
 
-Install dependencies:
 ```bash
-pnpm install
+pnpm dev                   # dev server
+pnpm dev:atomic            # dev server, atomic mode
+pnpm build                 # production build
+pnpm build:atomic          # production build, atomic mode
 ```
 
-Development:
-```bash
-pnpm run dev
-```
+Open http://localhost:3000. Styles are defined in `src/lib/`.
 
-Build:
-```bash
-pnpm run build
-```
-
-## Status
-
-⚠️ **Work in Progress** - The SvelteKit adapter needs further configuration to work properly with server-side rendering.
-
-The vite plugin is configured but SSR rendering has some issues that need to be resolved.
+See the [docs](https://style-this.usagi.io) for an explanation of the APIs used here.

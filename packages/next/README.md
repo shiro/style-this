@@ -1,75 +1,21 @@
-# @style-this/webpack
+# @style-this/next
 
-CSS-in-JS library for the modern web - webpack plugin
-
-## Installation
+Next.js integration for [style-this](https://style-this.usagi.io), zero-runtime CSS-in-JS. Supports the app and pages
+routers on webpack and turbopack.
 
 ```bash
-npm install @style-this/webpack
-# or
-pnpm add @style-this/webpack
-# or
-yarn add @style-this/webpack
+pnpm add @style-this/core @style-this/next
 ```
 
-## Usage
+```js
+// next.config.mjs
+import { withStyleThis } from "@style-this/next";
 
-### Basic Usage
-
-```javascript
-// webpack.config.js
-import styleThisWebpackPlugin from '@style-this/webpack';
-
-export default {
-  // ... other webpack config
-  plugins: [
-    styleThisWebpackPlugin({
-      // options
-    })
-  ]
-};
+export default withStyleThis({
+  // your Next.js config
+});
 ```
 
-### With SolidJS
+Set `ATOMIC=1` to enable atomic mode.
 
-```javascript
-// webpack.config.js
-import styleThisWebpackPlugin from '@style-this/webpack';
-import styleThisSolidJsWebpackPlugin from '@style-this/webpack/solid-js';
-
-export default {
-  // ... other webpack config
-  plugins: [
-    styleThisWebpackPlugin({
-      // options
-    }),
-    styleThisSolidJsWebpackPlugin({
-      // options
-    })
-  ]
-};
-```
-
-## Options
-
-### Main Plugin Options
-
-- `include?: RegExp[]` - Array of RegExp patterns to include files
-- `exclude?: RegExp[]` - Array of RegExp patterns to exclude files
-- `cssExtension?: string` - CSS file extension (default: "css")
-- `filter?: Filter | Filter[]` - Custom filter function(s) or RegExp(s)
-
-### SolidJS Plugin Options
-
-- `filter?: Filter | Filter[]` - Custom filter function(s) or RegExp(s)
-
-## Type Definitions
-
-```typescript
-type Filter = RegExp | ((filepath: string) => boolean);
-```
-
-## License
-
-MIT
-
+Documentation: [style-this.usagi.io/frameworks/next/](https://style-this.usagi.io/frameworks/next/)

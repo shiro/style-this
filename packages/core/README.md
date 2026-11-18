@@ -1,40 +1,28 @@
-# style-this - Core
+# @style-this/core
 
-Core functionality for the style-this library with WebAssembly bindings.
-
-## Installation
+Core package of [style-this](https://style-this.usagi.io), zero-runtime CSS-in-JS. Provides `css`, `style`,
+`extraClass`, `mergeStyles`, `joinStyles` and the WebAssembly compiler used by the bundler plugins.
 
 ```bash
 pnpm add @style-this/core
 ```
 
-## Usage
+```tsx
+import { css, mergeStyles } from "@style-this/core";
 
-```typescript
-import { init, css, initialize } from "@style-this/core";
-
-// Initialize the WebAssembly module
-await init();
-
-// Use the CSS functionality
-const styles = css`
-  color: red;
-  font-size: 16px;
+const button = css`
+  padding: 8px 16px;
 `;
+
+const primary = css`
+  background: royalblue;
+`;
+
+<button className={mergeStyles(button, primary)} />;
 ```
 
-## Development
+Styles are compiled at build time, so a bundler integration is required:
+[`@style-this/vite`](https://www.npmjs.com/package/@style-this/vite) or
+[`@style-this/next`](https://www.npmjs.com/package/@style-this/next).
 
-```bash
-# Build the native WebAssembly module
-pnpm build:native
-
-# Build the JavaScript package
-pnpm build:js
-
-# Build everything
-pnpm build
-
-# Watch mode for development
-pnpm dev
-```
+Documentation: [style-this.usagi.io/reference/core/](https://style-this.usagi.io/reference/core/)

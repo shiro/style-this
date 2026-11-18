@@ -1,38 +1,16 @@
-# next
+# next-pages-router
 
-Next.js example using Next.js 15.5+ (currently without @style-this integration due to transformer compatibility issues).
+Next.js pages router example using `@style-this/next` and `@style-this/react`.
 
-**Note**: This example demonstrates the same Counter component as the other examples, but uses inline styles instead of style-this transforms. Full style-this support for Next.js requires resolving WASM transformer compatibility issues in the Next.js build environment.
-
-## Features
-
-- ✅ Same Counter component structure as React/Solid examples
-- ✅ Next.js 15.5+ with both webpack and Turbopack support
-- ⚠️  Currently uses inline styles instead of style-this transforms
-
-## Getting Started
+Build the packages from the repository root first (`pnpm install && pnpm build`), then:
 
 ```bash
-pnpm install
-pnpm dev
+pnpm dev                   # dev server (webpack)
+pnpm dev:turbopack         # dev server (turbopack)
+pnpm dev:atomic            # dev server, atomic mode
+pnpm build                 # production build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Styles are defined in `src/pages/` and `src/components/`. Open http://localhost:3000.
 
-## Building
-
-Next.js 15 uses webpack by default for production builds:
-
-```bash
-# Build with default bundler
-pnpm build
-
-# Start production server
-pnpm start
-```
-
-## Future Work
-
-- Fix WASM transformer compatibility in Next.js environment
-- Enable style-this `css` and `styled` usage
-- Support both webpack and Turbopack modes
+See the [docs](https://style-this.usagi.io) for an explanation of the APIs used here.
