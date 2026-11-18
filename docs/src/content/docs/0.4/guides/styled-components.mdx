@@ -1,0 +1,167 @@
+---
+title: Styled components
+description: styled components for React and SolidJS with typed, dynamic style props.
+sidebar:
+  order: 2
+slug: 0.4/guides/styled-components
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+`styled` creates a component with styles attached. It's available for React
+(`@style-this/react`) and SolidJS (`@style-this/solid`) with the same API.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { styled } from "@style-this/react";
+
+    const Button = styled.button`
+      border: 1px solid blue;
+      border-radius: 2px;
+    `;
+
+    <Button onClick={save}>Save</Button>;
+    ```
+  </TabItem>
+
+  <TabItem label="Solid">
+    ```tsx
+    import { styled } from "@style-this/solid";
+
+    const Button = styled.button`
+      border: 1px solid blue;
+      border-radius: 2px;
+    `;
+
+    <Button onClick={save}>Save</Button>;
+    ```
+  </TabItem>
+</Tabs>
+
+Like `css`, styled components are compiled away: the result is a thin component rendering the
+element with a static class name.
+
+## Dynamic styles with `styleProps`
+
+Function expressions are dynamic. Declare their inputs as a type argument, callers pass them through
+the `styleProps` prop.
+
+```tsx
+const Button = styled.button<{ size: number; color: string }>`
+  padding: ${({ size }) => `${size}px`};
+  background: ${({ color }) => color};
+`;
+
+<Button styleProps={{ size: 8, color: "green" }}>Save</Button>;
+```
+
+Each function compiles to a CSS custom property that's set through the element's `style`:
+
+```css
+.Button-b05mnk {
+  padding: var(--var1-4lyfgx);
+  background: var(--var2-4lyfgx);
+}
+```
+
+`styleProps` is required whenever a type argument is given and is never forwarded to the DOM.
+
+:::tip
+Text following the expression stays in the CSS, both of these work:
+
+```ts
+padding: ${({ size }) => size}px;
+padding: ${({ size }) => `${size}px`};
+```
+:::
+
+## Reading component props
+
+The function argument also has a `props` field with the component's own props, so you can style
+based on regular props without duplicating them.
+
+```tsx
+const Button = styled.button`
+  background: ${({ props }) => (props.disabled ? "red" : "green")};
+`;
+
+<Button disabled={count >= 3} />;
+```
+
+## Extending components
+
+`styled(Component)` extends another styled component, or any component accepting
+`className` (React) / `class` (Solid).
+
+```tsx
+const Base = styled.button<{ a: number }>`
+  background: none;
+  padding: ${({ a }) => `${a}px`};
+`;
+
+const Extended = styled(Base)<{ b: number }>`
+  margin: ${({ b }) => `${b}px`};
+  cursor: pointer;
+`;
+
+<Extended styleProps={{ a: 8, b: 16 }} />;
+```
+
+* `styleProps` of the base and the extension are combined.
+* The extension's classes are merged last, so its declarations win. In
+  [atomic mode](/0.4/guides/atomic-css/) conflicting atomic classes of the base are dropped.
+
+`styled("div")` is equivalent to `styled.div`.
+
+## Overriding from outside
+
+Classes and inline styles passed to a styled component are merged after its own.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    const override = css`
+      background: blue;
+    `;
+
+    <Button className={override} style={{ opacity: 0.5 }} />;
+    ```
+  </TabItem>
+
+  <TabItem label="Solid">
+    ```tsx
+    const override = css`
+      background: blue;
+    `;
+
+    <Button class={override} />;
+    ```
+  </TabItem>
+</Tabs>
+
+## Using components in selectors
+
+A styled component stringifies to its class name.
+
+```ts
+const toolbar = css`
+  .${Button} {
+    margin: 0;
+  }
+`;
+```
+
+Components without `styleProps` also expose `.css`, the raw CSS body, for
+[composition](/0.4/guides/css/#composing-styles).
+
+## Extra classes
+
+[`extraClass`](/0.4/guides/css/#adding-extra-classes) works inside styled templates as well.
+
+```tsx
+const Button = styled.button`
+  border: none;
+  ${extraClass("btn")}
+`;
+```

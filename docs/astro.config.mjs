@@ -13,9 +13,12 @@ export default defineConfig({
 			editLink: { baseUrl: 'https://github.com/shiro/style-this/edit/master/docs/' },
 			plugins: [
 				starlightVersions({
-					current: { label: 'v0.4 (latest)' },
+					current: { label: 'v0.5 (latest)' },
 					// newest first, see src/content/docs/releases/versioning-the-docs.md
-					versions: [{ slug: '0.3', label: 'v0.3' }],
+					versions: [
+						{ slug: '0.4', label: 'v0.4' },
+						{ slug: '0.3', label: 'v0.3' },
+					],
 					exclude: ['releases/**'],
 				}),
 			],

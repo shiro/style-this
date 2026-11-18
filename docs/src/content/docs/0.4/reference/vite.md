@@ -1,0 +1,100 @@
+---
+title: "@style-this/vite"
+description: Vite plugin options.
+sidebar:
+  order: 3
+slug: 0.4/reference/vite
+---
+
+```ts
+import styleThis, { DefaultImport } from "@style-this/vite";
+
+styleThis(options?: Options): Plugin
+```
+
+The plugin is named `vite:style-this` and runs with `enforce: "pre"`.
+
+## Options
+
+### `filter`
+
+* Type: `Filter | Filter[]` where `Filter = RegExp | ((filepath: string) => boolean)`
+* Default: `[]` (every supported file)
+
+Files to transform. A file is transformed if **any** filter matches. Regardless of the filter, only
+JS/TS (`.js`, `.jsx`, `.ts`, `.tsx` and their `m`/`c` variants) and `.svelte` files outside
+`node_modules` are considered.
+
+Narrowing the filter to the files that contain styles (e.g. `/\.tsx$/`) speeds up builds.
+
+```ts
+styleThis({ filter: [/\.tsx$/, (file) => file.endsWith(".styles.ts")] });
+```
+
+### `atomic`
+
+* Type: `boolean`
+* Default: `false`
+
+Enables [atomic CSS](/0.4/guides/atomic-css/) output. Requires `import "@style-this/core/atomic"` in
+your app.
+
+### `ignoredImports`
+
+* Type: `Record<string, true | (string | typeof DefaultImport)[]>`
+
+Imports to skip during build-time evaluation. `true` ignores the whole module, an array ignores the
+listed import names, `DefaultImport` stands for the default import. See
+[Ignoring imports](/0.4/guides/evaluation/#ignoring-imports).
+
+### `cssExtension`
+
+* Type: `string`
+* Default: `"css"`
+
+Extension of the generated virtual stylesheets (`<file>.<cssExtension>`).
+
+### `debug`
+
+* Type: `boolean`
+* Default: `false`
+
+Logs every transform with a `[style-this]` prefix and keeps the generated evaluation programs for
+inspection.
+
+### `useRequire`
+
+* Type: `boolean`
+
+Makes the generated evaluation programs load dependencies with `require` instead of dynamic
+`import`. Leave unset unless you hit module loading issues with CommonJS-only dependencies.
+
+### `cacheRegistry`
+
+* Type: `CacheRegistry`
+
+Advanced. Supplies the cache instance holding evaluated CSS, to share it between several plugin
+instances.
+
+### `include` / `exclude`
+
+Reserved, currently not used. Use [`filter`](#filter).
+
+## Config changes
+
+The plugin adjusts your Vite config:
+
+* adds `@style-this/core/compiler` to `optimizeDeps.include`
+* adds `@style-this/core` to `ssr.noExternal` (unless it's `true`), so the atomic entrypoint
+  resolves during SSR
+
+## Virtual modules
+
+| Id | Content |
+| --- | --- |
+| `virtual:style-this:<file>.<cssExtension>` | per-file stylesheet |
+| `virtual:style-this:<file>.style-this.js` | class name exports (atomic mode) |
+| `@style-this/core/atomic` | atomic stylesheet |
+
+In atomic builds where no chunk stylesheet can be matched to the entrypoint, the atomic CSS is
+emitted as `assets/atomic.css`.

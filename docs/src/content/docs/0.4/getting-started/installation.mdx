@@ -1,0 +1,110 @@
+---
+title: Installation
+description: Install style-this and wire it into your bundler.
+sidebar:
+  order: 1
+slug: 0.4/getting-started/installation
+---
+
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
+
+style-this is split into a few packages. All of them are released in lockstep, always use the same
+version for every `@style-this/*` package.
+
+| Package | Purpose |
+| --- | --- |
+| `@style-this/core` | `css`, `mergeStyles`, `extraClass` and the compiler. Always required. |
+| `@style-this/vite` | Vite plugin (Vite, SolidStart, SvelteKit, ...). |
+| `@style-this/next` | Next.js integration (webpack and turbopack). |
+| `@style-this/react` | `styled` components for React. |
+| `@style-this/solid` | `styled` components for SolidJS. |
+| `@style-this/webpack` | Low-level webpack loader. |
+
+<Steps>
+  1. Install the core package and the integration for your bundler.
+
+     <Tabs syncKey="bundler">
+       <TabItem label="Vite">
+         ```bash
+         pnpm add @style-this/core
+         pnpm add -D @style-this/vite
+         ```
+       </TabItem>
+
+       <TabItem label="Next.js">
+         ```bash
+         pnpm add @style-this/core @style-this/next
+         ```
+       </TabItem>
+     </Tabs>
+
+  2. Optionally install styled components for your framework.
+
+     <Tabs syncKey="framework">
+       <TabItem label="React">
+         ```bash
+         pnpm add @style-this/react
+         ```
+       </TabItem>
+
+       <TabItem label="Solid">
+         ```bash
+         pnpm add @style-this/solid
+         ```
+       </TabItem>
+
+       <TabItem label="Svelte">
+         Nothing to install, use `css` from `@style-this/core`.
+       </TabItem>
+     </Tabs>
+
+  3. Register the plugin.
+
+     <Tabs syncKey="bundler">
+       <TabItem label="Vite">
+         ```ts title="vite.config.ts"
+         import { defineConfig } from "vite";
+         import react from "@vitejs/plugin-react";
+         import styleThis from "@style-this/vite";
+
+         export default defineConfig({
+           plugins: [
+             react(),
+             styleThis({ filter: /\.tsx$/ }),
+           ],
+         });
+         ```
+       </TabItem>
+
+       <TabItem label="Next.js">
+         ```js title="next.config.mjs"
+         import { withStyleThis } from "@style-this/next";
+
+         /** @type {import('next').NextConfig} */
+         const nextConfig = {};
+
+         export default withStyleThis(nextConfig);
+         ```
+       </TabItem>
+     </Tabs>
+
+  4. Write some styles.
+
+     ```tsx
+     import { css } from "@style-this/core";
+
+     const title = css`
+       font-size: 2rem;
+       color: rebeccapurple;
+     `;
+
+     export const Title = () => <h1 className={title}>Hello</h1>;
+     ```
+</Steps>
+
+## Next steps
+
+* Framework specific setup: [React](/0.4/frameworks/react/), [SolidJS](/0.4/frameworks/solid/),
+  [Svelte](/0.4/frameworks/svelte/), [Next.js](/0.4/frameworks/next/)
+* Learn the [`css` API](/0.4/guides/css/)
+* Understand [how it works](/0.4/getting-started/how-it-works/)
