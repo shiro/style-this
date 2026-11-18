@@ -321,7 +321,7 @@ export const resetRandom = (() => {
 export const tsx = (raw: TemplateStringsArray) => raw.join("");
 
 export const setupPlugin = async (
-  resolver: Record<string, string>,
+  resolver: Record<string, string | Promise<string>>,
   options?: Record<string, unknown>,
 ) => {
   // class name hashes depend on paths relative to cwd, pin it so output doesn't depend on where tests run from
@@ -343,10 +343,11 @@ export const setupPlugin = async (
         }
       }
 
-      // Then try the test resolver
-      if (resolver[id] == undefined) return undefined;
+      // Then try the test resolver, resolutions can be delayed by passing a promise
+      const resolved = await resolver[id];
+      if (resolved == undefined) return undefined;
       return Promise.resolve({
-        id: resolver[id],
+        id: resolved,
         external: false,
         resolvedBy: "",
       });

@@ -128,6 +128,7 @@ fn evaluate_dependencies<'alloc>(
     cwd: &str,
     temporary_programs: Rc<RefCell<HashMap<String, String>>>,
     skip_css_eval: bool,
+    import_chain: Rc<Vec<String>>,
 ) -> Vec<
     std::pin::Pin<
         std::boxed::Box<dyn futures::future::Future<Output = Result<(), TransformError>> + 'alloc>,
@@ -192,6 +193,7 @@ fn evaluate_dependencies<'alloc>(
             let specifiers = specifiers.clone_in(ast_builder.allocator);
             let referenced_idents = referenced_idents.clone();
             let temporary_programs = temporary_programs.clone();
+            let import_chain = import_chain.clone();
             let cwd = cwd.clone();
             let transformer =
                 unsafe { std::mem::transmute::<&Transformer, &'static Transformer>(transformer) };
@@ -399,10 +401,18 @@ fn evaluate_dependencies<'alloc>(
                         };
 
                     let cache_ref = &transformer.value_cache_ref;
-                    let cache_source = if let Some(remote_name) = &remote_name {
-                        format!("{cache_ref}[\"{remote_filepath}\"][\"{remote_name}\"]")
+                    let module_source = if import_chain.contains(&remote_filepath) {
+                        // circular imports aren't evaluated, see below
+                        format!(
+                            "({cache_ref}[\"{remote_filepath}\"] ?? (() => {{ throw new Error(\"circular import of '{remote_filepath}' from '{program_filepath}', its values can't be used before it's evaluated\"); }})())"
+                        )
                     } else {
                         format!("{cache_ref}[\"{remote_filepath}\"]")
+                    };
+                    let cache_source = if let Some(remote_name) = &remote_name {
+                        format!("{module_source}[\"{remote_name}\"]")
+                    } else {
+                        module_source
                     };
 
                     // add new variable declaration to our tmp program
@@ -465,6 +475,12 @@ fn evaluate_dependencies<'alloc>(
                     return Ok(());
                 }
 
+                // circular import, like in JS the importer sees the partially initialized
+                // module, i.e. only the values that are already in the value cache
+                if import_chain.contains(&remote_filepath) {
+                    return Ok(());
+                }
+
                 let source_type = SourceType::from_path(&remote_filepath)
                     .map_err(|_| TransformError::UknownExtension {
                         filepath: remote_filepath.clone(),
@@ -507,6 +523,7 @@ fn evaluate_dependencies<'alloc>(
                     temporary_programs,
                     None,
                     skip_css_eval,
+                    &import_chain,
                 )
                 .await
             })
@@ -721,6 +738,8 @@ pub(crate) fn slice_program<'alloc>(
 
 /// * `skip_css_eval` - If we already have the cached CSS and just want the transformed source file, we can set
 /// this flag to skip the evaluation portion.
+/// * `import_chain` - Files currently being evaluated up the import chain, used to detect circular
+/// imports.
 #[allow(clippy::too_many_arguments)]
 pub async fn evaluate_program<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
@@ -735,6 +754,7 @@ pub async fn evaluate_program<'alloc>(
     temporary_programs: Rc<RefCell<HashMap<String, String>>>,
     tx: Option<futures::channel::oneshot::Sender<Result<Option<JsValue>, TransformError>>>,
     skip_css_eval: bool,
+    import_chain: &[String],
 ) -> Result<(), TransformError> {
     let allocator = &ast_builder.allocator;
 
@@ -744,6 +764,8 @@ pub async fn evaluate_program<'alloc>(
         .cache_registry
         .get_or_create_value_cache(program_filepath.clone());
 
+    // released while awaiting dependencies, otherwise circular imports (also across concurrent
+    // evaluations) deadlock
     let mut value_cache = value_cache_guard.lock().await;
 
     referenced_idents.retain(|ident| !value_cache.contains(ident));
@@ -843,11 +865,20 @@ pub async fn evaluate_program<'alloc>(
         cwd,
         temporary_programs.clone(),
         skip_css_eval,
+        Rc::new(
+            import_chain
+                .iter()
+                .cloned()
+                .chain([program_filepath.clone()])
+                .collect(),
+        ),
     );
 
+    drop(value_cache);
     if let Err(err) = futures::future::try_join_all(dependency_futures).await {
         return report_error(entries.as_ref(), err);
     }
+    let mut value_cache = value_cache_guard.lock().await;
 
     // Always populate value cache with exported idents, even when skipping CSS eval
     // This is needed for dependency tracking to know what exports a file has

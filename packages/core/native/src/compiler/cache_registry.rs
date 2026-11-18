@@ -307,23 +307,39 @@ impl CacheRegistry {
             self.clear_file(filepath);
             return;
         };
-        let Some(values) = self.value_cache.borrow().get(filepath).cloned() else {
-            return;
+        let cleared = match self.value_cache.borrow().get(filepath) {
+            Some(values) => match Self::lock_idle(values) {
+                Some(mut values) => {
+                    values.retain(|name| !names.contains(name));
+                    true
+                }
+                None => false,
+            },
+            None => true,
         };
-        // a running evaluation holds the lock, it keeps its own (now detached) entry
-        match values.try_lock() {
-            Some(mut values) => values.retain(|name| !names.contains(name)),
-            None => self.clear_file(filepath),
+        // a running evaluation keeps its own (now detached) entry
+        if !cleared {
+            self.clear_file(filepath);
         }
     }
 
     /// Get the names of all cached values of a file, `None` while they're being evaluated
     pub fn cached_values(&self, filepath: &str) -> Option<HashSet<String>> {
-        let Some(values) = self.value_cache.borrow().get(filepath).cloned() else {
-            return Some(HashSet::new());
-        };
-        let values = values.try_lock()?;
-        Some(values.clone())
+        match self.value_cache.borrow().get(filepath) {
+            Some(values) => Some(Self::lock_idle(values)?.clone()),
+            None => Some(HashSet::new()),
+        }
+    }
+
+    /// Locks a file's values unless an evaluation of it is running. Evaluations hold a reference to
+    /// the entry until they're done, they release the lock while awaiting their dependencies.
+    fn lock_idle(
+        values: &Rc<FutureMutex<HashSet<String>>>,
+    ) -> Option<futures::lock::MutexGuard<'_, HashSet<String>>> {
+        if Rc::strong_count(values) > 1 {
+            return None;
+        }
+        values.try_lock()
     }
 
     /// Store the source of a file loaded as a dependency, unless there already is one
