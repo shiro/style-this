@@ -404,4 +404,100 @@ export const Toolbar = css\`
     for (const name of invalidated) await transform(name);
     expect(await cssOf("toolbar.tsx")).toContain(`.${await buttonClass()}`);
   });
+
+  describe("Svelte", () => {
+    const svelteFiles = {
+      "theme.ts": `export const accent = "red";\n`,
+      "Card.svelte": `<script lang="ts">
+  ${cssImport}
+  import { accent } from "./theme";
+  import Badge from "./Badge.svelte";
+
+  const padding = "1px";
+  const card = css\`
+    color: \${accent};
+    padding: \${padding};
+  \`;
+</script>
+
+<div class={card}><Badge /></div>
+`,
+      "Badge.svelte": `<script>
+  ${cssImport}
+
+  const badge = ${css("font-weight: bold;")};
+</script>
+
+<span class={badge}>badge</span>
+`,
+    };
+
+    /** Svelte files are transformed and cached as their script. */
+    const svelteCssOf = (name: string) => cssOf(name.replace(/\.svelte$/, ".ts"));
+
+    beforeEach(async () => {
+      for (const [name, code] of Object.entries(svelteFiles)) {
+        await writeFile(path(name), code);
+        environment.addModule(path(name));
+      }
+      plugin = await setupPlugin(
+        { "@style-this/core": "", "./theme": path("theme.ts"), "./Badge.svelte": path("Badge.svelte") },
+        { atomic, debug: false },
+      );
+      (plugin.configureServer as Function)({ environments: { client: environment } });
+
+      await transform("Card.svelte");
+      await transform("Badge.svelte");
+      expect(await svelteCssOf("Card.svelte")).toContain("color: red");
+      expect(await svelteCssOf("Badge.svelte")).toContain("font-weight: bold");
+    });
+
+    test("edits invalidate the Svelte file", async () => {
+      expect(await edit("Card.svelte", (code) => code.replace(`"1px"`, `"2px"`))).toEqual(["Card.svelte"]);
+      expect(await edit("Badge.svelte", (code) => code.replace("bold", "300"))).toEqual(["Badge.svelte"]);
+
+      await transform("Card.svelte");
+      await transform("Badge.svelte");
+      expect(await svelteCssOf("Card.svelte")).toContain("padding: 2px");
+      expect(await svelteCssOf("Badge.svelte")).toContain("font-weight: 300");
+    });
+
+    test("markup edits don't invalidate importers of the script", async () => {
+      expect(await edit("Card.svelte", (code) => code.replace("<Badge />", "<Badge /><Badge />"))).toEqual(
+        ["Card.svelte"],
+      );
+      expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["Card.svelte", "theme.ts"]);
+    });
+
+    test("changed dependencies invalidate Svelte importers", async () => {
+      expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["Card.svelte", "theme.ts"]);
+
+      await transform("Card.svelte");
+      expect(await svelteCssOf("Card.svelte")).toContain("color: blue");
+    });
+
+    test("Svelte files that lose their script stop being watched", async () => {
+      expect(await edit("Card.svelte", (code) => code.replace(/<script[\s\S]*<\/script>/, ""))).toEqual(
+        ["Card.svelte"],
+      );
+      expect(await transform("Card.svelte")).toBeUndefined();
+      expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["theme.ts"]);
+
+      await writeFile(path("Card.svelte"), svelteFiles["Card.svelte"]);
+      await transform("Card.svelte");
+      expect(await svelteCssOf("Card.svelte")).toContain("color: blue");
+    });
+
+    test("deleting a Svelte file invalidates it", async () => {
+      expect(await change("Badge.svelte", undefined)).toEqual(["Badge.svelte"]);
+    });
+
+    if (atomic) {
+      test("the atomic entrypoint waits for Svelte atomic modules", async () => {
+        await edit("Badge.svelte", (code) => code.replace("bold", "300"));
+        await transform("Badge.svelte");
+        expect(await loadCode(plugin, ATOMIC_ENTRYPOINT_ID)).toContain("font-weight: 300");
+      });
+    }
+  });
 });
