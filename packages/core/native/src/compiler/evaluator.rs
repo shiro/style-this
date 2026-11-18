@@ -24,6 +24,8 @@ use oxc_ast_visit::VisitMut;
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::{ParseOptions, Parser};
 use oxc_span::SourceType;
+use oxc_syntax::identifier::is_identifier_name;
+use oxc_syntax::keyword::is_reserved_keyword_or_global_object;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
@@ -481,13 +483,18 @@ fn evaluate_dependencies<'alloc>(
                     return Ok(());
                 }
 
-                let source_type = SourceType::from_path(&remote_filepath)
-                    .map_err(|_| TransformError::UknownExtension {
-                        filepath: remote_filepath.clone(),
-                        row: 1,
-                        column: 1,
-                    })
-                    .unwrap();
+                let (source_type, code) = if remote_filepath.ends_with(".json") {
+                    (SourceType::mjs(), json_module(&remote_filepath, &code)?)
+                } else {
+                    let source_type = SourceType::from_path(&remote_filepath).map_err(|_| {
+                        TransformError::UknownExtension {
+                            filepath: remote_filepath.clone(),
+                            row: 1,
+                            column: 1,
+                        }
+                    })?;
+                    (source_type, code)
+                };
 
                 let allocator = Allocator::default();
                 let ast_builder = AstBuilder::new(&allocator);
@@ -532,6 +539,38 @@ fn evaluate_dependencies<'alloc>(
     }
 
     futures
+}
+
+/// Module of a JSON file, like Vite it default-exports the JSON and exports top level keys that
+/// are valid identifiers by name.
+fn json_module(filepath: &str, code: &str) -> Result<String, TransformError> {
+    let parse_error = |cause: JsValue| TransformError::RawParseFailed {
+        filepath: filepath.to_string(),
+        message: js_sys::Error::from(cause).message().into(),
+        row: 1,
+        column: 1,
+    };
+    let value = js_sys::JSON::parse(code).map_err(parse_error)?;
+
+    let mut module = format!("export default {code};\n");
+    if let Some(object) = value.dyn_ref::<js_sys::Object>()
+        && !js_sys::Array::is_array(object)
+    {
+        for (key, value) in js_sys::Object::entries(object).iter().filter_map(|entry| {
+            let entry = js_sys::Array::from(&entry);
+            Some((entry.get(0).as_string()?, entry.get(1)))
+        }) {
+            if !is_identifier_name(&key)
+                || is_reserved_keyword_or_global_object(&key)
+                || matches!(key.as_str(), "arguments" | "eval")
+            {
+                continue;
+            }
+            let value = js_sys::JSON::stringify(&value).map_err(parse_error)?;
+            module.push_str(&format!("export const {key} = {};\n", String::from(value)));
+        }
+    }
+    Ok(module)
 }
 
 /// Insert a virtual CSS import for the given program filepath.
