@@ -120,7 +120,7 @@ var clientViteManifest = {
 		"name": "web"
 	},
 	"src/entry-client.tsx": {
-		"file": "_build/assets/entry-client-BNyVvIxO.js",
+		"file": "_build/assets/entry-client-BEGM4MHk.js",
 		"name": "entry-client",
 		"src": "src/entry-client.tsx",
 		"isEntry": true,
@@ -134,7 +134,7 @@ var clientViteManifest = {
 			"src/routes/about.tsx?pick=default&pick=$css&lang.tsx",
 			"src/routes/index.tsx?pick=default&pick=$css&lang.tsx"
 		],
-		"css": ["_build/assets/entry-client-DdmgQR4R.css"]
+		"css": ["_build/assets/entry-client-DnEFrN1y.css"]
 	},
 	"src/routes/[...404].tsx?pick=default&pick=$css&lang.tsx": {
 		"file": "_build/assets/_...404_-DEBQc9Xd.js",

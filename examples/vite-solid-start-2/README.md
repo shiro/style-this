@@ -1,32 +1,20 @@
-# SolidStart
+# vite-solid-start-2
 
-Everything you need to build a Solid project, powered by [`solid-start`](https://start.solidjs.com);
+SolidStart 2 example using `@style-this/vite` and `@style-this/solid`.
 
-## Creating a project
-
-```bash
-# create a new project in the current directory
-npm init solid@latest
-
-# create a new project in my-app
-npm init solid@latest my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Build the packages from the repository root first (`pnpm install && pnpm build`), then:
 
 ```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+pnpm dev                   # dev server
+pnpm dev:atomic            # dev server, atomic mode
+pnpm build                 # production build
+pnpm build:atomic          # production build, atomic mode
+pnpm start                 # run the production build
 ```
 
-## Building
+Open http://localhost:3000. Styles are defined in `src/components/`, the
+`@style-this/core/atomic` entrypoint is imported in `src/app.tsx`.
+`src/app.css` declares the cascade layer order and puts the base styles into `@layer base`, so
+atomic classes can override them.
 
-Solid apps are built with _presets_, which optimise your project for deployment to different environments.
-
-By default, `npm run build` will generate a Node app that you can run with `npm start`. To use a different preset, add it to the `devDependencies` in `package.json` and specify in your `app.config.js`.
-
-## This project was created with the [Solid CLI](https://github.com/solidjs-community/solid-cli)
+See the [docs](https://style-this.usagi.io) for an explanation of the APIs used here.
