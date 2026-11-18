@@ -35,8 +35,8 @@ styleThis({ filter: [/\.tsx$/, (file) => file.endsWith(".styles.ts")] });
 - Type: `boolean`
 - Default: `false`
 
-Enables [atomic CSS](/guides/atomic-css/) output. Requires `import "@style-this/core/atomic"` in
-your app.
+Enables [atomic CSS](/guides/atomic-css/) output, wrapped in `@layer utilities`. Requires
+`import "@style-this/core/atomic"` in your app.
 
 ### `ignoredImports`
 
@@ -93,7 +93,8 @@ The plugin adjusts your Vite config:
 | --- | --- |
 | `virtual:style-this:<file>.<cssExtension>` | per-file stylesheet |
 | `virtual:style-this:<file>.style-this.js` | class name exports (atomic mode) |
-| `@style-this/core/atomic` | atomic stylesheet |
+| `@style-this/core/atomic` | atomic stylesheet (layer order and `@layer utilities`) |
 
-In atomic builds where no chunk stylesheet can be matched to the entrypoint, the atomic CSS is
-emitted as `assets/atomic.css`.
+In atomic builds the atomic CSS is appended to the stylesheet of the chunk importing
+`@style-this/core/atomic`, falling back to an entry chunk's stylesheet. If there's no stylesheet at
+all, it's emitted as `assets/atomic.css`.

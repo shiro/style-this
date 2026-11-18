@@ -21,14 +21,14 @@ const button = css`
 `;
 ```
 
-Editing `theme.ts` re-evaluates `Button.tsx` and hot-swaps its CSS, no full reload. Invalidation is
-precise:
+Editing `theme.ts` re-evaluates `Button.tsx` and hot-swaps its CSS without a full reload.
+Invalidation is precise:
 
 - only importers whose **used exports** changed are invalidated
 - transitive chains (`a.ts` → `b.ts` → `Button.tsx`) are followed
 - CSS updates are sent as CSS-only updates, component state is preserved
-- in atomic mode the atomic stylesheet is updated in every environment that served it, including
-  query variants like `?inline` used by SSR frameworks
+- in [atomic mode](/guides/atomic-css/) the atomic stylesheet is updated in every environment that
+  served it, including query variants like `?inline` used by SSR frameworks
 
 ## CSS source maps
 

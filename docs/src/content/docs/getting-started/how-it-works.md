@@ -10,7 +10,7 @@ style-this runs as a bundler plugin. For each matching file it:
 1. Finds `css` and `styled` tagged templates.
 2. Builds a small program containing only the code those templates depend on (local constants,
    imported values, other styles) and **evaluates it at build time**.
-3. Emits the resulting CSS as a virtual CSS module and imports it from the file.
+3. Emits the resulting CSS as a virtual stylesheet and imports it from the file.
 4. Replaces each template with its class name.
 
 ## Example
@@ -42,24 +42,21 @@ const button = "button-4tu7c1";
 ```
 
 The class name is the variable name plus a stable hash, so it stays readable in devtools. The hash
-doesn't depend on the absolute project path, output is reproducible across machines.
+doesn't depend on the absolute project path, so output is reproducible across machines.
 
-## Build-time evaluation
+## Consequences
 
-Because expressions are evaluated at build time, anything interpolated into a `css` template must be
-computable without a browser, see [Imports & evaluation](/guides/evaluation/).
-
-Dynamic, per-instance values are supported through
-[styled components](/guides/styled-components/), which compile function expressions to CSS custom
-properties set through the `style` attribute.
+- **Values are computed at build time.** Anything interpolated into `css` must be computable
+  without a browser, see [Imports & evaluation](/guides/evaluation/). Per-instance values go through
+  [styled components](/guides/styled-components/), which compile them to CSS custom properties.
+- **There's (almost) no runtime.** `css`, `styled` and `extraClass` are removed by the transform,
+  calling them at runtime throws. The only helper that may remain in your bundle is the tiny
+  `mergeStyles` / `joinStyles` used to combine class lists.
 
 ## Output modes
 
-- **Default**: one rule per `css` template, emitted into a per-file stylesheet.
-- **[Atomic](/guides/atomic-css/)**: every top-level declaration becomes its own deduplicated class.
+- **Default**: one rule per style, in a per-file stylesheet. This is what the example above shows.
+- **[Atomic](/guides/atomic-css/)**: every top-level declaration becomes its own deduplicated
+  class, collected into a single stylesheet.
 
-## Runtime footprint
-
-`css`, `styled` and `extraClass` are removed entirely by the transform (calling them at runtime
-throws). The only code that may remain in your bundle is the tiny `mergeStyles` / `joinStyles`
-helper used to combine class lists.
+You can switch between them from config without changing your code.

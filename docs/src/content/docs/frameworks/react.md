@@ -18,12 +18,9 @@ import styleThis from "@style-this/vite";
 export default defineConfig({
   plugins: [
     react(),
-    styleThis({
-      filter: /\.tsx$/,
-      atomic: false,
-    }),
+    styleThis({ filter: /\.tsx$/ }),
   ],
-  css: { devSourcemap: true },
+  css: { devSourcemap: true }, // CSS source maps in dev
 });
 ```
 
@@ -63,8 +60,8 @@ export default function Counter() {
 }
 ```
 
-For atomic mode, add `import "@style-this/core/atomic"` to `src/App.tsx` or `src/main.tsx`, see
-[Atomic CSS](/guides/atomic-css/).
+For [atomic mode](/guides/atomic-css/), set `atomic: true` and add
+`import "@style-this/core/atomic"` to `src/App.tsx`.
 
 A complete project lives in
 [`examples/vite-react`](https://github.com/shiro/style-this/tree/master/examples/vite-react).

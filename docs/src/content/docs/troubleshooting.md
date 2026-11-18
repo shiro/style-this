@@ -36,9 +36,16 @@ Set [`debug: true`](/reference/vite/#debug) to see which modules get evaluated.
 
 ## An override doesn't apply
 
-In default mode both classes are applied and the CSS cascade decides. Either switch to
-[atomic mode](/guides/atomic-css/) and use `mergeStyles`, or increase specificity with a nested
-selector (`&&  { ... }`).
+- **Default mode**: both classes are applied and the CSS cascade decides, see
+  [Who wins in default mode](/guides/merging-styles/#who-wins-in-default-mode).
+- **Atomic mode**: combine styles with [`mergeStyles`](/guides/merging-styles/) instead of string
+  concatenation.
+
+## Atomic styles are overridden by my own CSS
+
+Atomic CSS lives in the `utilities` cascade layer, and unlayered CSS always wins against layered
+CSS. Move global and reset styles into a lower layer such as `@layer base { ... }`, see
+[Cascade layers](/guides/atomic-css/#cascade-layers).
 
 ## Mismatched package versions
 

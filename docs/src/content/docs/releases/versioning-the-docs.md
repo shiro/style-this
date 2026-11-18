@@ -19,13 +19,13 @@ describe:
 
    ```js
    starlightVersions({
-     current: { label: "v0.5 (latest)" },
-     versions: [{ slug: "0.4", label: "v0.4" }, { slug: "0.3", label: "v0.3" }],
+     current: { label: "v0.6 (latest)" },
+     versions: [{ slug: "0.5", label: "v0.5" }, { slug: "0.4", label: "v0.4" } /* ... */],
    });
    ```
 
 2. Run `pnpm dev` or `pnpm build` in `docs/`. The plugin copies the current pages to
-   `src/content/docs/0.4/` and writes `src/content/versions/0.4.json`. Only one new version can be
+   `src/content/docs/0.5/` and writes `src/content/versions/0.5.json`. Only one new version can be
    added per run.
 3. Commit the generated files.
 4. Update the unversioned pages for the new release and add its notes to the

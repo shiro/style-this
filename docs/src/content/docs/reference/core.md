@@ -51,7 +51,7 @@ const mergeStyles: (...classes: Array<string | false | null | undefined>) => str
 ```
 
 Joins class lists. Atomic classes of the same property are de-duplicated, the last one wins. Other
-classes are de-duplicated only if identical. Replaced by `joinStyles` in non-atomic mode. See
+classes are de-duplicated only if identical. Replaced by `joinStyles` in default mode. See
 [Merging styles](/guides/merging-styles/).
 
 ## `joinStyles`
@@ -75,7 +75,9 @@ import "@style-this/core/atomic";
 ```
 
 Side-effect only entrypoint of the [atomic stylesheet](/guides/atomic-css/). Resolved to a virtual
-CSS module by the bundler plugin, a no-op in non-atomic mode.
+CSS module by the Vite plugin, which declares the layer order
+`@layer theme, base, components, utilities;` and wraps the atomic CSS in `@layer utilities`
+([Cascade layers](/guides/atomic-css/#cascade-layers)). A no-op in default mode.
 
 ## Other entrypoints
 

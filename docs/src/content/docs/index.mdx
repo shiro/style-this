@@ -88,14 +88,15 @@ export const Card = () => (
 
 <CardGrid stagger>
 	<Card title="Zero runtime" icon="rocket">
-		Styles are evaluated at build time and extracted to real CSS files. `css` compiles to a class
+		Styles are evaluated at build time and extracted to plain CSS files. `css` compiles to a class
 		name string.
 	</Card>
 	<Card title="Rust core" icon="setting">
 		The transform is written in Rust and shipped as WebAssembly, no native binaries to install.
 	</Card>
 	<Card title="Atomic mode" icon="puzzle">
-		Opt in to atomic CSS output, one class per declaration, deduplicated across your whole app.
+		Opt in to one class per declaration, deduplicated across your whole app and kept in a
+		`utilities` cascade layer.
 	</Card>
 	<Card title="Framework support" icon="laptop">
 		Styled components for React and SolidJS, plain `css` for Svelte and anything else. Works with
@@ -105,6 +106,6 @@ export const Card = () => (
 		Cross-file HMR with dependency tracking, and CSS source maps pointing to your original source.
 	</Card>
 	<Card title="Just CSS" icon="pencil">
-		Nesting, media queries, selectors referencing other styles. Anything your CSS pipeline handles.
+		Nesting, media queries, selectors referencing other styles, anything your CSS pipeline handles.
 	</Card>
 </CardGrid>

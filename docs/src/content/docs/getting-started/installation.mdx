@@ -7,8 +7,8 @@ sidebar:
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
 
-style-this is split into a few packages. All of them are released in lockstep, always use the same
-version for every `@style-this/*` package.
+style-this is split into a few packages. They're released in lockstep, always use the same version
+for every `@style-this/*` package.
 
 | Package | Purpose |
 | --- | --- |
@@ -17,7 +17,7 @@ version for every `@style-this/*` package.
 | `@style-this/next` | Next.js integration (webpack and turbopack). |
 | `@style-this/react` | `styled` components for React. |
 | `@style-this/solid` | `styled` components for SolidJS. |
-| `@style-this/webpack` | Low-level webpack loader. |
+| `@style-this/webpack` | Low-level webpack loader, used by `@style-this/next`. |
 
 <Steps>
 
@@ -65,12 +65,11 @@ version for every `@style-this/*` package.
    import styleThis from "@style-this/vite";
 
    export default defineConfig({
-     plugins: [
-       react(),
-       styleThis({ filter: /\.tsx$/ }),
-     ],
+     plugins: [react(), styleThis({ filter: /\.tsx$/ })],
    });
    ```
+   `filter` limits the transform to files that contain styles, see
+   [`filter`](/reference/vite/#filter).
    </TabItem>
    <TabItem label="Next.js">
    ```js title="next.config.mjs"
@@ -84,7 +83,7 @@ version for every `@style-this/*` package.
    </TabItem>
    </Tabs>
 
-4. Write some styles.
+4. Write a style and use the returned class name.
 
    ```tsx
    import { css } from "@style-this/core";
@@ -101,7 +100,7 @@ version for every `@style-this/*` package.
 
 ## Next steps
 
-- Framework specific setup: [React](/frameworks/react/), [SolidJS](/frameworks/solid/),
-  [Svelte](/frameworks/svelte/), [Next.js](/frameworks/next/)
-- Learn the [`css` API](/guides/css/)
-- Understand [how it works](/getting-started/how-it-works/)
+1. [How it works](/getting-started/how-it-works/): what the transform does to your code.
+2. [Writing styles](/guides/css/): the `css` API, read the guides in order from there.
+3. Framework setup: [React](/frameworks/react/), [SolidJS](/frameworks/solid/),
+   [Svelte](/frameworks/svelte/), [Next.js](/frameworks/next/).

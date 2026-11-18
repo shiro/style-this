@@ -97,8 +97,8 @@ Dynamic expressions are reactive: they re-run whenever the signals or props they
 ## SSR
 
 The plugin keeps `@style-this/core` out of Vite's SSR externals automatically, so the
-`@style-this/core/atomic` import resolves on the server too. For atomic mode put the import in
-`src/app.tsx`.
+`@style-this/core/atomic` import resolves on the server too. For
+[atomic mode](/guides/atomic-css/), set `atomic: true` and put the import in `src/app.tsx`.
 
 Examples:
 [`vite-solid`](https://github.com/shiro/style-this/tree/master/examples/vite-solid) (SolidStart 1),

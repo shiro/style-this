@@ -5,6 +5,9 @@ sidebar:
   order: 4
 ---
 
+Styles are class names, so applying several of them means joining strings. `mergeStyles` does that
+and is the one helper to reach for.
+
 ## `mergeStyles`
 
 Joins class lists so that **later styles override earlier ones**.
@@ -24,18 +27,24 @@ const highlight = css`
 <span className={mergeStyles(color, isActive && highlight)} />;
 ```
 
-- Falsy values (`false`, `null`, `undefined`, `""`) are ignored, so conditionals can be inlined.
-- In [atomic mode](/guides/atomic-css/), atomic classes of the same property are de-duplicated and
-  the last one wins. Above, `color: coral` is dropped when `highlight` is applied.
-- Other classes are only de-duplicated when identical.
+- Falsy values (`false`, `null`, `undefined`, `""`) are ignored, so conditions can be inlined.
+- Identical classes are de-duplicated.
+- In [atomic mode](/guides/atomic-css/), atomic classes setting the same property are de-duplicated
+  and the last one wins. Above, `color: coral` is dropped when `highlight` is applied.
 
-In non-atomic mode there's nothing to de-duplicate, so the transform replaces `mergeStyles` with the
-cheaper `joinStyles`. You can write `mergeStyles` everywhere and switch modes freely.
+### Who wins in default mode
 
-:::caution
-In non-atomic mode overriding relies on regular CSS rules: both classes are applied and the cascade
-(specificity, then source order) decides. Prefer atomic mode if you rely heavily on overrides.
-:::
+In default mode both classes stay on the element and the regular CSS cascade decides: same
+specificity, so the rule that comes **later in the stylesheet** wins. That depends on where the
+styles are defined and the order modules are imported, not on the order passed to `mergeStyles`. If
+an override must always apply, either:
+
+- use [atomic mode](/guides/atomic-css/), where `mergeStyles` order is authoritative, or
+- raise its specificity with a nested selector (`&& { ... }`) or a
+  [contextual override](/examples/variants/#contextual-overrides).
+
+There's nothing to de-duplicate in default mode, so the transform replaces `mergeStyles` with the
+cheaper `joinStyles`. Write `mergeStyles` everywhere and switch modes freely.
 
 ## `joinStyles`
 
@@ -49,8 +58,7 @@ joinStyles("a", false, "b"); // "a b"
 
 ## With styled components
 
-Styled components merge the incoming `className` / `class` with `mergeStyles` semantics, no manual
-work needed:
+Styled components merge an incoming `className` / `class` with `mergeStyles` automatically:
 
 ```tsx
 <Button className={override} />

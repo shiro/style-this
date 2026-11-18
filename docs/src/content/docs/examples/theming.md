@@ -80,8 +80,8 @@ const page = css`
 document.documentElement.dataset.theme = "dark";
 ```
 
-Make sure the module defining the global style is imported somewhere in your app, its CSS is loaded
-with it.
+Global styles are loaded with their module, make sure `theme.ts` is imported somewhere in your app
+(e.g. `import "./theme"` in the root component).
 
 ## Mixins
 

@@ -1,5 +1,5 @@
 ---
-title: Writing styles with css
+title: Writing styles
 description: The css tagged template, expressions, nesting, selectors and global styles.
 sidebar:
   order: 1
@@ -19,13 +19,13 @@ const box = css`
 ```
 
 :::note
-`css` must be assigned to a variable at the top level of a module, the variable name is used to
-build the class name.
+Assign `css` to a variable at the top level of a module. The variable name becomes part of the class
+name.
 :::
 
 ## Expressions
 
-Any expression that can be evaluated at build time can be interpolated.
+Anything that can be evaluated at build time can be interpolated.
 
 ```ts
 import { colors } from "./theme";
@@ -39,8 +39,8 @@ const box = css`
 `;
 ```
 
-Values can come from other modules, including transitive imports. Changing them triggers HMR for
-every style that depends on them. See [Imports & evaluation](/guides/evaluation/) for the rules.
+Values can come from other modules, including transitive imports. The next guide,
+[Imports & evaluation](/guides/evaluation/), covers what's allowed.
 
 ## Nesting, pseudo classes and at-rules
 
@@ -62,7 +62,7 @@ const link = css`
 
 ## Referencing other styles
 
-A style interpolates to its class name, use it in selectors to style descendants contextually.
+A style interpolates to its class name. Use it in selectors to style descendants contextually.
 
 ```ts
 const inner = css`
@@ -70,29 +70,17 @@ const inner = css`
 `;
 
 const outer = css`
-  width: 100%;
-
   .${inner} {
     background: coral;
   }
 `;
 ```
 
-This also works across files, and with [styled components](/guides/styled-components/):
-
-```ts
-import { Button } from "./Button";
-
-const toolbar = css`
-  .${Button} {
-    margin: 0;
-  }
-`;
-```
+This works across files and with [styled components](/guides/styled-components/#using-components-in-selectors).
 
 ## Composing styles
 
-Every style exposes its raw CSS body as `.css`, interpolate it to inline one style into another.
+Every style exposes its CSS body as `.css`. Interpolate it to inline one style into another.
 
 ```ts
 const base = css`
@@ -106,12 +94,12 @@ const primary = css`
 `;
 ```
 
-To combine classes at the usage site instead, use [`mergeStyles`](/guides/merging-styles/).
+To combine class names at the usage site instead, use [`mergeStyles`](/guides/merging-styles/).
 
 ## Reusable fragments
 
-`style` is a plain string-concatenating tag. Use it for fragments and mixins, it gives you the same
-editor highlighting as `css` without creating a class.
+`style` concatenates a template into a plain string without creating a class. Use it for fragments
+and mixins, it gets the same editor highlighting as `css`.
 
 ```ts
 import { css, style } from "@style-this/core";
@@ -128,10 +116,10 @@ const title = css`
 `;
 ```
 
-## Adding extra classes
+## Extra classes
 
-`extraClass` appends additional class names to the generated one, handy for hooks used by tests,
-third party CSS or global selectors.
+`extraClass` adds class names next to the generated one, handy for test hooks, third party CSS or
+global selectors.
 
 ```ts
 import { css, extraClass } from "@style-this/core";
@@ -152,11 +140,7 @@ const _GlobalReset = css`
   *, *::before, *::after {
     box-sizing: border-box;
   }
-
-  .Global__Main {
-    background: coral;
-  }
 `;
 ```
 
-Global styles are never atomized in [atomic mode](/guides/atomic-css/).
+Its CSS is loaded with the module, so make sure the module is imported somewhere in your app.

@@ -23,7 +23,9 @@ export default defineConfig({
 });
 ```
 
-Add your `.ts` files to `filter` as well if you define styles outside of components.
+Add your `.ts` files to `filter` as well if you define styles outside of components. For
+[atomic mode](/guides/atomic-css/), set `atomic: true` and import `@style-this/core/atomic` in
+`src/routes/+layout.svelte`.
 
 ## Usage
 

@@ -7,7 +7,8 @@ sidebar:
 
 ## Variants with `mergeStyles`
 
-Static variants are separate styles picked at render time. Nothing dynamic ends up in the CSS.
+Static variants are separate styles picked at render time with
+[`mergeStyles`](/guides/merging-styles/). Nothing dynamic ends up in the CSS.
 
 ```tsx title="Button.tsx"
 import { css, mergeStyles } from "@style-this/core";
@@ -89,8 +90,9 @@ const toolbar = css`
 `;
 ```
 
-This works in atomic mode as well: nested rules stay regular CSS scoped under `toolbar`, and since
-they're more specific than a single atomic class they reliably win.
+This works in atomic mode as well: nested rules aren't atomized, they stay in the per-file
+stylesheet outside the [`utilities` layer](/guides/atomic-css/#cascade-layers) and always win
+against atomic classes.
 
 ## Extending third party components
 

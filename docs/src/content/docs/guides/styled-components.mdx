@@ -2,7 +2,7 @@
 title: Styled components
 description: styled components for React and SolidJS with typed, dynamic style props.
 sidebar:
-  order: 2
+  order: 3
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -37,13 +37,13 @@ const Button = styled.button`
 </TabItem>
 </Tabs>
 
-Like `css`, styled components are compiled away: the result is a thin component rendering the
-element with a static class name.
+Like `css`, the template is compiled away: what remains is a thin component rendering the element
+with a static class name. Everything from [Writing styles](/guides/css/) works inside the template.
 
 ## Dynamic styles with `styleProps`
 
-Function expressions are dynamic. Declare their inputs as a type argument, callers pass them through
-the `styleProps` prop.
+Function expressions are evaluated at render time. Declare their inputs as a type argument, callers
+pass them through the `styleProps` prop.
 
 ```tsx
 const Button = styled.button<{ size: number; color: string }>`
@@ -107,14 +107,14 @@ const Extended = styled(Base)<{ b: number }>`
 ```
 
 - `styleProps` of the base and the extension are combined.
-- The extension's classes are merged last, so its declarations win. In
-  [atomic mode](/guides/atomic-css/) conflicting atomic classes of the base are dropped.
+- The extension's classes are merged last, so its declarations win (see
+  [Merging styles](/guides/merging-styles/)).
 
 `styled("div")` is equivalent to `styled.div`.
 
 ## Overriding from outside
 
-Classes and inline styles passed to a styled component are merged after its own.
+Classes and inline styles passed to a styled component are merged after its own, so they win.
 
 <Tabs syncKey="framework">
 <TabItem label="React">
@@ -139,7 +139,8 @@ const override = css`
 
 ## Using components in selectors
 
-A styled component stringifies to its class name.
+A styled component stringifies to its class name, so it can be used like a
+[style reference](/guides/css/#referencing-other-styles).
 
 ```ts
 const toolbar = css`
@@ -154,7 +155,7 @@ Components without `styleProps` also expose `.css`, the raw CSS body, for
 
 ## Extra classes
 
-[`extraClass`](/guides/css/#adding-extra-classes) works inside styled templates as well.
+[`extraClass`](/guides/css/#extra-classes) works inside styled templates as well.
 
 ```tsx
 const Button = styled.button`

@@ -1,13 +1,13 @@
 ---
 title: Atomic CSS
-description: Emit one deduplicated class per declaration.
+description: Emit one deduplicated class per declaration, in a utilities cascade layer.
 sidebar:
-  order: 3
+  order: 5
 ---
 
 In atomic mode every top-level declaration becomes its own class, shared by every style using the
-same declaration. CSS size then grows with the number of *unique declarations* instead of the
-number of components.
+same declaration. CSS size then grows with the number of *unique declarations* instead of the number
+of components. Your code stays the same, only the output changes.
 
 ## Enabling
 
@@ -15,18 +15,19 @@ number of components.
 styleThis({ atomic: true });
 ```
 
-Then import the atomic entrypoint **once**, in your app's root module:
+Then import the atomic stylesheet **once**, in your app's root module:
 
 ```tsx title="src/App.tsx"
 import "@style-this/core/atomic";
 ```
 
-This import marks where the atomic stylesheet is loaded. In builds, the atomic CSS is appended to
-the stylesheet of the chunk containing this import. In non-atomic mode the import is a no-op, so
-it's safe to keep it and toggle the mode from config.
+The import marks where the atomic stylesheet is loaded. In builds, the atomic CSS is appended to the
+stylesheet of the chunk containing this import. In default mode the import is a no-op, so keep it
+and toggle the mode from config.
 
 :::note[Next.js]
-With `@style-this/next`, atomic mode is toggled with the `ATOMIC=1` environment variable.
+With `@style-this/next`, atomic mode is toggled with the `ATOMIC=1` environment variable instead.
+The entrypoint import and the cascade layer described below are features of the Vite plugin.
 :::
 
 ## Output
@@ -58,9 +59,12 @@ outer === "outer-mvwhqz w-YB1lg";
 ```
 
 ```css title="atomic stylesheet"
-.bg-gKimM { background: red }
-.p-vrRc6 { padding: 10px }
-.w-YB1lg { width: 100% }
+@layer theme, base, components, utilities;
+@layer utilities {
+  .bg-gKimM { background: red }
+  .p-vrRc6 { padding: 10px }
+  .w-YB1lg { width: 100% }
+}
 ```
 
 ```css title="per-file stylesheet"
@@ -77,15 +81,16 @@ outer === "outer-mvwhqz w-YB1lg";
 ```
 
 - Atomic classes are named `<property prefix>-<hash>`, e.g. `bg-…` for `background`.
-- Every style keeps its unique class (`inner-oty7sd`), so it can still be referenced in selectors.
-- **Nested rules and at-rules are not atomized**, they stay in the per-file stylesheet scoped to
-  the unique class. Same for [global styles](/guides/css/#global-styles).
+- Every style keeps its unique class (`inner-oty7sd`), so it can still be
+  [referenced in selectors](/guides/css/#referencing-other-styles).
+- **Nested rules and at-rules aren't atomized.** They stay in the per-file stylesheet, scoped to the
+  unique class. Same for [global styles](/guides/css/#global-styles).
 
 ## Overriding styles
 
-Since two styles can now set the same property through different classes, plain string
-concatenation gives order-dependent results. Use
-[`mergeStyles`](/guides/merging-styles/), which keeps only the last atomic class per property:
+Two styles can now set the same property through different classes, so plain string concatenation
+gives order-dependent results. Use [`mergeStyles`](/guides/merging-styles/), which keeps only the
+last atomic class per property:
 
 ```tsx
 import { mergeStyles } from "@style-this/core";
@@ -96,7 +101,48 @@ import { mergeStyles } from "@style-this/core";
 Styled components do this automatically for `className` / `class` and for
 [extended components](/guides/styled-components/#extending-components).
 
+## Cascade layers
+
+Atomic classes live in the `utilities` [cascade layer](https://developer.mozilla.org/docs/Web/CSS/@layer),
+declared after a default order of `theme, base, components, utilities`. Layered rules always lose
+against unlayered ones, regardless of specificity or position, so:
+
+- **Per-file CSS beats atomic CSS.** Nested rules, at-rules and global styles (unlayered) override
+  atomic declarations, which makes [contextual overrides](/examples/variants/#contextual-overrides)
+  reliable.
+- **Your own unlayered CSS beats atomic CSS too.** Put resets and base styles into a lower layer so
+  atomic classes can override them:
+
+  ```css title="src/app.css"
+  @layer base {
+    h1 {
+      font-size: 4rem;
+    }
+  }
+  ```
+
+- **Dev and build behave the same.** The cascade doesn't depend on where the atomic stylesheet ends
+  up in the bundle.
+
+The layer names match Tailwind CSS v4, so both can be used side by side.
+
+### Custom layer order
+
+Declare your own order before the atomic stylesheet is loaded. The first declaration of a layer
+fixes its position, so the default statement then has no effect.
+
+```css title="src/layers.css"
+@layer reset, base, components, utilities, overrides;
+```
+
+```tsx title="src/App.tsx"
+import "./layers.css";
+import "@style-this/core/atomic";
+```
+
+Default layers missing from your order (`theme` above) are appended after yours.
+
 ## Source maps and HMR
 
 Atomic rules carry source map markers back to the template they came from. During development the
-atomic stylesheet is hot-updated whenever any module contributes new declarations.
+atomic stylesheet is hot-updated whenever a module contributes new declarations.

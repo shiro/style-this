@@ -8,6 +8,14 @@ sidebar:
 All `@style-this/*` packages are released in lockstep since 0.2.0. Use the version picker in the
 header to read the docs of an older release.
 
+## 0.5.0
+
+- Wrap atomic CSS in `@layer utilities` after a default `@layer theme, base, components, utilities;`
+  order, so dev and build share the same cascade. Override the order by declaring your own `@layer`
+  statement before `@style-this/core/atomic` is imported. Unlayered CSS (including non-atomic
+  component CSS) now takes precedence over atomic CSS, see
+  [Cascade layers](/guides/atomic-css/#cascade-layers)
+
 ## 0.4.0
 
 - Append the atomic CSS to the stylesheet of the chunk importing `@style-this/core/atomic` in

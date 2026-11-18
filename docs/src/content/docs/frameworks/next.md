@@ -52,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ## Atomic mode
 
-Set the `ATOMIC` environment variable:
+[Atomic mode](/guides/atomic-css/) is enabled with the `ATOMIC` environment variable:
 
 ```json title="package.json"
 {

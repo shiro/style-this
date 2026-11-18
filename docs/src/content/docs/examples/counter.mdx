@@ -7,9 +7,9 @@ sidebar:
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-This is the component used in every project under
-[`examples/`](https://github.com/shiro/style-this/tree/master/examples). It touches `css`,
-`extraClass`, imported values, `styled`, `styleProps`, extension and `mergeStyles`.
+A simplified version of the component used by every project under
+[`examples/`](https://github.com/shiro/style-this/tree/master/examples). It touches most of the
+API: `css`, imported values, `extraClass`, `styled`, `styleProps`, extension and `mergeStyles`.
 
 ```ts title="tokens.ts"
 export const spacing = 16;
@@ -218,3 +218,5 @@ cd examples/vite-react
 pnpm dev         # default mode
 pnpm dev:atomic  # atomic mode
 ```
+
+Every example has `dev` and `dev:atomic` scripts.
