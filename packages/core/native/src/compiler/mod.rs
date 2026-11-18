@@ -15,6 +15,7 @@ pub mod atomic;
 // Re-exports for public API
 pub use error::TransformError;
 pub use evaluator::evaluate_program;
+pub(crate) use evaluator::resolve_virtual_modules_with_error;
 pub use transformer::Transformer;
 
 // Internal imports

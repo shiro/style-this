@@ -779,6 +779,9 @@ pub async fn evaluate_program<'alloc>(
             let Some(tx) = tx else {
                 return Err(error);
             };
+            if let Some(entries) = &entries {
+                entries.resolve_all(&(&error).into());
+            }
             let _ = tx.send(Err(error));
             return Ok(());
         }
@@ -1240,4 +1243,15 @@ fn report_error(
 
     entries.resolve_all(&err.into());
     Ok(())
+}
+
+/// Resolves the entrypoint's pending virtual modules with `err`, so their waiters don't hang. Only
+/// for errors before `evaluate_program` captured the entries, the current entries in the stores
+/// belong to this transform then.
+pub(crate) fn resolve_virtual_modules_with_error(
+    transformer: &Transformer,
+    program_filepath: &str,
+    err: &TransformError,
+) {
+    VirtualModuleEntries::capture(transformer, program_filepath).resolve_all(&err.into());
 }

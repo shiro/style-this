@@ -1,4 +1,4 @@
-use crate::compiler::evaluate_program;
+use crate::compiler::{evaluate_program, resolve_virtual_modules_with_error};
 
 pub use crate::compiler::{TransformError, Transformer};
 use crate::*;
@@ -36,12 +36,20 @@ impl Transformer {
             let ast_builder = AstBuilder::new(&allocator);
             let temporary_programs = Rc::new(RefCell::new(Default::default()));
 
+            let report = |tx: futures::channel::oneshot::Sender<_>, err: TransformError| {
+                resolve_virtual_modules_with_error(&_self, &filepath, &err);
+                let _ = tx.send(Err(err));
+            };
+
             let Ok(source_type) = SourceType::from_path(&filepath) else {
-                let _ = tx.send(Err(TransformError::UknownExtension {
-                    filepath: filepath.clone(),
-                    row: 1,
-                    column: 1,
-                }));
+                report(
+                    tx,
+                    TransformError::UknownExtension {
+                        filepath: filepath.clone(),
+                        row: 1,
+                        column: 1,
+                    },
+                );
                 return;
             };
 
@@ -53,12 +61,15 @@ impl Transformer {
                 .parse();
 
             if ast.panicked {
-                let _ = tx.send(Err(TransformError::RawParseFailed {
-                    filepath,
-                    message: ast.errors.first().unwrap().message.to_string(),
-                    row: 1,
-                    column: 1,
-                }));
+                report(
+                    tx,
+                    TransformError::RawParseFailed {
+                        filepath: filepath.clone(),
+                        message: ast.errors.first().unwrap().message.to_string(),
+                        row: 1,
+                        column: 1,
+                    },
+                );
                 return;
             }
 

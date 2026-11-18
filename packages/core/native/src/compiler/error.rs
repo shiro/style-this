@@ -35,13 +35,19 @@ pub enum TransformError {
 
 impl From<TransformError> for JsValue {
     fn from(from: TransformError) -> Self {
+        (&from).into()
+    }
+}
+
+impl From<&TransformError> for JsValue {
+    fn from(from: &TransformError) -> Self {
         let err = js_sys::Error::new(&from.to_string());
 
         // stack trace points to wasm wrapper, delete it
         js_sys::Reflect::set(&err, &JsValue::from_str("stack"), &JsValue::UNDEFINED).unwrap();
 
         // set cause property for variants that have one
-        match &from {
+        match from {
             TransformError::EvaluationFailed { cause, .. }
             | TransformError::ReadFileError { cause, .. } => {
                 js_sys::Reflect::set(&err, &JsValue::from_str("cause"), cause).unwrap();
