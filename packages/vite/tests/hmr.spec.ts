@@ -260,6 +260,69 @@ export const style = css\`
     }
   }, 30000);
 
+  for (const atomic of [false, true]) {
+    test(`files gaining styles get their CSS evaluated (atomic: ${atomic})`, async () => {
+      const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
+      try {
+        const a = join(dir, "a.tsx");
+        const b = join(dir, "b.ts");
+        await writeFile(b, `export const color = "red";\n`);
+        const unstyled = `import { color } from "./b";\n\nexport const value = color;\n`;
+        const styled = (prop: string) => `import { css } from "@style-this/core";
+import { color } from "./b";
+
+export const value = color;
+
+export const style = css\`
+  ${prop}: \${value};
+\`;
+`;
+
+        const plugin = await setupPlugin({ "./b": b, "@style-this/core": "" }, { atomic, debug: false });
+        const client = createEnvironment("client", "client");
+        (plugin.configureServer as Function)({ environments: { client } });
+        client.addModule(a);
+
+        // fail fast instead of waiting for the plugin's 5 minute timeout
+        const load = async (id: string) => {
+          let timeout: NodeJS.Timeout | undefined;
+          const result = await Promise.race([
+            loadCode(plugin, id),
+            new Promise<never>((_, reject) => {
+              timeout = setTimeout(() => reject(new Error(`loading '${id}' timed out`)), 5000);
+            }),
+          ]).finally(() => clearTimeout(timeout));
+          return result;
+        };
+        const cssOf = async () =>
+          atomic
+            ? `${await load(`${VIRTUAL_PREFIX}${a}.style-this.js`)}\n${await load(ATOMIC_ENTRYPOINT_ID)}`
+            : load(`${VIRTUAL_PREFIX}${a}.css`);
+
+        let timestamp = 0;
+        const edit = async (code: string) => {
+          await writeFile(a, code);
+          await hotUpdate(plugin, client, a, ++timestamp);
+          return plugin.transform(code, a) as Promise<{ code: string } | undefined>;
+        };
+
+        await writeFile(a, unstyled);
+        expect(await plugin.transform(unstyled, a)).toBeUndefined();
+
+        const result = await edit(styled("color"));
+        expect(result?.code).toContain(`virtual:style-this:${a}.css`);
+        expect(await cssOf()).toMatch(/(^|[^-])color: red/);
+
+        // losing and regaining styles
+        expect(await edit(unstyled)).toBeUndefined();
+        expect((await edit(styled("background-color")))?.code).toContain(`virtual:style-this:${a}.css`);
+        expect(await cssOf()).toContain("background-color: red");
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    }, 30000);
+  }
+
   test("files with the same name don't share cache entries", async () => {
     const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
     try {
