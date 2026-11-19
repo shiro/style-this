@@ -153,6 +153,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         flags: oxc_semantic::ScopeFlags,
     ) {
         let pos = self.tmp_program_statement_buffer.last().unwrap().len();
+        // before the walk rewrites the CSS inside
+        let right_references = utils::function_get_references(it);
 
         oxc_ast_visit::walk_mut::walk_function(self, it, flags);
 
@@ -166,14 +168,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let mut function_declaration = it.clone_in(self.allocator);
 
         if let Some(body) = &mut function_declaration.body {
-            let right_references = body
-                .statements
-                .iter()
-                .flat_map(|stmt| utils::statement_get_references(stmt))
-                .collect::<Vec<_>>();
-
             if self.check_dynamic_variable_access(&right_references, body.span().start) {
                 return;
+            }
+
+            for ident in right_references {
+                self.reference_variable(ident);
             }
 
             // transform
@@ -194,6 +194,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
     fn visit_class_declaration(&mut self, it: &mut oxc_ast::ast::Class<'alloc>) {
         let pos = self.tmp_program_statement_buffer.last().unwrap().len();
+        // before the walk rewrites the CSS inside
+        let right_references = utils::class_get_references(it);
 
         oxc_ast_visit::walk_mut::walk_class(self, it);
 
@@ -202,6 +204,14 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         if !self.is_variable_referenced(name) {
             return;
+        }
+
+        if self.check_dynamic_variable_access(&right_references, it.body.span.start) {
+            return;
+        }
+
+        for ident in right_references {
+            self.reference_variable(ident);
         }
 
         replace_in_class_body_using_spans(
@@ -1374,10 +1384,9 @@ fn program_declared_values(statements: &[Statement]) -> HashSet<String> {
         match declaration {
             Some(Declaration::VariableDeclaration(declaration)) if !declaration.declare => {
                 names.extend(
-                    declaration
-                        .declarations
-                        .iter()
-                        .flat_map(|declarator| binding_pattern_kind_get_idents(&declarator.id.kind)),
+                    declaration.declarations.iter().flat_map(|declarator| {
+                        binding_pattern_kind_get_idents(&declarator.id.kind)
+                    }),
                 );
             }
             Some(Declaration::FunctionDeclaration(function)) if !function.declare => {

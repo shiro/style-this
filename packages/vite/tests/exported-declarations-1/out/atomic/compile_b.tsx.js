@@ -1,14 +1,19 @@
-// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "css", "getLink"}
+// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "accent", "css", "decoration", "getLink", "underline"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
+let decoration = "none";
+let accent = "blue";
+function underline(enabled) {
+	return enabled ? "underline" : decoration;
+}
 let __styleThis_2 = new String("__styleThis_2-9erkd2");
-__styleThis_2.css = `text-decoration: none;
+__styleThis_2.css = `text-decoration: ${underline(false)};
   `;
 function getLink() {
 	return __styleThis_2;
 }
 let __styleThis_1 = new String("__styleThis_1-hi3g5a");
-__styleThis_1.css = `color: blue;
+__styleThis_1.css = `color: ${accent};
   `;
 class Theme {
 	static accent = __styleThis_1;
@@ -16,14 +21,19 @@ class Theme {
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] ?? {}), Theme,getLink};
 
-// /packages/vite/tests/exported-declarations-1/b.tsx: {"__styleThis_1", "__styleThis_2", "css"}
+// /packages/vite/tests/exported-declarations-1/b.tsx: {"__styleThis_1", "__styleThis_2", "accent", "css", "decoration", "underline"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
+let decoration = "none";
+let accent = "blue";
+function underline(enabled) {
+	return enabled ? "underline" : decoration;
+}
 let __styleThis_2 = new String("__styleThis_2-9erkd2");
-__styleThis_2.css = `text-decoration: none;
+__styleThis_2.css = `text-decoration: ${underline(false)};
   `;
 let __styleThis_1 = new String("__styleThis_1-hi3g5a");
-__styleThis_1.css = `color: blue;
+__styleThis_1.css = `color: ${accent};
   `;
 return {
 "__styleThis_2": __styleThis_2.css,

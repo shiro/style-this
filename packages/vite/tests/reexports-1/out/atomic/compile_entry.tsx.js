@@ -1,4 +1,4 @@
-// /packages/vite/tests/reexports-1/b.tsx (/packages/vite/tests/reexports-1/entry.tsx): {"Props", "__global__export__", "__styleThis_reexport_192", "__styleThis_reexport_210", "border", "color", "css", "fromC", "getGap", "internal", "late", "renamed", "secondary"}
+// /packages/vite/tests/reexports-1/b.tsx (/packages/vite/tests/reexports-1/entry.tsx): {"Props", "__global__export__", "__styleThis_reexport_192", "__styleThis_reexport_210", "border", "color", "css", "fromC", "getGap", "internal", "late", "renamed", "secondary", "size"}
 "use strict";
 const __styleThis_reexport_210 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-1/c.ts"]["__global__export__"];
 const __styleThis_reexport_192 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-1/c.ts"]["primary"];
@@ -6,8 +6,9 @@ const secondary = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexpor
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "red";
 let internal = "blue";
+let size = 4;
 function getGap() {
-	return "4px";
+	return `${size}px`;
 }
 let late = new String("late-j81urw");
 late.css = `color: ${color};`;

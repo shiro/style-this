@@ -341,6 +341,22 @@ pub fn expression_get_references<'a>(expression: &Expression<'a>) -> Vec<String>
     visitor.references
 }
 
+pub fn function_get_references<'a>(function: &oxc_ast::ast::Function<'a>) -> Vec<String> {
+    let mut visitor = ExpressionCollectorVisitor {
+        ..Default::default()
+    };
+    visitor.visit_function(function, ScopeFlags::Function);
+    visitor.references
+}
+
+pub fn class_get_references<'a>(class: &oxc_ast::ast::Class<'a>) -> Vec<String> {
+    let mut visitor = ExpressionCollectorVisitor {
+        ..Default::default()
+    };
+    visitor.visit_class(class);
+    visitor.references
+}
+
 pub fn tagged_template_expression_get_references<'a>(
     it: &TaggedTemplateExpression<'a>,
 ) -> Vec<String> {

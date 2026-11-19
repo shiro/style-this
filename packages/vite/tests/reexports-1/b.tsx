@@ -12,9 +12,10 @@ export { Props };
 
 const color = "red";
 const internal = "blue";
+const size = 4;
 
 function getGap() {
-  return "4px";
+  return `${size}px`;
 }
 
 const late = css`

@@ -65,6 +65,11 @@ export const iStyle = ${css("caret-color: ${theme.color};")};
 
 export const color = (name: keyof typeof palette) => palette[name];
 export const spacing = (n: number) => \`\${n * 4}px\`;
+
+const unit = 2;
+export function radius(n: number) {
+  return \`\${n * unit}px\`;
+}
 `,
   "j.tsx": `${cssImport}
 import { color } from "./palette";
@@ -75,6 +80,11 @@ export const jStyle = ${css('color: ${color("primary")};')};
 import { spacing } from "./palette";
 
 export const kStyle = ${css("padding: ${spacing(2)};")};
+`,
+  "l.tsx": `${cssImport}
+import { radius } from "./palette";
+
+export const lStyle = ${css("border-radius: ${radius(3)};")};
 `,
   "nav.tsx": `import { styled } from "@style-this/solid";
 ${cssImport}
@@ -129,8 +139,8 @@ export const sStyle = ${css("border-radius: ${rounded};")};
 };
 
 const entrypoints = [
-  "b.tsx", "c.tsx", "d.tsx", "e.tsx", "f.tsx", "h.tsx", "i.tsx", "j.tsx", "k.tsx", "nav.tsx", "header.tsx", "w.tsx",
-  "r.tsx", "s.tsx",
+  "b.tsx", "c.tsx", "d.tsx", "e.tsx", "f.tsx", "h.tsx", "i.tsx", "j.tsx", "k.tsx", "l.tsx", "nav.tsx", "header.tsx",
+  "w.tsx", "r.tsx", "s.tsx",
 ];
 
 const createEnvironment = (name = "client") => {
@@ -261,10 +271,12 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
   test("exported functions depend on the local values they use", async () => {
     expect(await edit("palette.ts", (code) => code.replace(`"green"`, `"blue"`))).toEqual(["j.tsx", "palette.ts"]);
     expect(await edit("palette.ts", (code) => code.replace("n * 4", "n * 8"))).toEqual(["k.tsx", "palette.ts"]);
+    expect(await edit("palette.ts", (code) => code.replace("unit = 2", "unit = 3"))).toEqual(["l.tsx", "palette.ts"]);
     expect(await edit("palette.ts", (code) => `// colors\n${code}`)).toEqual(["palette.ts"]);
 
-    for (const name of ["j.tsx", "k.tsx"]) await transform(name);
+    for (const name of ["j.tsx", "k.tsx", "l.tsx"]) await transform(name);
     expect(await cssOf("k.tsx")).toContain("padding: 16px");
+    expect(await cssOf("l.tsx")).toContain("border-radius: 9px");
   });
 
   test("styled components only invalidate importers of the changed component", async () => {
