@@ -635,10 +635,4 @@ where
             it.name = self.ast_builder.unwrap().atom(&replacement);
         }
     }
-
-    fn visit_identifier_name(&mut self, it: &mut oxc_ast::ast::IdentifierName<'alloc>) {
-        if let Some(replacement) = self.get_replacement.as_ref().unwrap()(&it.name) {
-            it.name = self.ast_builder.unwrap().atom(&replacement);
-        }
-    }
 }
