@@ -24,6 +24,8 @@ pub enum TransformError {
     },
     #[error("failed to read file '{filepath}'")]
     ReadFileError { filepath: String, cause: JsValue },
+    #[error("failed to evaluate import '{filepath}', '?raw' is the only supported query")]
+    UnsupportedImportQuery { filepath: String },
     #[error("tried to access dynamic variable '{variable}'")]
     AccessDynamicVariableError {
         variable: String,
@@ -79,6 +81,7 @@ impl From<&TransformError> for JsValue {
                 )
                 .unwrap();
             }
+            TransformError::UnsupportedImportQuery { .. } => {}
         };
 
         err.into()

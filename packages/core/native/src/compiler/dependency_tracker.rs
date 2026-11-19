@@ -6,6 +6,9 @@ use std::cell::RefCell;
 pub(crate) const STAR_IMPORT: &str = "__star__";
 /// Imported name of default imports
 pub(crate) const DEFAULT_EXPORT: &str = "__global__export__";
+/// Imported name of modules with a query (`x.ts?raw`) from the file they're generated from
+/// (`x.ts`). Its slice is never found, so any change of the file invalidates them.
+pub(crate) const QUERY_SOURCE_IMPORT: &str = "__query_source__";
 
 /// Tracks which files depend on which variables from other files.
 ///

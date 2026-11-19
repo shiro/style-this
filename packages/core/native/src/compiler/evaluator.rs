@@ -1,6 +1,6 @@
 use super::atomic::{insert_virtual_atomic_program_import, transform_atomic_entrypoint};
 use super::css_parser;
-use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
+use super::dependency_tracker::{DEFAULT_EXPORT, QUERY_SOURCE_IMPORT, STAR_IMPORT};
 use super::error::TransformError;
 use super::transformer::Transformer;
 use super::types::CssVariableIdentifier;
@@ -205,16 +205,28 @@ fn evaluate_dependencies<'alloc>(
                     .load_file(&remote_module_id, &program_filepath)
                     .await?;
 
+                // modules with a query are separate modules generated from the file
+                let (code, query_source) = match remote_filepath.split_once('?') {
+                    None => (code, None),
+                    Some((source, "raw")) => (raw_module(&code), Some(source)),
+                    Some(_) => {
+                        return Err(TransformError::UnsupportedImportQuery {
+                            filepath: remote_filepath,
+                        });
+                    }
+                };
+
                 // needed to find out which exports changed on HMR
                 if !code.is_empty() {
                     transformer
                         .cache_registry
                         .record_module_code(&remote_filepath, &code);
-                    transformer
-                        .cache_registry
-                        .dependency_tracker()
-                        .borrow()
-                        .register_resolution(&program_filepath, &remote_module_id, &remote_filepath);
+                    let tracker = transformer.cache_registry.dependency_tracker();
+                    let tracker = tracker.borrow();
+                    tracker.register_resolution(&program_filepath, &remote_module_id, &remote_filepath);
+                    if let Some(query_source) = query_source {
+                        tracker.register_import(query_source, QUERY_SOURCE_IMPORT, &remote_filepath);
+                    }
                 }
 
                 for specifier in specifiers.iter() {
@@ -483,7 +495,9 @@ fn evaluate_dependencies<'alloc>(
                     return Ok(());
                 }
 
-                let (source_type, code) = if remote_filepath.ends_with(".json") {
+                let (source_type, code) = if query_source.is_some() {
+                    (SourceType::mjs(), code)
+                } else if remote_filepath.ends_with(".json") {
                     (SourceType::mjs(), json_module(&remote_filepath, &code)?)
                 } else {
                     let source_type = SourceType::from_path(&remote_filepath).map_err(|_| {
@@ -539,6 +553,12 @@ fn evaluate_dependencies<'alloc>(
     }
 
     futures
+}
+
+/// Module of a file imported with `?raw`, like Vite it default-exports the file's contents.
+fn raw_module(code: &str) -> String {
+    let code = js_sys::JSON::stringify(&JsValue::from_str(code)).unwrap();
+    format!("export default {};\n", String::from(code))
 }
 
 /// Module of a JSON file, like Vite it default-exports the JSON and exports top level keys that

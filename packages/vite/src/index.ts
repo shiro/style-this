@@ -317,7 +317,7 @@ const vitePlugin = (options: Options = {}) => {
         if (filepathWithQuery == undefined)
           throw new Error(`vite failed to resolve import '${id}'`);
 
-        let [filepath, _query] = filepathWithQuery.split("?", 2);
+        let [filepath, query] = filepathWithQuery.split("?", 2);
 
         if (filepath.startsWith(resolvedVirtualModulePrefix)) {
           const virtualPath = fromVirtualId(filepath);
@@ -328,6 +328,9 @@ const vitePlugin = (options: Options = {}) => {
           }
           return [virtualPath, ''];
         }
+
+        // modules with a query (e.g. `?raw`) are generated from the file by the compiler
+        if (query !== undefined) return [filepathWithQuery, await readFile(filepath, "utf-8")];
 
         if (
           !filepath.startsWith(`${cwd}/node_modules/`) &&

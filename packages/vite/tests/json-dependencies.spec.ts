@@ -73,6 +73,32 @@ export const style = css\`
 
 export const unused = styles;
 `,
+  "tokens.ts": `export const color = "red";
+// "double" 'single' \\backslash \`backtick\` \${notInterpolated}
+`,
+  "raw.tsx": `${cssImport}
+import tokens from "./tokens.ts?raw";
+
+export const style = css\`
+  --raw: \${JSON.stringify(tokens)};
+\`;
+`,
+  "raw-and-plain.tsx": `${cssImport}
+import tokens from "./tokens.ts?raw";
+import { color } from "./tokens.ts";
+
+export const style = css\`
+  color: \${color};
+  --raw-length: \${tokens.length};
+\`;
+`,
+  "url.tsx": `${cssImport}
+import url from "./tokens.ts?url";
+
+export const style = css\`
+  background-image: url(\${url});
+\`;
+`,
   "working.tsx": `${cssImport}
 
 export const style = css\`
@@ -126,6 +152,8 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
       await writeFile(path(name), code);
       resolver[`./${name}`] = path(name);
     }
+    resolver["./tokens.ts?raw"] = `${path("tokens.ts")}?raw`;
+    resolver["./tokens.ts?url"] = `${path("tokens.ts")}?url`;
 
     plugin = await setupPlugin(resolver, { atomic, debug: false });
     (plugin.configureServer as Function)({ environments: {} });
@@ -171,6 +199,43 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
 
   test("side effect and unreferenced imports of unknown extensions are ignored", async () => {
     expect(await cssOf("css-import.tsx")).toContain("color: red");
+  });
+
+  test("raw import of a file is its contents", async () => {
+    expect(await cssOf("raw.tsx")).toContain(`--raw: ${JSON.stringify(files["tokens.ts"])}`);
+  });
+
+  test("raw and plain imports of the same file are separate modules", async () => {
+    const css = await cssOf("raw-and-plain.tsx");
+    expect(css).toContain("color: red");
+    expect(css).toContain(`--raw-length: ${files["tokens.ts"].length}`);
+  });
+
+  test("unsupported import queries are reported", async () => {
+    await expect(cssOf("url.tsx")).rejects.toThrow(
+      /failed to evaluate import '.*tokens\.ts\?url', '\?raw' is the only supported query/,
+    );
+    expect(await cssOf("working.tsx")).toContain("color: purple");
+  });
+
+  test("editing a file invalidates its raw importers", async () => {
+    expect(await cssOf("raw.tsx")).toContain("--raw:");
+    expect(await cssOf("raw-and-plain.tsx")).toContain("color: red");
+
+    // a comment doesn't change any export of the plain module, but the raw contents
+    const commented = `${files["tokens.ts"]}// comment\n`;
+    expect(await change("tokens.ts", commented)).toEqual(
+      ["raw-and-plain.tsx", "raw.tsx", "tokens.ts", "tokens.ts?raw"],
+    );
+    expect(await cssOf("raw.tsx")).toContain(`--raw: ${JSON.stringify(commented)}`);
+    expect(await cssOf("raw-and-plain.tsx")).toContain(`--raw-length: ${commented.length}`);
+
+    const blue = commented.replace(`"red"`, `"blue"`);
+    expect(await change("tokens.ts", blue)).toEqual(
+      ["raw-and-plain.tsx", "raw.tsx", "tokens.ts", "tokens.ts?raw"],
+    );
+    expect(await cssOf("raw.tsx")).toContain(`--raw: ${JSON.stringify(blue)}`);
+    expect(await cssOf("raw-and-plain.tsx")).toContain("color: blue");
   });
 
   test("editing a JSON file invalidates its importers", async () => {
