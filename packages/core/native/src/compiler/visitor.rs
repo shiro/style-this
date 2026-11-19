@@ -39,7 +39,8 @@ pub struct VisitorTransformer<'a, 'alloc> {
     referenced_idents: Vec<HashSet<String>>,
     css_variable_identifiers: Vec<CssVariableIdentifier>,
     style_variable_identifiers: HashSet<String>,
-    exported_idents: HashSet<String>,
+    /// exported name -> local name
+    exported_idents: HashMap<String, String>,
     scope_depth: u32,
 
     scan_pass: bool,
@@ -123,7 +124,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         Vec<CssVariableIdentifier>,
         HashSet<String>,
         HashMap<String, HashSet<String>>,
-        HashSet<String>,
+        HashMap<String, String>,
         Program<'alloc>,
     ) {
         let namespace_imports_by_module: HashMap<String, HashSet<String>> = self
@@ -610,6 +611,50 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         };
     }
 
+    /// Handles `export { x as y }` and `export { x as y } from "./b"`, their locals are referenced
+    /// up front since the declarations can come after the export.
+    fn reference_export_specifiers(&mut self, statements: &[Statement<'alloc>]) {
+        let declared_values = program_declared_values(statements);
+
+        for stmt in statements {
+            let Statement::ExportNamedDeclaration(export) = stmt else {
+                continue;
+            };
+            if export.export_kind.is_type() {
+                continue;
+            }
+
+            for specifier in &export.specifiers {
+                let exported = match specifier.exported.name().as_str() {
+                    "default" => DEFAULT_EXPORT.to_string(),
+                    name => name.to_string(),
+                };
+                if specifier.export_kind.is_type()
+                    || !self.referenced_idents.first().unwrap().contains(&exported)
+                {
+                    continue;
+                }
+
+                let local = if export.source.is_some() {
+                    utils::reexport_local_name(specifier)
+                } else {
+                    let local = specifier.local.name();
+                    // e.g. types, which don't exist at runtime
+                    if !declared_values.contains(local.as_str()) {
+                        continue;
+                    }
+                    local.to_string()
+                };
+
+                self.referenced_idents
+                    .first_mut()
+                    .unwrap()
+                    .insert(local.clone());
+                self.exported_idents.insert(exported, local);
+            }
+        }
+    }
+
     fn unique_number(&mut self) -> u32 {
         self.unique_number_counter += 1;
         self.unique_number_counter
@@ -638,6 +683,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             self.visit_statement(el);
         }
         self.scan_pass = false;
+        if self.scope_depth == 1 {
+            self.reference_export_specifiers(it);
+        }
         for el in it.iter_mut().rev() {
             self.visit_statement(el);
         }
@@ -1129,12 +1177,14 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
-        if let Statement::FunctionDeclaration(function) = it {
-            self.visit_function_declaration(function, ScopeFlags::Function);
-        }
+        if !self.scan_pass {
+            if let Statement::FunctionDeclaration(function) = it {
+                self.visit_function_declaration(function, ScopeFlags::Function);
+            }
 
-        if let Statement::ClassDeclaration(class) = it {
-            self.visit_class_declaration(class);
+            if let Statement::ClassDeclaration(class) = it {
+                self.visit_class_declaration(class);
+            }
         }
 
         oxc_ast_visit::walk_mut::walk_statement(self, it);
@@ -1160,7 +1210,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
-        self.exported_idents.insert(global_sentinel.to_string());
+        self.exported_idents
+            .insert(global_sentinel.to_string(), global_sentinel.to_string());
 
         match &it.declaration {
             ExportDefaultDeclarationKind::FunctionDeclaration(function) => {
@@ -1226,6 +1277,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
+        // specifiers are handled by `reference_export_specifiers`
         let Some(declaration) = &mut it.declaration else {
             return;
         };
@@ -1240,9 +1292,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 for decl in &variable_declaration.declarations {
                     let idents = binding_pattern_kind_get_idents(&decl.id.kind);
                     self.exported_idents.extend(
-                        idents.into_iter().filter(|ident| {
-                            self.referenced_idents.first().unwrap().contains(ident)
-                        }),
+                        idents
+                            .into_iter()
+                            .filter(|ident| self.referenced_idents.first().unwrap().contains(ident))
+                            .map(|ident| (ident.clone(), ident)),
                     );
                 }
             }
@@ -1255,7 +1308,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     .as_str();
 
                 if self.referenced_idents.first().unwrap().contains(name) {
-                    self.exported_idents.insert(name.to_string());
+                    self.exported_idents
+                        .insert(name.to_string(), name.to_string());
                 }
             }
             Declaration::ClassDeclaration(class) => {
@@ -1267,7 +1321,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     .as_str();
 
                 if self.referenced_idents.first().unwrap().contains(name) {
-                    self.exported_idents.insert(name.to_string());
+                    self.exported_idents
+                        .insert(name.to_string(), name.to_string());
                 }
             }
             _ => return,
@@ -1290,4 +1345,50 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             .unwrap()
             .extend(idents);
     }
+}
+
+/// Names of the top level values of a program that exist at runtime.
+fn program_declared_values(statements: &[Statement]) -> HashSet<String> {
+    let mut names = HashSet::new();
+
+    for stmt in statements {
+        let declaration = match stmt {
+            Statement::ImportDeclaration(import) => {
+                if import.import_kind.is_type() {
+                    continue;
+                }
+                let specifiers = import.specifiers.iter().flatten();
+                names.extend(
+                    specifiers
+                        .filter(|specifier| {
+                            !matches!(specifier, ImportDeclarationSpecifier::ImportSpecifier(spec) if spec.import_kind.is_type())
+                        })
+                        .map(|specifier| specifier.name().to_string()),
+                );
+                continue;
+            }
+            Statement::ExportNamedDeclaration(export) => export.declaration.as_ref(),
+            stmt => stmt.as_declaration(),
+        };
+
+        match declaration {
+            Some(Declaration::VariableDeclaration(declaration)) if !declaration.declare => {
+                names.extend(
+                    declaration
+                        .declarations
+                        .iter()
+                        .flat_map(|declarator| binding_pattern_kind_get_idents(&declarator.id.kind)),
+                );
+            }
+            Some(Declaration::FunctionDeclaration(function)) if !function.declare => {
+                names.extend(function.id.as_ref().map(|id| id.name.to_string()));
+            }
+            Some(Declaration::ClassDeclaration(class)) if !class.declare => {
+                names.extend(class.id.as_ref().map(|id| id.name.to_string()));
+            }
+            _ => {}
+        }
+    }
+
+    names
 }

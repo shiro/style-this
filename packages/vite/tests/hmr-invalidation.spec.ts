@@ -110,10 +110,27 @@ import { border } from "./pq";
 
 export const wStyle = ${css("border: ${border};")};
 `,
+  "tokens.ts": `const accent = "red";
+const radius = "2px";
+
+export { accent, radius as rounded };
+`,
+  "barrel.ts": `export { accent as primary, rounded } from "./tokens";\n`,
+  "r.tsx": `${cssImport}
+import { primary } from "./barrel";
+
+export const rStyle = ${css("color: ${primary};")};
+`,
+  "s.tsx": `${cssImport}
+import { rounded } from "./barrel";
+
+export const sStyle = ${css("border-radius: ${rounded};")};
+`,
 };
 
 const entrypoints = [
   "b.tsx", "c.tsx", "d.tsx", "e.tsx", "f.tsx", "h.tsx", "i.tsx", "j.tsx", "k.tsx", "nav.tsx", "header.tsx", "w.tsx",
+  "r.tsx", "s.tsx",
 ];
 
 const createEnvironment = (name = "client") => {
@@ -270,6 +287,19 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
 
     await transform("w.tsx");
     expect(await cssOf("w.tsx")).toContain("border: 2px dashed");
+  });
+
+  test("export specifiers and re-exports invalidate importers of the changed exports", async () => {
+    expect(await edit("tokens.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(
+      ["barrel.ts", "r.tsx", "tokens.ts"],
+    );
+    expect(await edit("tokens.ts", (code) => code.replace("2px", "4px"))).toEqual(
+      ["barrel.ts", "s.tsx", "tokens.ts"],
+    );
+
+    for (const name of ["r.tsx", "s.tsx"]) await transform(name);
+    expect(await cssOf("r.tsx")).toContain("color: blue");
+    expect(await cssOf("s.tsx")).toContain("border-radius: 4px");
   });
 
   test("syntax errors while editing invalidate conservatively", async () => {

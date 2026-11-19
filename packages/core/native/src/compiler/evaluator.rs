@@ -17,8 +17,9 @@ use indoc::formatdoc;
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
-    BindingPatternKind, Expression, ImportDeclarationSpecifier, ImportOrExportKind,
-    ModuleExportName, Program, PropertyKey, Statement, VariableDeclarationKind, WithClause,
+    BindingPatternKind, Expression, ImportDeclaration, ImportDeclarationSpecifier,
+    ImportOrExportKind, ModuleExportName, Program, PropertyKey, Statement, VariableDeclarationKind,
+    WithClause,
 };
 use oxc_ast_visit::VisitMut;
 use oxc_codegen::{Codegen, CodegenOptions};
@@ -140,10 +141,7 @@ fn evaluate_dependencies<'alloc>(
     let cwd = cwd.to_string();
 
     // handle imports - resolve other modules and rewrite return values into variable declarations
-    for stmt in program.body.iter() {
-        let Statement::ImportDeclaration(import_declaration) = stmt else {
-            break;
-        };
+    for import_declaration in program_imports(program, ast_builder) {
         let remote_module_id = import_declaration.source.value.to_string();
 
         // Skip the virtual atomic CSS import - it should not be evaluated as a dependency
@@ -555,6 +553,53 @@ fn evaluate_dependencies<'alloc>(
     futures
 }
 
+/// Imports of `program`, re-exports (`export { x as y } from "./b"`) are included as imports bound
+/// to their `utils::reexport_local_name`s.
+pub(crate) fn program_imports<'a, 'alloc>(
+    program: &'a Program<'alloc>,
+    ast_builder: &'a AstBuilder<'alloc>,
+) -> Vec<&'a ImportDeclaration<'alloc>> {
+    program
+        .body
+        .iter()
+        .filter_map(|stmt| match stmt {
+            Statement::ImportDeclaration(import) => Some(&**import),
+            Statement::ExportNamedDeclaration(export) => {
+                let source = export.source.as_ref()?;
+                let specifiers =
+                    ast_builder.vec_from_iter(export.specifiers.iter().map(|specifier| {
+                        let span = specifier.span;
+                        let local = ast_builder.binding_identifier(
+                            span,
+                            ast_builder.atom(&utils::reexport_local_name(specifier)),
+                        );
+                        if specifier.local.name() == "default" {
+                            ast_builder
+                                .import_declaration_specifier_import_default_specifier(span, local)
+                        } else {
+                            ast_builder.import_declaration_specifier_import_specifier(
+                                span,
+                                specifier.local.clone_in(ast_builder.allocator),
+                                local,
+                                specifier.export_kind,
+                            )
+                        }
+                    }));
+                let import = ast_builder.import_declaration(
+                    export.span,
+                    Some(specifiers),
+                    source.clone_in(ast_builder.allocator),
+                    None,
+                    None::<oxc_allocator::Box<WithClause>>,
+                    export.export_kind,
+                );
+                Some(&*ast_builder.allocator.alloc(import))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Module of a file imported with `?raw`, like Vite it default-exports the file's contents.
 fn raw_module(code: &str) -> String {
     let code = js_sys::JSON::stringify(&JsValue::from_str(code)).unwrap();
@@ -638,7 +683,8 @@ pub(crate) struct ProgramSlice<'alloc> {
     /// Identifiers the slice references, including local names of imports.
     pub referenced_idents: HashSet<String>,
     pub namespace_imports: HashMap<String, HashSet<String>>,
-    pub exported_idents: HashSet<String>,
+    /// exported name -> local name
+    pub exported_idents: HashMap<String, String>,
     /// Program that only contains what's needed to evaluate the referenced identifiers.
     pub tmp_program: Program<'alloc>,
     /// The program is an entrypoint that doesn't use the library.
@@ -873,7 +919,7 @@ pub async fn evaluate_program<'alloc>(
     if should_return_early {
         // Populate value cache with exports before returning
         if !exported_idents.is_empty() {
-            value_cache.extend(exported_idents.iter().cloned());
+            value_cache.extend(exported_idents.keys().cloned());
         }
         
         if let Some(tx) = tx {
@@ -942,7 +988,7 @@ pub async fn evaluate_program<'alloc>(
     // Always populate value cache with exported idents, even when skipping CSS eval
     // This is needed for dependency tracking to know what exports a file has
     if !exported_idents.is_empty() {
-        value_cache.extend(exported_idents.iter().cloned());
+        value_cache.extend(exported_idents.keys().cloned());
     }
 
     // After registering imports and exports, if we're skipping CSS evaluation, return early
@@ -968,14 +1014,23 @@ pub async fn evaluate_program<'alloc>(
 
     // evaluated exports are only stored at the end of the program, if evaluation fails they need
     // to be evaluated again by the next importer
-    let evaluated_exports: Vec<String> = exported_idents.iter().cloned().collect();
+    let evaluated_exports: Vec<String> = exported_idents.keys().cloned().collect();
 
     // we append all exported idents we evaluated to the cache
     if !exported_idents.is_empty() {
-        value_cache.extend(exported_idents.iter().cloned());
+        value_cache.extend(exported_idents.keys().cloned());
 
         // TODO this only needs to be sorted for tests to stay consistent
-        let mut idents: Vec<String> = exported_idents.into_iter().collect();
+        let mut idents: Vec<String> = exported_idents
+            .into_iter()
+            .map(|(exported, local)| {
+                if exported == local {
+                    local
+                } else {
+                    format!("{exported:?}: {local}")
+                }
+            })
+            .collect();
         idents.sort();
         let idents = idents.join(",");
 

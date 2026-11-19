@@ -6,7 +6,7 @@
 
 use super::cache::CSS_CLASSNAME_CACHE;
 use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
-use super::evaluator::slice_program;
+use super::evaluator::{program_imports, slice_program};
 use super::transformer::Transformer;
 use crate::utils::{
     binding_pattern_kind_get_idents, expression_get_references, statement_get_references,
@@ -143,19 +143,14 @@ fn slice_export<'alloc>(
     )
     .ok()?;
 
-    if !slice.exported_idents.contains(export) {
-        return None;
-    }
+    let local = slice.exported_idents.get(export)?;
 
     let mut slice_program = slice.tmp_program;
-    let references = prune_slice(&mut slice_program, export);
+    let references = prune_slice(&mut slice_program, local);
 
     // same as the imports `evaluate_dependencies` evaluates
     let mut imports = BTreeSet::new();
-    for stmt in &program.body {
-        let Statement::ImportDeclaration(import) = stmt else {
-            break;
-        };
+    for import in program_imports(program, ast_builder) {
         let Some(specifiers) = &import.specifiers else {
             continue;
         };
@@ -183,18 +178,18 @@ fn slice_export<'alloc>(
     })
 }
 
-/// Removes top level statements `export` doesn't depend on, returns the identifiers it references.
+/// Removes top level statements `local` doesn't depend on, returns the identifiers it references.
 ///
 /// The visitor only adds referenced declarations to slices, but always adds all CSS of the program
 /// since entrypoints need it.
-fn prune_slice(program: &mut Program, export: &str) -> HashSet<String> {
+fn prune_slice(program: &mut Program, local: &str) -> HashSet<String> {
     let statements: Vec<_> = program
         .body
         .iter()
         .map(|stmt| (statement_declared_names(stmt), statement_references(stmt)))
         .collect();
 
-    let mut references = HashSet::from([export.to_string()]);
+    let mut references = HashSet::from([local.to_string()]);
     let mut kept = vec![false; statements.len()];
     let mut changed = true;
     while changed {

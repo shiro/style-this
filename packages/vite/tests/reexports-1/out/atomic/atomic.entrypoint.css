@@ -1,0 +1,10 @@
+@layer theme, base, components, utilities;
+@layer utilities {
+.b-NNPSB { border: 1px solid }
+.bg-i1jU1 { background: blue }
+.c-tMpWo { color: red }
+.gap-u7G7b { gap: 4px }
+.p-YBDDB { padding: 2px }
+.bc-C7MJP { border-color: green }
+.olc-jv8bB { outline-color: purple }
+}
