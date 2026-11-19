@@ -37,7 +37,7 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
   inputSourceMap,
 ) {
   // tell Webpack this loader is async
-  this.async();
+  const callback = this.async();
 
   // TODO remove this when done
   this.cacheable(false);
@@ -150,7 +150,7 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
       transformedResult.code,
       // TODO sourcemap
     );
-  })();
+  })().catch((err) => callback(err));
 };
 
 export default webpack5Loader;

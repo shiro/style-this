@@ -19,7 +19,7 @@ const mocks = new Map<string, string>();
 
 const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
   // tell Webpack this loader is async
-  this.async();
+  const callback = this.async();
 
   // TODO remove this when done
   this.cacheable(false);
@@ -89,7 +89,12 @@ const webpackTransformLoader: LoaderType = function (code, inputSourceMap) {
       transformedResult.code,
       // TODO sourcemap
     );
-  })();
+  })().catch((err) => {
+    // the compiler resolves the stored CSS entry with the error, drop it or later transforms would
+    // skip CSS evaluation and keep serving the error
+    cssFiles.delete(`${this.resourcePath}.${cssExtension}`);
+    callback(err);
+  });
 };
 
 export default webpackTransformLoader;
