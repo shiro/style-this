@@ -1231,13 +1231,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         };
 
         match declaration {
-            Declaration::VariableDeclaration(it) => {
+            Declaration::VariableDeclaration(variable_declaration) => {
                 // TODO
                 //                 if !self.referenced_idents.contains(global_sentinel) {
                 //                     return;
                 // }
 
-                for decl in &it.declarations {
+                for decl in &variable_declaration.declarations {
                     let idents = binding_pattern_kind_get_idents(&decl.id.kind);
                     self.exported_idents.extend(
                         idents.into_iter().filter(|ident| {
@@ -1245,7 +1245,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         }),
                     );
                 }
-                self.visit_variable_declaration(it);
             }
             Declaration::FunctionDeclaration(function) => {
                 let name = function
@@ -1258,10 +1257,6 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 if self.referenced_idents.first().unwrap().contains(name) {
                     self.exported_idents.insert(name.to_string());
                 }
-
-                let mut statement =
-                    Statement::FunctionDeclaration(function.clone_in(self.allocator));
-                self.visit_statement(&mut statement);
             }
             Declaration::ClassDeclaration(class) => {
                 let name = class
@@ -1274,12 +1269,14 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 if self.referenced_idents.first().unwrap().contains(name) {
                     self.exported_idents.insert(name.to_string());
                 }
-
-                let mut statement = Statement::ClassDeclaration(class.clone_in(self.allocator));
-                self.visit_statement(&mut statement);
             }
-            _ => {}
+            _ => return,
         }
+
+        // visit the declaration in place as a statement, so the rewrites end up in the output
+        let mut statement = Statement::from(it.declaration.take().unwrap());
+        self.visit_statement(&mut statement);
+        it.declaration = Some(statement.into_declaration());
     }
 
     fn visit_formal_parameter(&mut self, it: &mut oxc_ast::ast::FormalParameter<'alloc>) {
