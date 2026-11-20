@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { css, mergeStyles } from "@style-this/core";
-import "virtual:style-this:__atomic_entrypoint.css";
+import "@style-this/core/atomic";
 import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
 import "virtual:style-this:/entry.tsx.css";
 // duplicate properties: the last declaration wins in atomic mode too

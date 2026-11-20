@@ -32,7 +32,6 @@ pub struct Transformer {
 pub(crate) enum VirtualImport {
     Css,
     AtomicProgram,
-    AtomicEntrypoint,
 }
 
 #[wasm_bindgen]
@@ -389,16 +388,12 @@ impl Transformer {
                     let filename = filepath.split('/').next_back().unwrap_or(filepath);
                     format!("virtual:style-this:./{filename}.style-this.js")
                 }
-                VirtualImport::AtomicEntrypoint => {
-                    "virtual:style-this:__atomic_entrypoint.css".to_string()
-                }
             });
         };
 
         let kind = match kind {
             VirtualImport::Css => "css",
             VirtualImport::AtomicProgram => "atomicProgram",
-            VirtualImport::AtomicEntrypoint => "atomicEntrypoint",
         };
         let error = |cause| TransformError::ResolveVirtualImportFailed {
             filepath: filepath.to_string(),

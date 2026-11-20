@@ -72,7 +72,7 @@ export const Transformer = _Transformer as unknown as new (opts: {
   resolveVirtualImport?: (kind: VirtualImportKind, filepath: string) => string;
 }) => Transformer;
 
-export type VirtualImportKind = "css" | "atomicProgram" | "atomicEntrypoint";
+export type VirtualImportKind = "css" | "atomicProgram";
 
 export const CacheRegistry = _CacheRegistry as unknown as new () => CacheRegistry;
 

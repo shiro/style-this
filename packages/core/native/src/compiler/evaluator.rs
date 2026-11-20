@@ -1,6 +1,4 @@
-use super::atomic::{
-    insert_virtual_atomic_program_import, is_atomic_program_import, transform_atomic_entrypoint,
-};
+use super::atomic::{insert_virtual_atomic_program_import, is_atomic_program_import};
 use super::css_parser;
 use super::dependency_tracker::{DEFAULT_EXPORT, QUERY_SOURCE_IMPORT, STAR_IMPORT};
 use super::error::TransformError;
@@ -682,7 +680,6 @@ fn insert_virtual_imports<'alloc>(
     program_filepath: &str,
     has_css: bool,
 ) -> Result<(), TransformError> {
-    transform_atomic_entrypoint(program, ast_builder, transformer, program_filepath)?;
     if transformer.atomic && has_css {
         insert_virtual_atomic_program_import(program, ast_builder, transformer, program_filepath)?;
     }

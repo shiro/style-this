@@ -4,6 +4,6 @@ import "virtual:style-this:/entry.tsx.css";
 const scale = 2;
 // imports after other statements
 import { css } from "@style-this/core";
-import "virtual:style-this:__atomic_entrypoint.css";
+import "@style-this/core/atomic";
 import { primary, secondary, own, palette, tokens } from "./b";
 export const box = _styleThisClasses.box;

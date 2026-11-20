@@ -1,7 +1,7 @@
 use super::cache_registry::CacheRegistry;
 use super::error::TransformError;
 use super::transformer::{Transformer, VirtualImport};
-use crate::{LIBRARY_CORE_ATOMIC_IMPORT_NAME, LIBRARY_CORE_IMPORT_NAME};
+use crate::LIBRARY_CORE_IMPORT_NAME;
 use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
     ImportDeclaration, ImportDeclarationSpecifier, ImportOrExportKind, Program, Statement,
@@ -255,51 +255,6 @@ pub fn add_atomic(declaration: &str, cache_registry: &CacheRegistry) -> String {
     let class_name = generate_atomic_class_name(&key);
     cache_registry.insert_atomic_class(key, class_name.clone());
     class_name
-}
-
-/// Transform @style-this/core/atomic imports into virtual module imports
-pub fn transform_atomic_entrypoint<'alloc>(
-    program: &mut Program<'alloc>,
-    ast_builder: &'alloc AstBuilder<'alloc>,
-    transformer: &Transformer,
-    program_filepath: &str,
-) -> Result<(), TransformError> {
-    if !transformer.atomic {
-        return Ok(());
-    }
-
-    let mut indices_to_replace = vec![];
-    for (idx, stmt) in program.body.iter().enumerate() {
-        let Statement::ImportDeclaration(import_decl) = stmt else {
-            continue;
-        };
-
-        if import_decl.source.value.as_str() == LIBRARY_CORE_ATOMIC_IMPORT_NAME {
-            indices_to_replace.push(idx);
-        }
-    }
-    if indices_to_replace.is_empty() {
-        return Ok(());
-    }
-
-    let atomic_css_path =
-        transformer.virtual_import(VirtualImport::AtomicEntrypoint, program_filepath)?;
-
-    // Replace the imports
-    for idx in indices_to_replace.into_iter().rev() {
-        // Create new import declaration with transformed source
-        let new_import = ast_builder.alloc_import_declaration(
-            program.span,
-            None, // side-effect import
-            ast_builder.string_literal(program.span, ast_builder.atom(&atomic_css_path), None),
-            None,
-            None::<oxc_allocator::Box<WithClause>>,
-            ImportOrExportKind::Value,
-        );
-
-        program.body[idx] = Statement::ImportDeclaration(new_import);
-    }
-    Ok(())
 }
 
 /// In non-atomic mode there are no atomic classes to de-dupe, so `mergeStyles` imports from

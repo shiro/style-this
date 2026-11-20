@@ -359,10 +359,7 @@ const vitePlugin = (options: Options = {}) => {
     },
 
     resolveId(id, importer) {
-      if (id === '@style-this/core/atomic') {
-        const atomicPath = `${virtualModulePrefix}__style_this_atomic_entrypoint.css`;
-        return resolvedVirtualModulePrefix + atomicPath.slice(virtualModulePrefix.length);
-      }
+      if (id === '@style-this/core/atomic') return atomicEntrypointId;
 
       if (id.startsWith(virtualModulePrefix)) {
         if (!importer)

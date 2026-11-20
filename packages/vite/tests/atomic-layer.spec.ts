@@ -24,7 +24,8 @@ const withStyledFile = async (
     const file = join(dir, "a.tsx");
     await writeFile(
       file,
-      `import { css } from "@style-this/core";
+      `import "@style-this/core/atomic";
+import { css } from "@style-this/core";
 
 export const aStyle = css\`
   color: red;
@@ -33,7 +34,10 @@ export const aStyle = css\`
     );
 
     const plugin = await setupPlugin({ "@style-this/core": "" }, { debug: false, ...options });
-    await plugin.transform(await readFile(file, "utf-8"), file);
+    const { code } = (await plugin.transform(await readFile(file, "utf-8"), file))!;
+    // the styled file's entrypoint import must resolve to the module the atomic CSS is served from
+    const entrypointImport = code.match(/^import "(.*atomic.*)";$/m)?.[1];
+    expect(entrypointImport && plugin.resolveId(entrypointImport, file)).toBe(ATOMIC_ENTRYPOINT_ID);
     if (options.atomic) await loadCode(plugin, `${VIRTUAL_PREFIX}${file}.style-this.js`);
     await run(plugin, file);
   } finally {
