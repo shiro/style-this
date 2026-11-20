@@ -259,6 +259,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 .random
                 .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
 
+            // `$` is valid in JS identifiers but not in CSS class names, `__` instead of `_` so
+            // `$Global` doesn't become a `_Global` class
+            let variable_name = variable_name.replace('$', "__");
+
             format!("{variable_name}-{random_suffix}")
         };
 

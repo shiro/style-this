@@ -24,4 +24,11 @@ describe("edge-cases", () => {
 
     await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });
+
+  test("edge-cases-dollar-names", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
+  });
 });
