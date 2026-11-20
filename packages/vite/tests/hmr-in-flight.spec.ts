@@ -13,6 +13,7 @@ const source = (width: string) => `import { css } from "@style-this/core";
 
 const color = await (globalThis as any).__styleThisTestGate();
 
+// 色: non-ASCII text, UTF-8 byte offsets of the styles differ from string indices
 export const xStyle = css\`
   color: \${color};
   width: ${width};
@@ -141,8 +142,7 @@ describe.each([false, true])("edits during in-flight evaluations (atomic: %s)", 
   test("CSS sourcemaps point to the styles' source", async () => {
     const { map } = await load(".css");
     expect(map).toMatchObject({ sources: [file], sourcesContent: [source("1px")] });
-    // first segment: generated line 0, column 0 maps to the template literal on line 4 (0-based)
-    const [column, sourceIndex, line] = map!.mappings.split(";")[0].split(",")[0];
-    expect([column, sourceIndex, line]).toEqual(["A", "A", "I"]);
+    // first segment: generated line 0, column 0 maps to `css` on line 5, column 22 (0-based)
+    expect(map!.mappings.split(";")[0].split(",")[0]).toBe("AAKsB");
   });
 });

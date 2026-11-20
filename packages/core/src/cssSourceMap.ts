@@ -28,6 +28,9 @@ export function generateCssSourceMap(
   generatedFilepath?: string,
 ): SourceMap {
   const segments: SourceMapSegment[] = [];
+  // the compiler's offsets are UTF-8 byte offsets
+  const originalBytes = new TextEncoder().encode(originalSource);
+  const decoder = new TextDecoder();
 
   // For each CSS class, find its position in the generated CSS and map it back
   for (const entry of sourcemapData) {
@@ -35,8 +38,7 @@ export function generateCssSourceMap(
     const position = findSelectorInCss(cssContent, selector);
 
     if (position) {
-      // Calculate line and column from byte offset in original source
-      const originalPos = getLineAndColumn(originalSource, entry.start);
+      const originalPos = getLineAndColumn(decoder.decode(originalBytes.subarray(0, entry.start)));
 
       segments.push({
         generatedLine: position.line,
@@ -76,16 +78,12 @@ function findSelectorInCss(
   return { line, column };
 }
 
-function getLineAndColumn(
-  source: string,
-  offset: number,
-): { line: number; column: number } {
-  const beforeOffset = source.substring(0, offset);
+/** Line and column at the end of `beforeOffset` */
+function getLineAndColumn(beforeOffset: string): { line: number; column: number } {
   const line = (beforeOffset.match(/\n/g) || []).length;
-  const lastNewline = beforeOffset.lastIndexOf("\n");
-  const column = offset - lastNewline - 1;
+  const column = beforeOffset.length - beforeOffset.lastIndexOf("\n") - 1;
 
-  return { line, column: Math.max(0, column) };
+  return { line, column };
 }
 
 /**
