@@ -249,15 +249,16 @@ export const evaluateProgramBothModes = async (
   testDir: string,
   entry: string,
   resolver: Record<string, string>,
+  options?: Record<string, unknown>,
 ) => {
   // Test with default mode
   resetRandom();
-  const defaultPlugin = await setupPlugin(resolver, { atomic: false });
+  const defaultPlugin = await setupPlugin(resolver, { ...options, atomic: false });
   await evaluateProgramWithMode(testDir, entry, defaultPlugin, "default");
 
   // Test with atomic mode
   resetRandom();
-  const atomicPlugin = await setupPlugin(resolver, { atomic: true });
+  const atomicPlugin = await setupPlugin(resolver, { ...options, atomic: true });
   await evaluateProgramWithMode(testDir, entry, atomicPlugin, "atomic");
 
   // For single-file test, snapshot atomic entrypoint after transformation

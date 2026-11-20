@@ -116,6 +116,27 @@ fn get_import_local_name<'a>(specifier: &'a ImportDeclarationSpecifier<'a>) -> &
     }
 }
 
+/// `ignored_list` lists the imported names (`DEFAULT_EXPORT` for the default import), an empty
+/// list ignores the whole module.
+fn is_import_ignored(
+    specifier: &ImportDeclarationSpecifier,
+    ignored_list: Option<&Vec<String>>,
+) -> bool {
+    let Some(ignored_list) = ignored_list else {
+        return false;
+    };
+    if ignored_list.is_empty() {
+        return true;
+    }
+
+    let imported_name = match specifier {
+        ImportDeclarationSpecifier::ImportSpecifier(import) => import.imported.name(),
+        ImportDeclarationSpecifier::ImportDefaultSpecifier(_) => DEFAULT_EXPORT.into(),
+        ImportDeclarationSpecifier::ImportNamespaceSpecifier(_) => return false,
+    };
+    ignored_list.iter().any(|name| name == imported_name.as_str())
+}
+
 #[allow(clippy::too_many_arguments)]
 /// Iterate over program's imports and run an evaluation on each of them we import referenced
 /// identifiers from.
@@ -166,22 +187,21 @@ fn evaluate_dependencies<'alloc>(
             continue;
         };
 
+        let ignored_list = transformer.ignored_imports.get(&remote_module_id);
+        let specifiers = ast_builder.vec_from_iter(
+            specifiers
+                .iter()
+                .filter(|specifier| !is_import_ignored(specifier, ignored_list))
+                .map(|specifier| specifier.clone_in(ast_builder.allocator)),
+        );
+
         let mut remote_referenced_idents = namespace_imports
             .remove(&remote_module_id)
             .unwrap_or_default();
 
-        let any_ident_referenced = specifiers.iter().any(|specifier| {
-            let local_name = get_import_local_name(specifier);
-
-            // if inside of ignored_imports, skip this import
-            if let Some(ignored_list) = transformer.ignored_imports.get(&remote_module_id)
-                && (ignored_list.is_empty() || ignored_list.contains(&local_name.to_string()))
-            {
-                return false;
-            }
-
-            referenced_idents.contains(local_name)
-        });
+        let any_ident_referenced = specifiers
+            .iter()
+            .any(|specifier| referenced_idents.contains(get_import_local_name(specifier)));
 
         if !any_ident_referenced {
             continue;
@@ -193,7 +213,6 @@ fn evaluate_dependencies<'alloc>(
             >,
         > = {
             let program_filepath = program_filepath.clone();
-            let specifiers = specifiers.clone_in(ast_builder.allocator);
             let referenced_idents = referenced_idents.clone();
             let temporary_programs = temporary_programs.clone();
             let import_chain = import_chain.clone();

@@ -81,21 +81,13 @@ const vitePlugin = (options: Options = {}) => {
     if (debug) console.log("[style-this]", ...args);
   };
 
-  if (options.ignoredImports) {
-    for (const [key, value] of Object.entries(options.ignoredImports)) {
-      if (value === true) {
-        options.ignoredImports[key] = [];
-        continue;
-      }
-      if (Array.isArray(value)) {
-        if (value.length == 0) {
-          delete options.ignoredImports[key];
-          continue;
-        }
-        options.ignoredImports[key] = value.map((item) =>
-          item === DefaultImport ? "__global__export__" : item,
-        );
-      }
+  // an empty list ignores the whole module
+  const ignoredImports: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(options.ignoredImports ?? {})) {
+    if (value === true) {
+      ignoredImports[key] = [];
+    } else if (value.length > 0) {
+      ignoredImports[key] = value.map((item) => (item === DefaultImport ? "__global__export__" : item));
     }
   }
 
@@ -349,7 +341,7 @@ const vitePlugin = (options: Options = {}) => {
 
       styleThis = new Transformer({
         cwd,
-        ignoredImports: options.ignoredImports as Record<string, string[]>,
+        ignoredImports,
         loadFile: createLoadFile(async () => {
           throw new Error("transform must be called with a plugin context loadFile");
         }),
