@@ -1,9 +1,11 @@
 use super::cache_registry::CacheRegistry;
-use super::transformer::Transformer;
+use super::error::TransformError;
+use super::transformer::{Transformer, VirtualImport};
 use crate::{LIBRARY_CORE_ATOMIC_IMPORT_NAME, LIBRARY_CORE_IMPORT_NAME};
 use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
-    ImportDeclarationSpecifier, ImportOrExportKind, Program, Statement, WithClause,
+    ImportDeclaration, ImportDeclarationSpecifier, ImportOrExportKind, Program, Statement,
+    WithClause,
 };
 use once_cell::sync::Lazy;
 use std::collections::{HashMap, HashSet};
@@ -261,9 +263,9 @@ pub fn transform_atomic_entrypoint<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
     transformer: &Transformer,
     program_filepath: &str,
-) {
+) -> Result<(), TransformError> {
     if !transformer.atomic {
-        return;
+        return Ok(());
     }
 
     let mut indices_to_replace = vec![];
@@ -276,11 +278,15 @@ pub fn transform_atomic_entrypoint<'alloc>(
             indices_to_replace.push(idx);
         }
     }
+    if indices_to_replace.is_empty() {
+        return Ok(());
+    }
+
+    let atomic_css_path =
+        transformer.virtual_import(VirtualImport::AtomicEntrypoint, program_filepath)?;
 
     // Replace the imports
     for idx in indices_to_replace.into_iter().rev() {
-        let atomic_css_path = "virtual:style-this:__atomic_entrypoint.css".to_string();
-
         // Create new import declaration with transformed source
         let new_import = ast_builder.alloc_import_declaration(
             program.span,
@@ -293,6 +299,7 @@ pub fn transform_atomic_entrypoint<'alloc>(
 
         program.body[idx] = Statement::ImportDeclaration(new_import);
     }
+    Ok(())
 }
 
 /// In non-atomic mode there are no atomic classes to de-dupe, so `mergeStyles` imports from
@@ -328,33 +335,43 @@ pub fn rewrite_merge_styles_imports<'alloc>(
     rewrote
 }
 
+/// Local name of the atomic `.style-this.js` module's namespace import.
+pub const ATOMIC_CLASSES_IDENT: &str = "_styleThisClasses";
+
+/// Whether `import_decl` is the import inserted by `insert_virtual_atomic_program_import`.
+pub fn is_atomic_program_import(import_decl: &ImportDeclaration) -> bool {
+    import_decl.specifiers.as_ref().is_some_and(|specifiers| {
+        specifiers.iter().any(|specifier| {
+            matches!(
+                specifier,
+                ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace)
+                    if namespace.local.name == ATOMIC_CLASSES_IDENT
+            )
+        })
+    })
+}
+
 /// Insert a namespace import for the atomic .style-this.js module in atomic mode
 /// Creates: import * as _styleThisClasses from "virtual:style-this:filename.style-this.js"
 pub fn insert_virtual_atomic_program_import<'alloc>(
     program: &mut Program<'alloc>,
     ast_builder: &'alloc AstBuilder<'alloc>,
+    transformer: &Transformer,
     program_filepath: &str,
-) {
-    // Create: import * as _styleThisClasses from "virtual:style-this:filename.style-this.js"
+) -> Result<(), TransformError> {
     use oxc_ast::ast::ImportNamespaceSpecifier;
 
     let namespace_specifier = ast_builder.alloc(ImportNamespaceSpecifier {
         span: program.span,
-        local: ast_builder.binding_identifier(program.span, ast_builder.atom("_styleThisClasses")),
+        local: ast_builder.binding_identifier(program.span, ast_builder.atom(ATOMIC_CLASSES_IDENT)),
     });
 
     let specifiers = ast_builder.vec1(ImportDeclarationSpecifier::ImportNamespaceSpecifier(
         namespace_specifier,
     ));
 
-    // Extract just the filename from the full path
-    let filename = program_filepath
-        .split('/')
-        .next_back()
-        .unwrap_or(program_filepath);
-
-    // Create import path with just the filename: virtual:style-this:filename.style-this.js
-    let style_this_import_source = format!("virtual:style-this:./{}.style-this.js", filename);
+    let style_this_import_source =
+        transformer.virtual_import(VirtualImport::AtomicProgram, program_filepath)?;
 
     let style_this_import = ast_builder.alloc_import_declaration(
         program.span,
@@ -378,6 +395,7 @@ pub fn insert_virtual_atomic_program_import<'alloc>(
     program
         .body
         .insert(insert_pos, Statement::ImportDeclaration(style_this_import));
+    Ok(())
 }
 
 #[cfg(test)]

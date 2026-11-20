@@ -1,8 +1,10 @@
-use super::atomic::{insert_virtual_atomic_program_import, transform_atomic_entrypoint};
+use super::atomic::{
+    insert_virtual_atomic_program_import, is_atomic_program_import, transform_atomic_entrypoint,
+};
 use super::css_parser;
 use super::dependency_tracker::{DEFAULT_EXPORT, QUERY_SOURCE_IMPORT, STAR_IMPORT};
 use super::error::TransformError;
-use super::transformer::Transformer;
+use super::transformer::{Transformer, VirtualImport};
 use super::types::CssVariableIdentifier;
 use super::visitor::VisitorTransformer;
 use crate::compiler::atomic::{add_atomic, dedupe_atomic_declarations, rewrite_merge_styles_imports};
@@ -167,19 +169,9 @@ fn evaluate_dependencies<'alloc>(
     for import_declaration in program_imports(program, ast_builder) {
         let remote_module_id = import_declaration.source.value.to_string();
 
-        // Skip the virtual atomic CSS import - it should not be evaluated as a dependency
-        // The atomic CSS file will be loaded separately by Vite when requested
-        if remote_module_id.starts_with("virtual:style-this:")
-            && remote_module_id.ends_with(".atomic.css")
-        {
-            continue;
-        }
-
-        // Skip virtual .style-this.js module imports - they are synthesized modules
-        // that should not be treated as real dependencies to load and evaluate
-        if remote_module_id.starts_with("virtual:style-this:")
-            && remote_module_id.ends_with(".style-this.js")
-        {
+        // the `.style-this.js` module is generated from this program's evaluation, the other
+        // inserted virtual module imports are side-effect imports and skipped below
+        if is_atomic_program_import(import_declaration) {
             continue;
         }
 
@@ -681,19 +673,30 @@ fn json_module(filepath: &str, code: &str) -> Result<String, TransformError> {
     Ok(module)
 }
 
-/// Insert a virtual CSS import for the given program filepath.
-/// In atomic mode, creates a side-effect import to the .style-this.js module.
-/// In non-atomic mode, creates a side-effect import to the .css file.
+/// Inserts the imports of the entrypoint's virtual modules. Only the entrypoint's code is emitted,
+/// in dependencies the virtual modules aren't needed.
+fn insert_virtual_imports<'alloc>(
+    program: &mut Program<'alloc>,
+    ast_builder: &'alloc AstBuilder<'alloc>,
+    transformer: &Transformer,
+    program_filepath: &str,
+    has_css: bool,
+) -> Result<(), TransformError> {
+    transform_atomic_entrypoint(program, ast_builder, transformer, program_filepath)?;
+    if transformer.atomic && has_css {
+        insert_virtual_atomic_program_import(program, ast_builder, transformer, program_filepath)?;
+    }
+    insert_virtual_css_import(program, ast_builder, transformer, program_filepath)
+}
+
+/// Insert a side-effect import of the program's virtual CSS module.
 fn insert_virtual_css_import<'alloc>(
     program: &mut Program<'alloc>,
     ast_builder: &'alloc AstBuilder<'alloc>,
     transformer: &Transformer,
     program_filepath: &str,
-) {
-    let module_id = format!(
-        "virtual:style-this:{}.{}",
-        program_filepath, transformer.css_extension
-    );
+) -> Result<(), TransformError> {
+    let module_id = transformer.virtual_import(VirtualImport::Css, program_filepath)?;
 
     let import_declaration = ast_builder.alloc_import_declaration(
         program.span,
@@ -713,6 +716,7 @@ fn insert_virtual_css_import<'alloc>(
     program
         .body
         .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
+    Ok(())
 }
 
 /// JS expression of the object evaluated exports of `filepath` are stored in.
@@ -974,21 +978,25 @@ pub async fn evaluate_program<'alloc>(
         return Ok(());
     }
 
-    // Transform @style-this/core/atomic imports into virtual module imports
-    transform_atomic_entrypoint(program, ast_builder, transformer, &program_filepath);
-
     let has_css = !css_variable_identifiers.is_empty();
 
-    // new entrypoint handling
     if entrypoint {
-        // Insert virtual module imports
-        if has_css {
-            // Add import for .style-this.js virtual atomic module
-            if transformer.atomic {
-                insert_virtual_atomic_program_import(program, ast_builder, &program_filepath);
+        if let Err(error) = insert_virtual_imports(
+            program,
+            ast_builder,
+            transformer,
+            &program_filepath,
+            has_css,
+        ) {
+            let Some(tx) = tx else {
+                return Err(error);
+            };
+            if let Some(entries) = &entries {
+                entries.resolve_all(&(&error).into());
             }
+            let _ = tx.send(Err(error));
+            return Ok(());
         }
-        insert_virtual_css_import(program, ast_builder, transformer, &program_filepath);
 
         if let Some(tx) = tx {
             let _ = tx.send(Ok(Some(codegen_transform_result(program, &program_filepath))));

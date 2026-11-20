@@ -65,7 +65,14 @@ export const Transformer = _Transformer as unknown as new (opts: {
   debug?: boolean;
   atomic?: boolean;
   onDebugVirtualModule?: (name: string, code: string) => void;
+  /**
+   * Overrides the import specifier of the virtual modules inserted into `filepath` (defaults to
+   * `virtual:style-this:...`), for bundlers that can't resolve virtual modules.
+   */
+  resolveVirtualImport?: (kind: VirtualImportKind, filepath: string) => string;
 }) => Transformer;
+
+export type VirtualImportKind = "css" | "atomicProgram" | "atomicEntrypoint";
 
 export const CacheRegistry = _CacheRegistry as unknown as new () => CacheRegistry;
 

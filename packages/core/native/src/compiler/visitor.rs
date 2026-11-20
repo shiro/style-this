@@ -1,3 +1,4 @@
+use super::atomic::ATOMIC_CLASSES_IDENT;
 use super::cache::CSS_CLASSNAME_CACHE;
 use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::error::TransformError;
@@ -611,7 +612,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     span,
                     Expression::Identifier(self.ast_builder.alloc_identifier_reference(
                         span,
-                        self.ast_builder.atom("_styleThisClasses"),
+                        self.ast_builder.atom(ATOMIC_CLASSES_IDENT),
                     )),
                     self.ast_builder
                         .identifier_name(span, self.ast_builder.atom(variable_name)),

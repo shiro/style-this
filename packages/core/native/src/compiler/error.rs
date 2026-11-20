@@ -24,6 +24,8 @@ pub enum TransformError {
     },
     #[error("failed to read file '{filepath}'")]
     ReadFileError { filepath: String, cause: JsValue },
+    #[error("failed to resolve the virtual module imports of '{filepath}'")]
+    ResolveVirtualImportFailed { filepath: String, cause: JsValue },
     #[error("failed to evaluate import '{filepath}', '?raw' is the only supported query")]
     UnsupportedImportQuery { filepath: String },
     #[error("tried to access dynamic variable '{variable}'")]
@@ -51,7 +53,8 @@ impl From<&TransformError> for JsValue {
         // set cause property for variants that have one
         match from {
             TransformError::EvaluationFailed { cause, .. }
-            | TransformError::ReadFileError { cause, .. } => {
+            | TransformError::ReadFileError { cause, .. }
+            | TransformError::ResolveVirtualImportFailed { cause, .. } => {
                 js_sys::Reflect::set(&err, &JsValue::from_str("cause"), cause).unwrap();
             }
             TransformError::RawParseFailed {

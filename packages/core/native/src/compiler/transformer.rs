@@ -24,6 +24,15 @@ pub struct Transformer {
     pub(crate) debug: bool,
     pub(crate) atomic: bool,
     pub(crate) on_debug_virtual_module_ref: String,
+    pub(crate) resolve_virtual_import: Option<js_sys::Function>,
+}
+
+/// Virtual module the compiler inserts an import of.
+#[derive(Clone, Copy)]
+pub(crate) enum VirtualImport {
+    Css,
+    AtomicProgram,
+    AtomicEntrypoint,
 }
 
 #[wasm_bindgen]
@@ -190,6 +199,11 @@ impl Transformer {
                 .and_then(|v| v.dyn_into::<js_sys::Function>().ok())
                 .unwrap_or_else(|| js_sys::Function::new_no_args(""));
 
+        let resolve_virtual_import =
+            js_sys::Reflect::get(&opts, &JsValue::from_str("resolveVirtualImport"))
+                .ok()
+                .and_then(|v| v.dyn_into::<js_sys::Function>().ok());
+
         let callback_suffix = crate::utils::generate_random_id(8);
         let on_debug_virtual_module_ref = format!("{PREFIX}_debug_callback_{callback_suffix}");
 
@@ -217,6 +231,7 @@ impl Transformer {
             debug,
             atomic,
             on_debug_virtual_module_ref,
+            resolve_virtual_import,
         }
     }
 
@@ -356,5 +371,49 @@ impl Transformer {
         let code = arr.remove(0);
 
         Ok((filepath, code))
+    }
+
+    /// Import specifier of a virtual module imported by `filepath`, `resolveVirtualImport` replaces
+    /// the default `virtual:style-this:` specifiers for bundlers without virtual module support.
+    pub(crate) fn virtual_import(
+        &self,
+        kind: VirtualImport,
+        filepath: &str,
+    ) -> Result<String, TransformError> {
+        let Some(resolve) = &self.resolve_virtual_import else {
+            return Ok(match kind {
+                VirtualImport::Css => {
+                    format!("virtual:style-this:{filepath}.{}", self.css_extension)
+                }
+                VirtualImport::AtomicProgram => {
+                    let filename = filepath.split('/').next_back().unwrap_or(filepath);
+                    format!("virtual:style-this:./{filename}.style-this.js")
+                }
+                VirtualImport::AtomicEntrypoint => {
+                    "virtual:style-this:__atomic_entrypoint.css".to_string()
+                }
+            });
+        };
+
+        let kind = match kind {
+            VirtualImport::Css => "css",
+            VirtualImport::AtomicProgram => "atomicProgram",
+            VirtualImport::AtomicEntrypoint => "atomicEntrypoint",
+        };
+        let error = |cause| TransformError::ResolveVirtualImportFailed {
+            filepath: filepath.to_string(),
+            cause,
+        };
+        resolve
+            .call2(
+                &JsValue::UNDEFINED,
+                &JsValue::from_str(kind),
+                &JsValue::from_str(filepath),
+            )
+            .map_err(error)?
+            .as_string()
+            .ok_or_else(|| {
+                error(js_sys::TypeError::new("resolveVirtualImport must return a string").into())
+            })
     }
 }
