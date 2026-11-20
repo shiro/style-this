@@ -59,6 +59,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 - Requires Next.js 16.2 or newer.
 - [Atomic mode](/guides/atomic-css/) isn't supported yet.
 
-Examples:
-[`next-app-router`](https://github.com/shiro/style-this/tree/master/examples/next-app-router),
-[`next-pages-router`](https://github.com/shiro/style-this/tree/master/examples/next-pages-router).
+Example (app router and pages router):
+[`next`](https://github.com/shiro/style-this/tree/master/examples/next).

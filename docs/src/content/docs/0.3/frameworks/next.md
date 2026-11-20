@@ -71,6 +71,5 @@ Set the `ATOMIC` environment variable:
 * `middleware.ts` is skipped under turbopack.
 * `withStyleThis` currently takes no style-this specific options.
 
-Examples:
-[`next-app-router`](https://github.com/shiro/style-this/tree/master/examples/next-app-router),
-[`next-pages-router`](https://github.com/shiro/style-this/tree/master/examples/next-pages-router).
+Example (app router and pages router):
+[`next`](https://github.com/shiro/style-this/tree/master/examples/next).

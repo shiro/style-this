@@ -4,3 +4,4 @@ out/
 dist/
 *.local
 *.tsbuildinfo
+AGENTS.md

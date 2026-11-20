@@ -7,14 +7,12 @@ import { chromium, Browser } from 'playwright';
 const REACT_EXAMPLE = path.join(process.cwd(), 'examples/vite-react');
 const SOLID_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid');
 const SOLID_START_2_EXAMPLE = path.join(process.cwd(), 'examples/vite-solid-start-2');
-const NEXT_PAGES_ROUTER_EXAMPLE = path.join(process.cwd(), 'examples/next-pages-router');
-const NEXT_APP_ROUTER_EXAMPLE = path.join(process.cwd(), 'examples/next-app-router');
+const NEXT_EXAMPLE = path.join(process.cwd(), 'examples/next');
 const SVELTEKIT_3_EXAMPLE = path.join(process.cwd(), 'examples/sveltekit-3');
 const REACT_PORT = 4173;
 const SOLID_PORT = 3000;
 const SOLID_START_2_PORT = 3010;
-const NEXT_PAGES_ROUTER_PORT = 3002;
-const NEXT_APP_ROUTER_PORT = 3003;
+const NEXT_PORT = 3002;
 const SVELTEKIT_3_PORT = 3004;
 
 interface BuildOutput {
@@ -194,22 +192,23 @@ async function buildAndCaptureSolidStart2(browser: Browser): Promise<BuildOutput
   }
 }
 
-async function buildAndCaptureNext(browser: Browser, examplePath: string, port: number, name: string): Promise<BuildOutput> {
-  console.log(`Building ${name} example...`);
-  exec('pnpm build', examplePath);
+async function buildAndCaptureNext(browser: Browser): Promise<{ app: BuildOutput; pages: BuildOutput }> {
+  console.log('Building Next example...');
+  exec('pnpm build', NEXT_EXAMPLE);
   
   let server: ChildProcess | null = null;
   try {
     // For Next.js, we start the production server
-    server = await startServer('pnpm start', examplePath, port, name, { PORT: String(port) });
+    server = await startServer('pnpm start', NEXT_EXAMPLE, NEXT_PORT, 'Next', { PORT: String(NEXT_PORT) });
     await sleep(2000); // Give server time to fully start
     
-    const html = await fetchHTML(`http://localhost:${port}`, browser);
+    const capture = async (route: string): Promise<BuildOutput> => {
+      const html = await fetchHTML(`http://localhost:${NEXT_PORT}${route}`, browser);
+      return { html: extractBodyContent(html), css: extractCSS(html) };
+    };
     
-    const css = extractCSS(html);
-    const bodyContent = extractBodyContent(html);
-    
-    return { html: bodyContent, css };
+    // `/` is served by the app router, `/pages-router` by the pages router
+    return { app: await capture('/'), pages: await capture('/pages-router') };
   } finally {
     if (server) {
       server.kill();
@@ -408,12 +407,9 @@ async function main() {
       console.warn('\n⚠ Solid capture failed:', err instanceof Error ? err.message : err);
     }
     
-    // Capture Next examples
-    console.log('\nCapturing Next Pages Router example...');
-    const nextPagesRouterOutput = await buildAndCaptureNext(browser, NEXT_PAGES_ROUTER_EXAMPLE, NEXT_PAGES_ROUTER_PORT, 'Next Pages Router');
-    
-    console.log('\nCapturing Next App Router example...');
-    const nextAppRouterOutput = await buildAndCaptureNext(browser, NEXT_APP_ROUTER_EXAMPLE, NEXT_APP_ROUTER_PORT, 'Next App Router');
+    // Capture the Next example (app router on `/`, pages router on `/pages-router`)
+    console.log('\nCapturing Next example...');
+    const { app: nextAppRouterOutput, pages: nextPagesRouterOutput } = await buildAndCaptureNext(browser);
     
     let cssMatchSolid = true;
     let htmlMatchSolid = true;

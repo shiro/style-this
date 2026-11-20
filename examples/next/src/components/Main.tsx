@@ -1,6 +1,5 @@
 import { css, mergeStyles } from "@style-this/core";
-import Counter, { counterColor } from "./Counter";
-import s from "./foo.css";
+import Counter, { counterColor } from "@/components/Counter";
 
 const ContainerStyle = css`
   display: flex;
@@ -13,10 +12,10 @@ const colorStyle = css`
 `;
 
 const highlightStyle = css`
-  color: crimson;
+  color: green;
 `;
 
-export default function MainComponent() {
+export default function Main() {
   return (
     <div className={`${ContainerStyle} Global__Main`}>
       <Counter />
@@ -27,3 +26,9 @@ export default function MainComponent() {
     </div>
   );
 }
+
+const _GlobalMain = css`
+  .Global__Main {
+    background: ${counterColor};
+  }
+`;

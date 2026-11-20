@@ -1,9 +1,9 @@
-'use client';
+"use client";
 import { css, extraClass } from "@style-this/core";
 import { styled } from "@style-this/react";
 import { useState } from "react";
-import { exportedColorA, exportedNumberA } from "./a";
-import { exportedColorB } from "./b";
+import { exportedColorA, exportedNumberA } from "@/components/a";
+import { exportedColorB } from "@/components/b";
 
 const spacing = 16;
 

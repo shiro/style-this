@@ -4,22 +4,18 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
-    "dev:webpack": "TURBOPACK=0 next dev",
-    "dev:turbopack": "TURBOPACK=1 next dev",
-    "dev:atomic": "ATOMIC=1 next dev",
-    "dev:turbopack:atomic": "TURBOPACK=1 ATOMIC=1 next dev",
+    "dev:webpack": "next dev --webpack",
     "build": "next build",
-    "build:webpack": "TURBOPACK=0 next build",
-    "build:turbopack": "TURBOPACK=1 next build",
+    "build:webpack": "next build --webpack",
     "start": "next start"
   },
   "dependencies": {
     "@style-this/core": "workspace:",
     "@style-this/next": "workspace:",
     "@style-this/react": "workspace:",
+    "next": "^16.4.6",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "next": "^16.2.12"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
