@@ -9,3 +9,9 @@ const b = css`
   color: blue;
   ${extraClass("baz")}
 `;
+
+const c = css`
+  .${a} {
+    color: green;
+  }
+`;

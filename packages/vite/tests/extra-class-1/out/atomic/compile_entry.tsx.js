@@ -1,13 +1,18 @@
-// /packages/vite/tests/extra-class-1/entry.tsx: {"a", "b", "css", "extraClass"}
+// /packages/vite/tests/extra-class-1/entry.tsx: {"a", "b", "c", "css", "extraClass"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let a = new String("a-4tu7c1 bar foo");
+let a = new String("a-encp6v");
 a.css = `background: red;
   `;
-let b = new String("b-9mz4di baz");
+let b = new String("b-4tu7c1");
 b.css = `color: blue;
   `;
+let c = new String("c-9mz4di");
+c.css = `.${a} {
+    color: green;
+  }`;
 return {
 "a": a.css,
-"b": b.css
+"b": b.css,
+"c": c.css
 };

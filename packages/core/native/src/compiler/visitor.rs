@@ -566,6 +566,65 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .push(stmt);
     }
 
+    /// In the virtual program, the variable only holds the generated class so it can be used in
+    /// other selectors (e.g. `.${Other} {}`), extra classes are only part of the runtime value.
+    fn insert_css_class_into_virtual_program(
+        &mut self,
+        span: Span,
+        variable_name: &str,
+        class_name: &str,
+    ) {
+        let variable_declarator = ast::build_variable_declarator(
+            self.ast_builder,
+            span,
+            variable_name,
+            ast::build_decorated_string(self.ast_builder, span, class_name),
+        );
+
+        self.insert_into_virtual_program(
+            VirtualProgramInsert::VariableDeclarator(variable_declarator),
+            None,
+        );
+
+        self.replacement_points.insert(
+            span,
+            Expression::Identifier(
+                self.ast_builder
+                    .alloc_identifier_reference(span, self.ast_builder.atom(variable_name)),
+            ),
+        );
+    }
+
+    /// Builds the runtime value of a `css` template, atomic mode references the class list
+    /// exported by the `.style-this.js` module (`_styleThisClasses._styleThis_xxx`), which also
+    /// includes the extra classes.
+    fn build_css_class_value(
+        &self,
+        span: Span,
+        variable_name: &str,
+        class_name: &str,
+        extra_classes: &BTreeSet<String>,
+    ) -> Expression<'alloc> {
+        if self.atomic {
+            return Expression::StaticMemberExpression(
+                self.ast_builder.alloc_static_member_expression(
+                    span,
+                    Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                        span,
+                        self.ast_builder.atom("_styleThisClasses"),
+                    )),
+                    self.ast_builder
+                        .identifier_name(span, self.ast_builder.atom(variable_name)),
+                    false,
+                ),
+            );
+        }
+
+        let mut class_list = vec![class_name];
+        class_list.extend(extra_classes.iter().map(String::as_str));
+        ast::build_string(self.ast_builder, span, &class_list.join(" "))
+    }
+
     /// extracts extraClass("a b c") calls from template expressions
     fn extract_extra_classes(&self, it: &TaggedTemplateExpression<'alloc>) -> BTreeSet<String> {
         let mut extra_classes = BTreeSet::new();
@@ -954,79 +1013,18 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         extra_classes.clone(),
                     );
 
-                    let mut full_class_list = vec![class_name.clone()];
-                    full_class_list.extend(extra_classes.iter().cloned());
-                    let full_class_string = full_class_list.join(" ");
+                    self.insert_css_class_into_virtual_program(
+                        span,
+                        &resolved_variable_name,
+                        &class_name,
+                    );
 
-                    if self.atomic {
-                        // Atomic mode: In the virtual program, the variable holds the non-atomic
-                        // class so it can be used in other selectors (e.g. `.${Other} {}`), the
-                        // marker rule keeps that class in the CSS
-                        let variable_declarator = ast::build_variable_declarator(
-                            self.ast_builder,
-                            span,
-                            &resolved_variable_name,
-                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
-                        );
-
-                        self.insert_into_virtual_program(
-                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                            None,
-                        );
-
-                        self.replacement_points.insert(
-                            span,
-                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.ast_builder.atom(&resolved_variable_name),
-                            )),
-                        );
-
-                        // Build expression: _styleThisClasses._styleThis_xxx
-                        let member_expr = Expression::StaticMemberExpression(
-                            self.ast_builder.alloc_static_member_expression(
-                                span,
-                                Expression::Identifier(
-                                    self.ast_builder.alloc_identifier_reference(
-                                        span,
-                                        self.ast_builder.atom("_styleThisClasses"),
-                                    ),
-                                ),
-                                self.ast_builder.identifier_name(
-                                    span,
-                                    self.ast_builder.atom(&resolved_variable_name),
-                                ),
-                                false,
-                            ),
-                        );
-
-                        // In atomic mode, extra classes are included in the exported variable,
-                        // so we just use the member expression directly
-                        *it = member_expr;
-                    } else {
-                        // Non-atomic mode: inline the class name string
-                        let variable_declarator = ast::build_variable_declarator(
-                            self.ast_builder,
-                            span,
-                            &resolved_variable_name,
-                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
-                        );
-
-                        self.insert_into_virtual_program(
-                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                            None,
-                        );
-
-                        self.replacement_points.insert(
-                            span,
-                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.ast_builder.atom(&resolved_variable_name),
-                            )),
-                        );
-
-                        *it = ast::build_string(self.ast_builder, span, &full_class_string);
-                    }
+                    *it = self.build_css_class_value(
+                        span,
+                        &resolved_variable_name,
+                        &class_name,
+                        &extra_classes,
+                    );
                 }
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
@@ -1134,79 +1132,18 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         extra_classes.clone(),
                     );
 
-                    let mut full_class_list = vec![class_name.clone()];
-                    full_class_list.extend(extra_classes.iter().cloned());
-                    let full_class_string = full_class_list.join(" ");
+                    self.insert_css_class_into_virtual_program(
+                        span,
+                        &resolved_variable_name,
+                        &class_name,
+                    );
 
-                    if self.atomic {
-                        // Atomic mode: In the virtual program, the variable holds the non-atomic
-                        // class so it can be used in other selectors (e.g. `.${Other} {}`), the
-                        // marker rule keeps that class in the CSS
-                        let variable_declarator = ast::build_variable_declarator(
-                            self.ast_builder,
-                            span,
-                            &resolved_variable_name,
-                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
-                        );
-
-                        self.insert_into_virtual_program(
-                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                            None,
-                        );
-
-                        // In the main program, reference the imported atomic class from .style-this.js module
-                        // Build expression: _styleThisClasses._styleThis_xxx
-                        let member_expr = Expression::StaticMemberExpression(
-                            self.ast_builder.alloc_static_member_expression(
-                                span,
-                                Expression::Identifier(
-                                    self.ast_builder.alloc_identifier_reference(
-                                        span,
-                                        self.ast_builder.atom("_styleThisClasses"),
-                                    ),
-                                ),
-                                self.ast_builder.identifier_name(
-                                    span,
-                                    self.ast_builder.atom(&resolved_variable_name),
-                                ),
-                                false,
-                            ),
-                        );
-
-                        // In atomic mode, extra classes are handled separately
-                        *init = member_expr;
-
-                        self.replacement_points.insert(
-                            span,
-                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.ast_builder.atom(&resolved_variable_name),
-                            )),
-                        );
-                    } else {
-                        // Non-atomic mode: inline the class name string
-                        let variable_declarator = ast::build_variable_declarator(
-                            self.ast_builder,
-                            span,
-                            &resolved_variable_name,
-                            ast::build_decorated_string(self.ast_builder, span, &full_class_string),
-                        );
-
-                        self.insert_into_virtual_program(
-                            VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                            None,
-                        );
-
-                        self.replacement_points.insert(
-                            span,
-                            Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.ast_builder.atom(&resolved_variable_name),
-                            )),
-                        );
-
-                        *init = ast::build_string(self.ast_builder, span, &full_class_string);
-                    }
+                    *init = self.build_css_class_value(
+                        span,
+                        &resolved_variable_name,
+                        &class_name,
+                        &extra_classes,
+                    );
                 }
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
