@@ -50,25 +50,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-## Atomic mode
-
-[Atomic mode](/guides/atomic-css/) is enabled with the `ATOMIC` environment variable:
-
-```json title="package.json"
-{
-  "scripts": {
-    "dev": "next dev",
-    "dev:atomic": "ATOMIC=1 next dev"
-  }
-}
-```
-
 ## Limitations
 
 - With turbopack only `.tsx` files are transformed. With webpack `.ts`, `.tsx`, `.js`, `.jsx` and
   `.mjs` files outside `node_modules` are.
 - `middleware.ts` is skipped under turbopack.
 - `withStyleThis` currently takes no style-this specific options.
+- Requires Next.js 16.2 or newer.
+- [Atomic mode](/guides/atomic-css/) isn't supported yet.
 
 Examples:
 [`next-app-router`](https://github.com/shiro/style-this/tree/master/examples/next-app-router),

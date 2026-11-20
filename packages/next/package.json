@@ -4,7 +4,8 @@
   "description": "CSS-in-JS library for the modern web - nextjs plugin",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "style-this.*.css"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -15,6 +16,7 @@
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
+    "./style-this.atomic.css": "./style-this.atomic.css",
     "./package.json": "./package.json"
   },
   "scripts": {

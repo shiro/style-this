@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import type * as NextServer from "next/dist/server/config-shared";
 import type * as Webpack from "webpack";
 
-import { regexLinariaCSS, regexLinariaCSSQuery } from "./loaders/consts";
+import { noopAtomicCssFile, regexFilepathQuery, regexNoopCss } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,7 +27,7 @@ function modifyCssLoaderConfig(rules: Webpack.RuleSetRule[]) {
           exportName,
           ...rest
         ) => {
-          if (regexLinariaCSSQuery.test(context.resourceQuery)) {
+          if (regexNoopCss.test(context.resourcePath)) {
             return exportName;
           }
           return nextGetLocalIdent(context, _, exportName, ...rest);
@@ -54,11 +54,17 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
     if (config.module?.rules && config.plugins) {
       modifyCssLoaderConfig(config.module.rules as Webpack.RuleSetRule[]);
 
+      config.resolve ??= {};
+      config.resolve.alias = {
+        ...(config.resolve.alias as Record<string, string>),
+        "@style-this/core/atomic$": noopAtomicCssFile,
+      };
+
       config.module.rules.push({
-        test: regexLinariaCSS,
+        test: regexNoopCss,
+        resourceQuery: regexFilepathQuery,
         loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"),
         options: {},
-        exclude: /node_modules/,
       });
 
       config.module.rules.push({

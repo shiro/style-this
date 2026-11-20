@@ -1,41 +1,38 @@
 import type { RawLoaderDefinitionFunction } from "webpack";
-import { cssFiles, dependencyStore } from "../shared";
-type Loader = RawLoaderDefinitionFunction;
+import { readFile } from "fs/promises";
+import { cssFiles } from "../shared";
+import { cssExtension, transformFile, type Bundler } from "./transform";
 
-const cssLoader: Loader = function webpack5LoaderPlugin(code, inputSourceMap) {
+/**
+ * Serves the CSS of the file in `?filepath=`. Turbopack runs loaders in a pool of processes, so the
+ * CSS may have been evaluated in another process, the file is transformed again if this process has
+ * no (or outdated) CSS for it.
+ */
+const cssLoader: RawLoaderDefinitionFunction<{ bundler?: Bundler }> = function () {
   const callback = this.async();
   // TODO remove this when done
   this.cacheable(false);
 
-  let filepath = this.resourcePath;
+  const bundler = this.getOptions().bundler ?? "webpack";
+  // the loader rules only match imports with `?filepath=`
+  const filepath = new URLSearchParams(this.resourceQuery).get("filepath")!;
+  const cssFilepath = `${filepath}.${cssExtension}`;
 
-  if (this.resourceQuery.startsWith("?filepath=")) {
-    filepath = this.resourceQuery.slice("?filepath=".length).split("&")[0];
-  }
+  (async () => {
+    this.addDependency(filepath);
+    const code = await readFile(filepath, "utf-8").catch(() => undefined);
 
-  const css = cssFiles.get(`${filepath}.css`);
-
-  // this.clearDependencies();
-  // this.addDependency(filepath);
-
-  if (!css) {
-    // If CSS is not in cache yet, return empty string
-    // The CSS will be injected during runtime
-    callback(null, "");
-    return;
-  }
-
-  // Handle the promise-based CSS entry
-  Promise.resolve(css).then(
-    (resolvedCss) => {
-      if (resolvedCss instanceof Error) callback(resolvedCss);
-      else callback(null, resolvedCss);
-    },
-    (error) => {
-      callback(error);
+    if (code !== undefined && cssFiles.get(cssFilepath)?.code !== code) {
+      if (!(await transformFile(this, bundler, code, filepath))) return "";
     }
+
+    const css = await cssFiles.get(cssFilepath);
+    if (css instanceof Error) throw css;
+    return css ?? "";
+  })().then(
+    (css) => callback(null, css),
+    (err) => callback(err),
   );
 };
 
 export default cssLoader;
-

@@ -8,15 +8,17 @@ import { cssFiles } from "../src/shared";
 
 type LoaderResult = { err: Error | null | undefined; result?: string };
 
-const runLoader = (loader: Function, code: string, resourcePath: string) =>
+const runLoader = (loader: Function, code: string, resource: string) =>
   new Promise<LoaderResult>((resolve) => {
     const callback = (err: Error | null | undefined, result?: string | Buffer) =>
       resolve({ err, result: result?.toString() });
+    const queryStart = resource.indexOf("?");
     loader.call(
       {
-        resourcePath,
-        resourceQuery: "",
+        resourcePath: queryStart === -1 ? resource : resource.slice(0, queryStart),
+        resourceQuery: queryStart === -1 ? "" : resource.slice(queryStart),
         async: () => callback,
+        getOptions: () => ({}),
         callback,
         cacheable: () => {},
         addDependency: () => {},
@@ -43,6 +45,12 @@ export const cls = css\`
 
 const SYNTAX_ERROR = "\nconst = ;\n";
 
+/** The CSS import the transform inserted into `filepath`, as a resource for the CSS loader. */
+const cssImport = (filepath: string, code: string) => {
+  const source = code.match(/import "([^"]+\?filepath=[^"]+)"/)![1];
+  return path.resolve(path.dirname(filepath), source);
+};
+
 describe.each([
   ["webpack", webpackTransformLoader],
   ["turbopack", turbopackTransformLoader],
@@ -61,15 +69,17 @@ describe("next turbopack transform loader errors", () => {
   it("evaluates the CSS once a syntax error is fixed", async () => {
     const filepath = "/tmp/style-this-turbopack-recover.tsx";
     const transform = (code: string) => runLoader(turbopackTransformLoader, code, filepath);
-    const css = () => runLoader(cssLoader, "", filepath);
+    const css = async (code: string) => {
+      const { err, result } = await transform(code);
+      expect(err).toBeNull();
+      return runLoader(cssLoader, "", cssImport(filepath, result!));
+    };
 
     expect((await transform(styled("red") + SYNTAX_ERROR)).err).toBeInstanceOf(Error);
-    expect((await transform(styled("red"))).err).toBeNull();
-    expect(await css()).toEqual({ err: null, result: expect.stringContaining("color: red") });
+    expect(await css(styled("red"))).toEqual({ err: null, result: expect.stringContaining("color: red") });
 
     // a failure after a cached evaluation must not keep the outdated CSS
     expect((await transform(styled("blue") + SYNTAX_ERROR)).err).toBeInstanceOf(Error);
-    expect((await transform(styled("blue"))).err).toBeNull();
-    expect(await css()).toEqual({ err: null, result: expect.stringContaining("color: blue") });
+    expect(await css(styled("blue"))).toEqual({ err: null, result: expect.stringContaining("color: blue") });
   });
 });

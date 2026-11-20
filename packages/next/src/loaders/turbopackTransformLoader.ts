@@ -1,99 +1,24 @@
-import path from "path";
-import { initializeStyleThis } from "@style-this/core/compiler";
-import { cacheRegistry, cssFiles } from "../shared";
-import { dependencyStore } from "../shared";
-import { Transformer } from "@style-this/core/compiler";
 import type { RawLoaderDefinitionFunction } from "webpack";
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
-import { makeLoadFile } from "./shared";
+import { dependencyStore } from "../shared";
+import { transformFile } from "./transform";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-type LoaderType = RawLoaderDefinitionFunction<{}>;
-
-let styleThis: Transformer;
-const filesContainingStyledTemplates = new Set<string>();
-const cssExtension = "css";
-const mocks = new Map<string, string>();
-
-const turbopackTransformLoader: LoaderType = function (code, inputSourceMap) {
-  // tell Webpack this loader is async
+const turbopackTransformLoader: RawLoaderDefinitionFunction<{}> = function (code, inputSourceMap) {
   const callback = this.async();
+  const filepath = this.resourcePath;
 
-  const loadFile = makeLoadFile(this, mocks);
-
-  (async () => {
-    if (!styleThis) {
-      await initializeStyleThis();
-      const requireFn = createRequire(import.meta.url);
-      styleThis = new Transformer({
-        cwd: process.cwd(),
-        ignoredImports: {},
-        loadFile,
-        createRequire: requireFn,
-        cacheRegistry,
-        cssExtension,
-        wrapSelectorsWithGlobal: true,
-        useRequire: true,
-        atomic: process.env.ATOMIC === '1',
-      });
-    }
-
-    const filepath = this.resourcePath;
-    const qualifier = filepath.endsWith("pages/_app.tsx") ? "global" : "module";
-    const noopFilepath = path.resolve(
-      __dirname,
-      `../../style-this.${qualifier}.css`,
-    );
-    
-    // Create CSS cache entry for this file
-    const cssFilepath = `${filepath}.${cssExtension}`;
-    const skipCssEval = cssFiles.has(cssFilepath);
-    
-    if (!skipCssEval) {
-      let resolve: import("@style-this/core/compiler").CssCachEntry["resolve"] | undefined;
-      const entry = new Promise((_resolve, _reject) => {
-        resolve = (_css: string | Error, _sourcemapData?: any, _filepath?: string) => {
-          _resolve(_css);
-        };
-      }) as import("@style-this/core/compiler").CssCachEntry;
-      entry.resolve = resolve!;
-      entry.code = code.toString();
-      
-      cssFiles.set(cssFilepath, entry);
-    }
-
-    const transformedResult = await styleThis.transform(
-      code.toString(),
-      filepath,
-      skipCssEval,
-    );
-
-    if (!transformedResult) {
-      filesContainingStyledTemplates.delete(filepath);
-      dependencyStore.delete(filepath);
-      this.callback(null, code, inputSourceMap);
-      return;
-    }
-
-    filesContainingStyledTemplates.add(filepath);
-    dependencyStore.set(filepath, this.getDependencies());
-
-    this.addDependency(noopFilepath);
-
-    this.callback(
-      null,
-      transformedResult.code,
+  transformFile(this, "turbopack", code.toString(), filepath).then(
+    (result) => {
+      if (!result) {
+        dependencyStore.delete(filepath);
+        callback(null, code, inputSourceMap);
+        return;
+      }
+      dependencyStore.set(filepath, this.getDependencies());
       // TODO sourcemap
-    );
-  })().catch((err) => {
-    // the compiler resolves the stored CSS entry with the error, drop it or later transforms would
-    // skip CSS evaluation and keep serving the error
-    cssFiles.delete(`${this.resourcePath}.${cssExtension}`);
-    callback(err);
-  });
+      callback(null, result.code);
+    },
+    (err) => callback(err),
+  );
 };
 
 export default turbopackTransformLoader;

@@ -16,6 +16,6 @@ export default withStyleThis({
 });
 ```
 
-Set `ATOMIC=1` to enable atomic mode.
+Requires Next.js 16.2 or newer. Atomic mode isn't supported yet.
 
 Documentation: [style-this.usagi.io/frameworks/next/](https://style-this.usagi.io/frameworks/next/)

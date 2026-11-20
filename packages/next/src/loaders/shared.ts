@@ -34,6 +34,7 @@ export const makeLoadFile = (ctx: LoaderCtx, mocks: Map<string, string>) => {
 
   const loadFile = async (
     importSourceId: string,
+    importer: string,
   ): Promise<[string, string]> => {
     if (mocks.has(importSourceId)) {
       const filepath = require.resolve(importSourceId);
@@ -41,7 +42,7 @@ export const makeLoadFile = (ctx: LoaderCtx, mocks: Map<string, string>) => {
     }
 
     let filepath =
-      (await resolve(importSourceId, "./index.ts")) ?? importSourceId;
+      (await resolve(importSourceId, importer)) ?? importSourceId;
 
     if (
       !filepath.startsWith(`${cwd}/node_modules/`) &&
