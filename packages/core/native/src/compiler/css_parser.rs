@@ -129,23 +129,23 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     let mut brace_depth = 0;
     let mut paren_depth = 0usize;
     let mut string_char: Option<char> = None;
-    let mut prev_char = ' ';
+    let mut escaped = false;
 
     for (idx, ch) in css.char_indices() {
-        let escaped = prev_char == '\\';
-        prev_char = ch;
+        let was_escaped = escaped;
+        escaped = ch == '\\' && !escaped;
 
         if let Some(quote) = string_char {
-            if ch == quote && !escaped {
+            if ch == quote && !was_escaped {
                 string_char = None;
             }
             continue;
         }
 
         match ch {
-            '\'' | '"' if !escaped => string_char = Some(ch),
-            '(' if !escaped => paren_depth += 1,
-            ')' if !escaped => paren_depth = paren_depth.saturating_sub(1),
+            '\'' | '"' if !was_escaped => string_char = Some(ch),
+            '(' if !was_escaped => paren_depth += 1,
+            ')' if !was_escaped => paren_depth = paren_depth.saturating_sub(1),
             '{' if paren_depth == 0 => brace_depth += 1,
             '}' if paren_depth == 0 => {
                 brace_depth -= 1;
@@ -414,37 +414,37 @@ mod tests {
     }
 
     #[test]
-    fn content_with_braces_in_string() {
-        // Test that braces inside string values don't confuse the tokenizer
-        let input = indoc! {"
-            content: 'something { nice';
-        "};
-        let expected_atomics = HashSet::from(["content: 'something { nice'".to_string()]);
-        let expected_non_atomizable = None;
-
-        let result = parse_css(input);
-
-        assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
-        assert_eq!(result.non_atomizable, expected_non_atomizable);
-    }
-
-    #[test]
-    fn content_with_braces_in_double_quotes() {
-        // Test with double quotes and braces
+    fn strings_and_escapes() {
         let input = indoc! {r#"
-            content: "before { after }";
+            content: 'something { nice';
+            quotes: "a \" ; }" '\';';
+            content: "\\";
+            font-family: '\\'; /* ; */
             color: red;
+            &:hover {
+              color: blue;
+            }
         "#};
-        let expected_atomics = HashSet::from([
-            r#"content: "before { after }""#.to_string(),
-            "color: red".to_string(),
-        ]);
-        let expected_non_atomizable = None;
-
         let result = parse_css(input);
 
-        assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
-        assert_eq!(result.non_atomizable, expected_non_atomizable);
+        assert_eq!(
+            result.atomizable,
+            vec![
+                "content: 'something { nice'".to_string(),
+                r#"quotes: "a \" ; }" '\';'"#.to_string(),
+                r#"content: "\\""#.to_string(),
+                r"font-family: '\\'".to_string(),
+                "color: red".to_string(),
+            ]
+        );
+        assert_eq!(
+            result.non_atomizable.as_deref(),
+            Some(indoc! {"
+                &:hover {
+                  color: blue;
+                }
+            "})
+        );
     }
 
     #[test]
