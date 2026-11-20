@@ -86,7 +86,8 @@ describe.each([false, true])("circular imports (atomic: %s)", (atomic) => {
     `circular import of '${path(to)}' from '${path(from)}', its values can't be used before it's evaluated`;
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "style-this-circular-imports-"));
+    // quotes and backslashes in paths need to be escaped in the evaluated programs
+    dir = await mkdtemp(join(tmpdir(), `style-this-circular-imports-'"\\-`));
   });
 
   afterEach(async () => {

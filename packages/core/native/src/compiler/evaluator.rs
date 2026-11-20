@@ -419,14 +419,17 @@ fn evaluate_dependencies<'alloc>(
                     let cache_ref = &transformer.value_cache_ref;
                     let module_source = if import_chain.contains(&remote_filepath) {
                         // circular imports aren't evaluated, see below
+                        let message = format!(
+                            "circular import of '{remote_filepath}' from '{program_filepath}', its values can't be used before it's evaluated"
+                        );
                         format!(
-                            "({cache_ref}[\"{remote_filepath}\"] ?? (() => {{ throw new Error(\"circular import of '{remote_filepath}' from '{program_filepath}', its values can't be used before it's evaluated\"); }})())"
+                            "({cache_ref}[{remote_filepath:?}] ?? (() => {{ throw new Error({message:?}); }})())"
                         )
                     } else {
-                        format!("{cache_ref}[\"{remote_filepath}\"]")
+                        format!("{cache_ref}[{remote_filepath:?}]")
                     };
                     let cache_source = if let Some(remote_name) = &remote_name {
-                        format!("{module_source}[\"{remote_name}\"]")
+                        format!("{module_source}[{remote_name:?}]")
                     } else {
                         module_source
                     };
@@ -696,7 +699,7 @@ fn insert_virtual_css_import<'alloc>(
 /// JS expression of the object evaluated exports of `filepath` are stored in.
 fn value_store(transformer: &Transformer, filepath: &str) -> String {
     let cache_ref = &transformer.value_cache_ref;
-    format!("global.{cache_ref}[\"{filepath}\"]")
+    format!("global.{cache_ref}[{filepath:?}]")
 }
 
 pub(crate) struct ProgramSlice<'alloc> {
