@@ -1030,18 +1030,12 @@ pub async fn evaluate_program<'alloc>(
     for statement in dependency_statements.into_iter().flatten() {
         eval_program.body.insert(0, statement);
     }
-    let mut value_cache = value_cache_guard.lock().await;
-
-    // Always populate value cache with exported idents, even when skipping CSS eval
-    // This is needed for dependency tracking to know what exports a file has
-    if !exported_idents.is_empty() {
-        value_cache.extend(exported_idents.keys().cloned());
-    }
-
-    // After registering imports and exports, if we're skipping CSS evaluation, return early
+    // the dependencies only had to register their imports. The exports aren't evaluated, so they
+    // mustn't be cached, importers would read them from the store before it's populated
     if skip_css_eval {
         return Ok(());
     }
+    let mut value_cache = value_cache_guard.lock().await;
 
     transpile_ts_to_js(allocator, &mut eval_program);
 
