@@ -136,11 +136,28 @@ import { rounded } from "./barrel";
 
 export const sStyle = ${css("border-radius: ${rounded};")};
 `,
+  "ink.ts": `export const ink = "black";\n`,
+  "brand.ts": `export * from "./ink";
+export const accent = "red";
+`,
+  "star.ts": `export * from "./ink";
+export * as brand from "./brand";
+`,
+  "t.tsx": `${cssImport}
+import { ink } from "./star";
+
+export const tStyle = ${css("color: ${ink};")};
+`,
+  "u.tsx": `${cssImport}
+import { brand } from "./star";
+
+export const uStyle = ${css("color: ${brand.accent};\n  background: ${brand.ink};")};
+`,
 };
 
 const entrypoints = [
   "b.tsx", "c.tsx", "d.tsx", "e.tsx", "f.tsx", "h.tsx", "i.tsx", "j.tsx", "k.tsx", "l.tsx", "nav.tsx", "header.tsx",
-  "w.tsx", "r.tsx", "s.tsx",
+  "w.tsx", "r.tsx", "s.tsx", "t.tsx", "u.tsx",
 ];
 
 const createEnvironment = (name = "client") => {
@@ -312,6 +329,19 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
     for (const name of ["r.tsx", "s.tsx"]) await transform(name);
     expect(await cssOf("r.tsx")).toContain("color: blue");
     expect(await cssOf("s.tsx")).toContain("border-radius: 4px");
+  });
+
+  test("star re-exports invalidate importers of the changed exports", async () => {
+    expect(await edit("ink.ts", (code) => code.replace("black", "gray"))).toEqual(
+      ["brand.ts", "ink.ts", "star.ts", "t.tsx", "u.tsx"],
+    );
+    for (const name of ["t.tsx", "u.tsx"]) await transform(name);
+    expect(await cssOf("t.tsx")).toContain("color: gray");
+    expect(await cssOf("u.tsx")).toContain("background: gray");
+
+    expect(await edit("brand.ts", (code) => code.replace("red", "blue"))).toEqual(["brand.ts", "star.ts", "u.tsx"]);
+    await transform("u.tsx");
+    expect(await cssOf("u.tsx")).toContain("color: blue");
   });
 
   test("syntax errors while editing invalidate conservatively", async () => {

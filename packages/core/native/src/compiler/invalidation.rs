@@ -338,15 +338,19 @@ impl Transformer {
         let old_slices = slice_exports(self, filepath, old_code, &exports);
         let slices = slice_exports(self, filepath, code, &exports);
 
-        ChangedExports::Names(
-            exports
-                .into_iter()
-                .filter(|export| match (old_slices.get(export), slices.get(export)) {
-                    (Some(old_slice), Some(slice)) => old_slice != slice,
-                    _ => true,
-                })
-                .collect(),
-        )
+        let mut changed: HashSet<String> = exports
+            .iter()
+            .filter(|export| match (old_slices.get(*export), slices.get(*export)) {
+                (Some(old_slice), Some(slice)) => old_slice != slice,
+                _ => true,
+            })
+            .cloned()
+            .collect();
+        // the slice of all exports only covers the ones of `export * from`
+        if !changed.is_empty() && exports.contains(STAR_IMPORT) {
+            changed.insert(STAR_IMPORT.to_string());
+        }
+        ChangedExports::Names(changed)
     }
 
     /// Exports of `importer` that depend on the changed exports of `source`

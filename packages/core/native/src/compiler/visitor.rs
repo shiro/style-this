@@ -1,5 +1,5 @@
 use super::cache::CSS_CLASSNAME_CACHE;
-use super::dependency_tracker::DEFAULT_EXPORT;
+use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::error::TransformError;
 use super::types::{CssVariableIdentifier, VirtualProgramInsert};
 use crate::PREFIX;
@@ -13,9 +13,9 @@ use crate::utils::{
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
-    BindingPatternKind, Declaration, ExportDefaultDeclaration, ExportDefaultDeclarationKind,
-    Expression, ImportDeclarationSpecifier, Program, Statement, TaggedTemplateExpression,
-    VariableDeclarationKind, VariableDeclarator,
+    BindingPatternKind, ChainElement, Declaration, ExportDefaultDeclaration,
+    ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, LogicalOperator, Program,
+    Statement, TaggedTemplateExpression, VariableDeclarationKind, VariableDeclarator,
 };
 use oxc_ast_visit::VisitMut;
 use oxc_semantic::ScopeFlags;
@@ -127,11 +127,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         HashMap<String, String>,
         Program<'alloc>,
     ) {
-        let namespace_imports_by_module: HashMap<String, HashSet<String>> = self
-            .namespace_imports
-            .into_iter()
-            .map(|(_, (module_id, referenced_idents))| (module_id, referenced_idents))
-            .collect();
+        let mut namespace_imports_by_module: HashMap<String, HashSet<String>> = HashMap::new();
+        for (module_id, referenced_idents) in self.namespace_imports.into_values() {
+            namespace_imports_by_module
+                .entry(module_id)
+                .or_default()
+                .extend(referenced_idents);
+        }
 
         // since we collected variable names buttom-up we reverse
         self.css_variable_identifiers.reverse();
@@ -621,12 +623,59 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         };
     }
 
-    /// Handles `export { x as y }` and `export { x as y } from "./b"`, their locals are referenced
-    /// up front since the declarations can come after the export.
+    /// Handles `export { x as y }`, `export { x as y } from "./b"`, `export * as y from "./b"` and
+    /// `export * from "./b"`, their locals are referenced up front since the declarations can come
+    /// after the export.
+    ///
+    /// Referenced names that aren't exported by the program itself are evaluated in all
+    /// `export * from` modules, the first module exporting a name provides it.
+    ///
+    /// `STAR_IMPORT` requests all exports, for namespaces that are used as a whole.
     fn reference_export_specifiers(&mut self, statements: &[Statement<'alloc>]) {
         let declared_values = program_declared_values(statements);
+        let exported_names = program_exported_names(statements);
+        let requested = self.referenced_idents.first_mut().unwrap();
+        if requested.contains(STAR_IMPORT) {
+            requested.extend(exported_names.iter().cloned());
+        }
+        let mut star_reexports = vec![];
+        let forwarded_names: BTreeSet<String> = requested
+            .difference(&exported_names)
+            .filter(|name| *name != DEFAULT_EXPORT)
+            .cloned()
+            .collect();
 
         for stmt in statements {
+            if let Statement::ExportAllDeclaration(export) = stmt
+                && !export.export_kind.is_type()
+            {
+                let local = utils::reexport_local_name(export.span);
+                match &export.exported {
+                    Some(exported) => {
+                        let exported = match exported.name().as_str() {
+                            "default" => DEFAULT_EXPORT.to_string(),
+                            name => name.to_string(),
+                        };
+                        if self.referenced_idents.first().unwrap().contains(&exported) {
+                            self.referenced_idents
+                                .first_mut()
+                                .unwrap()
+                                .insert(local.clone());
+                            self.namespace_imports.insert(
+                                local.clone(),
+                                (
+                                    export.source.value.to_string(),
+                                    HashSet::from([STAR_IMPORT.to_string()]),
+                                ),
+                            );
+                            self.exported_idents.insert(exported, local);
+                        }
+                    }
+                    None => star_reexports.push((local, export.source.value.to_string())),
+                }
+                continue;
+            }
+
             let Statement::ExportNamedDeclaration(export) = stmt else {
                 continue;
             };
@@ -646,12 +695,18 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 }
 
                 let local = if export.source.is_some() {
-                    utils::reexport_local_name(specifier)
+                    utils::reexport_local_name(specifier.span)
                 } else {
                     let local = specifier.local.name();
                     // e.g. types, which don't exist at runtime
                     if !declared_values.contains(local.as_str()) {
                         continue;
+                    }
+                    // e.g. `import * as ns from "./b"; export { ns };`
+                    if let Some((_, remote_referenced_idents)) =
+                        self.namespace_imports.get_mut(local.as_str())
+                    {
+                        remote_referenced_idents.insert(STAR_IMPORT.to_string());
                     }
                     local.to_string()
                 };
@@ -662,6 +717,84 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     .insert(local.clone());
                 self.exported_idents.insert(exported, local);
             }
+        }
+
+        if star_reexports.is_empty() || forwarded_names.is_empty() {
+            return;
+        }
+
+        for (namespace, module_id) in &star_reexports {
+            self.referenced_idents
+                .first_mut()
+                .unwrap()
+                .insert(namespace.clone());
+            self.namespace_imports.insert(
+                namespace.clone(),
+                (module_id.clone(), forwarded_names.iter().cloned().collect()),
+            );
+        }
+
+        // `const local = namespace_1?.["name"] ?? namespace_2?.["name"];`, all exports are
+        // `const local = { ...namespace_2, ...namespace_1 };`
+        let span = Span::default();
+        for (idx, name) in forwarded_names.into_iter().enumerate() {
+            let local = format!("{PREFIX}_star_reexport_{idx}");
+            let value = if name == STAR_IMPORT {
+                self.ast_builder.expression_object(
+                    span,
+                    self.ast_builder
+                        .vec_from_iter(star_reexports.iter().rev().map(|(namespace, _)| {
+                            self.ast_builder.object_property_kind_spread_property(
+                                span,
+                                ast::build_identifier(self.ast_builder, span, namespace),
+                            )
+                        })),
+                )
+            } else {
+                star_reexports
+                    .iter()
+                    .map(|(namespace, _)| {
+                        Expression::ChainExpression(self.ast_builder.alloc_chain_expression(
+                            span,
+                            ChainElement::ComputedMemberExpression(
+                                self.ast_builder.alloc_computed_member_expression(
+                                    span,
+                                    ast::build_identifier(self.ast_builder, span, namespace),
+                                    ast::build_string(self.ast_builder, span, &name),
+                                    true,
+                                ),
+                            ),
+                        ))
+                    })
+                    .reduce(|left, right| {
+                        self.ast_builder.expression_logical(
+                            span,
+                            left,
+                            LogicalOperator::Coalesce,
+                            right,
+                        )
+                    })
+                    .unwrap()
+            };
+
+            self.tmp_program_statement_buffer.last_mut().unwrap().push(
+                Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                    span,
+                    VariableDeclarationKind::Const,
+                    self.ast_builder.vec1(ast::build_variable_declarator(
+                        self.ast_builder,
+                        span,
+                        &local,
+                        value,
+                    )),
+                    false,
+                )),
+            );
+            self.referenced_idents
+                .first_mut()
+                .unwrap()
+                .insert(local.clone());
+            self.exported_idents.insert(name, local);
         }
     }
 
@@ -1399,5 +1532,36 @@ fn program_declared_values(statements: &[Statement]) -> HashSet<String> {
         }
     }
 
+    names
+}
+
+/// Names the program exports itself, i.e. not through `export * from`.
+fn program_exported_names(statements: &[Statement]) -> HashSet<String> {
+    let mut names = HashSet::new();
+
+    for stmt in statements {
+        match stmt {
+            Statement::ExportDefaultDeclaration(_) => {
+                names.insert(DEFAULT_EXPORT.to_string());
+            }
+            Statement::ExportAllDeclaration(export) => {
+                names.extend(export.exported.as_ref().map(|name| name.name().to_string()));
+            }
+            Statement::ExportNamedDeclaration(export) => {
+                names.extend(
+                    export
+                        .specifiers
+                        .iter()
+                        .map(|specifier| specifier.exported.name().to_string()),
+                );
+                names.extend(program_declared_values(std::slice::from_ref(stmt)));
+            }
+            _ => {}
+        }
+    }
+
+    if names.remove("default") {
+        names.insert(DEFAULT_EXPORT.to_string());
+    }
     names
 }

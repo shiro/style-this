@@ -126,7 +126,6 @@ fn evaluate_dependencies<'alloc>(
     transformer: &Transformer,
     referenced_idents: &HashSet<String>,
     namespace_imports: &mut HashMap<String, HashSet<String>>,
-    eval_program: Rc<RefCell<Program<'alloc>>>,
     program_filepath: String,
     cwd: &str,
     temporary_programs: Rc<RefCell<HashMap<String, String>>>,
@@ -134,7 +133,10 @@ fn evaluate_dependencies<'alloc>(
     import_chain: Rc<Vec<String>>,
 ) -> Vec<
     std::pin::Pin<
-        std::boxed::Box<dyn futures::future::Future<Output = Result<(), TransformError>> + 'alloc>,
+        std::boxed::Box<
+            dyn futures::future::Future<Output = Result<Vec<Statement<'alloc>>, TransformError>>
+                + 'alloc,
+        >,
     >,
 > {
     let mut futures = vec![];
@@ -186,9 +188,10 @@ fn evaluate_dependencies<'alloc>(
         }
 
         let future: std::pin::Pin<
-            std::boxed::Box<dyn futures::future::Future<Output = Result<(), TransformError>>>,
+            std::boxed::Box<
+                dyn futures::future::Future<Output = Result<Vec<Statement<'alloc>>, TransformError>>,
+            >,
         > = {
-            let tmp_program = eval_program.clone();
             let program_filepath = program_filepath.clone();
             let specifiers = specifiers.clone_in(ast_builder.allocator);
             let referenced_idents = referenced_idents.clone();
@@ -199,6 +202,10 @@ fn evaluate_dependencies<'alloc>(
                 unsafe { std::mem::transmute::<&Transformer, &'static Transformer>(transformer) };
 
             Box::pin(async move {
+                // declarations of the imported values, in the order they're inserted at the start
+                // of the evaluated program
+                let mut statements = vec![];
+
                 let (remote_filepath, code) = transformer
                     .load_file(&remote_module_id, &program_filepath)
                     .await?;
@@ -281,8 +288,7 @@ fn evaluate_dependencies<'alloc>(
                                     None as Option<oxc_allocator::Box<_>>,
                                 ),
                             );
-                                    tmp_program.borrow_mut().body.insert(
-                                        0,
+                                    statements.push(
                                         if transformer.use_require {
                                             utils::make_require(
                                                 ast_builder,
@@ -341,8 +347,7 @@ fn evaluate_dependencies<'alloc>(
                                     None as Option<oxc_allocator::Box<_>>,
                                 ),
                             );
-                                    tmp_program.borrow_mut().body.insert(
-                                        0,
+                                    statements.push(
                                         if transformer.use_require {
                                             utils::make_require(
                                                 ast_builder,
@@ -387,8 +392,7 @@ fn evaluate_dependencies<'alloc>(
                                             ast_builder.atom(&namespace_name),
                                         ),
                                     );
-                                    tmp_program.borrow_mut().body.insert(
-                                        0,
+                                    statements.push(
                                         if transformer.use_require {
                                             utils::make_require(
                                                 ast_builder,
@@ -455,10 +459,7 @@ fn evaluate_dependencies<'alloc>(
                             )),
                             false,
                         ));
-                    tmp_program
-                        .borrow_mut()
-                        .body
-                        .insert(0, variable_declaration);
+                    statements.push(variable_declaration);
                     
                     // Track this import dependency
                     let var_name_for_tracking = if let Some(ref remote_name) = remote_name {
@@ -483,14 +484,13 @@ fn evaluate_dependencies<'alloc>(
 
                 // if nothing referenced, nothing to do
                 if remote_referenced_idents.is_empty() {
-                    // continue;
-                    return Ok(());
+                    return Ok(statements);
                 }
 
                 // circular import, like in JS the importer sees the partially initialized
                 // module, i.e. only the values that are already in the value cache
                 if import_chain.contains(&remote_filepath) {
-                    return Ok(());
+                    return Ok(statements);
                 }
 
                 let (source_type, code) = if query_source.is_some() {
@@ -544,7 +544,8 @@ fn evaluate_dependencies<'alloc>(
                     skip_css_eval,
                     &import_chain,
                 )
-                .await
+                .await?;
+                Ok(statements)
             })
         };
         futures.push(future);
@@ -553,8 +554,8 @@ fn evaluate_dependencies<'alloc>(
     futures
 }
 
-/// Imports of `program`, re-exports (`export { x as y } from "./b"`) are included as imports bound
-/// to their `utils::reexport_local_name`s.
+/// Imports of `program`, re-exports (`export { x as y } from "./b"`, `export * from "./b"`) are
+/// included as imports bound to their `utils::reexport_local_name`s.
 pub(crate) fn program_imports<'a, 'alloc>(
     program: &'a Program<'alloc>,
     ast_builder: &'a AstBuilder<'alloc>,
@@ -571,7 +572,7 @@ pub(crate) fn program_imports<'a, 'alloc>(
                         let span = specifier.span;
                         let local = ast_builder.binding_identifier(
                             span,
-                            ast_builder.atom(&utils::reexport_local_name(specifier)),
+                            ast_builder.atom(&utils::reexport_local_name(specifier.span)),
                         );
                         if specifier.local.name() == "default" {
                             ast_builder
@@ -589,6 +590,26 @@ pub(crate) fn program_imports<'a, 'alloc>(
                     export.span,
                     Some(specifiers),
                     source.clone_in(ast_builder.allocator),
+                    None,
+                    None::<oxc_allocator::Box<WithClause>>,
+                    export.export_kind,
+                );
+                Some(&*ast_builder.allocator.alloc(import))
+            }
+            Statement::ExportAllDeclaration(export) => {
+                let local = ast_builder.binding_identifier(
+                    export.span,
+                    ast_builder.atom(&utils::reexport_local_name(export.span)),
+                );
+                let import = ast_builder.import_declaration(
+                    export.span,
+                    Some(ast_builder.vec1(
+                        ast_builder.import_declaration_specifier_import_namespace_specifier(
+                            export.span,
+                            local,
+                        ),
+                    )),
+                    export.source.clone_in(ast_builder.allocator),
                     None,
                     None::<oxc_allocator::Box<WithClause>>,
                     export.export_kind,
@@ -720,7 +741,7 @@ pub(crate) fn slice_program<'alloc>(
 
     for stmt in &program.body {
         let Statement::ImportDeclaration(import_decl) = stmt else {
-            break;
+            continue;
         };
 
         let Some(specifiers) = &import_decl.specifiers else {
@@ -886,7 +907,7 @@ pub async fn evaluate_program<'alloc>(
         css_variable_identifiers,
         referenced_idents,
         mut namespace_imports,
-        exported_idents,
+        mut exported_idents,
         tmp_program,
         return_early: should_return_early,
         rewrote_merge_styles,
@@ -955,7 +976,7 @@ pub async fn evaluate_program<'alloc>(
     // first evaluate dependencies (imports) and transform imports into varible assignments
     // NOTE: We MUST do this even when skip_css_eval is true, because import registration
     // happens inside evaluate_dependencies. If we skip it, dependency tracking won't work.
-    let eval_program = Rc::new(RefCell::new(tmp_program));
+    let mut eval_program = tmp_program;
 
     let css_file_store_ref = &transformer.css_file_store_ref;
 
@@ -965,7 +986,6 @@ pub async fn evaluate_program<'alloc>(
         transformer,
         &referenced_idents,
         &mut namespace_imports,
-        eval_program.clone(),
         program_filepath.clone(),
         cwd,
         temporary_programs.clone(),
@@ -980,8 +1000,13 @@ pub async fn evaluate_program<'alloc>(
     );
 
     drop(value_cache);
-    if let Err(err) = futures::future::try_join_all(dependency_futures).await {
-        return report_error(entries.as_ref(), err);
+    let dependency_statements = match futures::future::try_join_all(dependency_futures).await {
+        Ok(statements) => statements,
+        Err(err) => return report_error(entries.as_ref(), err),
+    };
+    // inserted in import order, independent of which dependency finished loading first
+    for statement in dependency_statements.into_iter().flatten() {
+        eval_program.body.insert(0, statement);
     }
     let mut value_cache = value_cache_guard.lock().await;
 
@@ -996,20 +1021,17 @@ pub async fn evaluate_program<'alloc>(
         return Ok(());
     }
 
-    transpile_ts_to_js(allocator, &mut eval_program.borrow_mut());
+    transpile_ts_to_js(allocator, &mut eval_program);
 
-    if !eval_program.borrow().body.is_empty()
-        && matches!(
-            eval_program.borrow().body[0],
-            Statement::ImportDeclaration(_)
-        )
+    if !eval_program.body.is_empty()
+        && matches!(eval_program.body[0], Statement::ImportDeclaration(_))
     {
-        eval_program.borrow_mut().body.remove(0);
+        eval_program.body.remove(0);
     }
 
     let mut eval_program_js = Codegen::new()
         .with_options(CodegenOptions::default())
-        .build(&eval_program.borrow())
+        .build(&eval_program)
         .code;
 
     // evaluated exports are only stored at the end of the program, if evaluation fails they need
@@ -1019,6 +1041,12 @@ pub async fn evaluate_program<'alloc>(
     // we append all exported idents we evaluated to the cache
     if !exported_idents.is_empty() {
         value_cache.extend(exported_idents.keys().cloned());
+
+        // the program's own exports take precedence over the ones of `export * from`
+        let star_reexports = exported_idents
+            .remove(STAR_IMPORT)
+            .map(|local| format!("...{local},"))
+            .unwrap_or_default();
 
         // TODO this only needs to be sorted for tests to stay consistent
         let mut idents: Vec<String> = exported_idents
@@ -1034,7 +1062,9 @@ pub async fn evaluate_program<'alloc>(
         idents.sort();
         let idents = idents.join(",");
 
-        eval_program_js.push_str(&format!("\n{store} = {{...({store} ?? {{}}), {idents}}};"));
+        eval_program_js.push_str(&format!(
+            "\n{store} = {{...({store} ?? {{}}), {star_reexports}{idents}}};"
+        ));
     }
 
     if entrypoint && has_css {
@@ -1275,7 +1305,7 @@ pub async fn evaluate_program<'alloc>(
                 err,
                 &program_filepath,
                 program_code,
-                &eval_program.borrow(),
+                &eval_program,
                 &eval_program_js,
             );
         })

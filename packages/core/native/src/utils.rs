@@ -57,9 +57,10 @@ pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> Has
     idents
 }
 
-/// Name a re-exported value (`export { x } from "./b"`) is bound to during evaluation.
-pub fn reexport_local_name(specifier: &oxc_ast::ast::ExportSpecifier) -> String {
-    format!("{PREFIX}_reexport_{}", specifier.span.start)
+/// Name a re-exported value (`export { x } from "./b"`, `export * from "./b"`) is bound to during
+/// evaluation, `span` is the span of the specifier or `export *` declaration.
+pub fn reexport_local_name(span: Span) -> String {
+    format!("{PREFIX}_reexport_{}", span.start)
 }
 
 pub fn export_default_declaration_to_expression<'alloc>(

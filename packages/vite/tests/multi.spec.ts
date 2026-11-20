@@ -36,4 +36,11 @@ describe("multi", () => {
 
     await evaluateProgramBothModesMultiFile(testDir, ["entry.tsx"], resolver);
   });
+
+  test("reexports-2", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver(testDir);
+
+    await evaluateProgramBothModesMultiFile(testDir, ["entry.tsx"], resolver);
+  });
 });

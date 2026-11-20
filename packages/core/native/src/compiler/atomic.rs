@@ -269,7 +269,7 @@ pub fn transform_atomic_entrypoint<'alloc>(
     let mut indices_to_replace = vec![];
     for (idx, stmt) in program.body.iter().enumerate() {
         let Statement::ImportDeclaration(import_decl) = stmt else {
-            break;
+            continue;
         };
 
         if import_decl.source.value.as_str() == LIBRARY_CORE_ATOMIC_IMPORT_NAME {
