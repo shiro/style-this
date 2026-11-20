@@ -121,11 +121,13 @@ fn strip_comments(css: &str) -> String {
     output
 }
 
-/// Split CSS into top-level segments (declarations and blocks)
+/// Split CSS into top-level segments (declarations and blocks), `;` and braces inside parentheses
+/// are part of the value, e.g. `url(data:image/png;base64,...)`.
 fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     let mut segments = Vec::new();
     let mut segment_start = 0;
     let mut brace_depth = 0;
+    let mut paren_depth = 0usize;
     let mut string_char: Option<char> = None;
     let mut prev_char = ' ';
 
@@ -142,15 +144,17 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
 
         match ch {
             '\'' | '"' if !escaped => string_char = Some(ch),
-            '{' => brace_depth += 1,
-            '}' => {
+            '(' if !escaped => paren_depth += 1,
+            ')' if !escaped => paren_depth = paren_depth.saturating_sub(1),
+            '{' if paren_depth == 0 => brace_depth += 1,
+            '}' if paren_depth == 0 => {
                 brace_depth -= 1;
                 if brace_depth == 0 {
                     segments.push(TopLevelSegment::Block(&css[segment_start..=idx]));
                     segment_start = idx + 1;
                 }
             }
-            ';' if brace_depth == 0 => {
+            ';' if brace_depth == 0 && paren_depth == 0 => {
                 segments.push(TopLevelSegment::Declaration(&css[segment_start..=idx]));
                 segment_start = idx + 1;
             }
@@ -441,5 +445,38 @@ mod tests {
 
         assert_eq!(HashSet::from_iter(result.atomizable), expected_atomics);
         assert_eq!(result.non_atomizable, expected_non_atomizable);
+    }
+
+    #[test]
+    fn semicolons_and_braces_in_parentheses() {
+        let input = indoc! {r"
+            background: url(data:image/png;base64,iVBORw0KGgo=);
+            mask: url(data:image/svg+xml;utf8,<svg><style>a{fill:red}</style></svg>);
+            cursor: url(a\)b;c.png), auto;
+            &:hover {
+              background-image: url(data:image/png;base64,AAAA);
+            }
+            color: red;
+        "};
+        let result = parse_css(input);
+
+        assert_eq!(
+            result.atomizable,
+            vec![
+                "background: url(data:image/png;base64,iVBORw0KGgo=)".to_string(),
+                "mask: url(data:image/svg+xml;utf8,<svg><style>a{fill:red}</style></svg>)"
+                    .to_string(),
+                r"cursor: url(a\)b;c.png), auto".to_string(),
+                "color: red".to_string(),
+            ]
+        );
+        assert_eq!(
+            result.non_atomizable.as_deref(),
+            Some(indoc! {"
+                &:hover {
+                  background-image: url(data:image/png;base64,AAAA);
+                }
+            "})
+        );
     }
 }
