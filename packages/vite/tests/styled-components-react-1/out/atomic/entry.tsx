@@ -5,19 +5,25 @@ import { mergeStyles as __styleThis__mergeStyles } from "@style-this/core";
 import { forwardRef as __styleThis__forwardRef } from "react";
 import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
 import "virtual:style-this:/entry.tsx.css";
+// must not be shadowed by the generated wrapper's props
+const props = { gap: 4 };
 export const FancyButton = (() => {
 	let FancyButton = _styleThisClasses.__styleThis_var_FancyButton_2;
-	let comp = __styleThis__forwardRef((props, ref) => {
-		const { styleProps: _styleProps, style: _style,...rest } = props;
-		return <button {...rest} ref={ref} className={__styleThis__mergeStyles(FancyButton, rest.className)} style={{
+	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
+		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
+		return <button {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(FancyButton, __styleThis__rest.className)} style={{
 			"--var1-4lyfgx": (({ a }) => a)({
-				...props.styleProps,
-				"props": props
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
 			}),
-			...props.style ?? {}
+			"--var2-ngdi74": (() => props.gap)({
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
+			}),
+			...__styleThis__props.style ?? {}
 		}} />;
 	});
-	comp.toString = () => FancyButton;
-	return comp;
+	__styleThis__comp.toString = () => FancyButton;
+	return __styleThis__comp;
 })();
 const unrelated = _styleThisClasses.unrelated;

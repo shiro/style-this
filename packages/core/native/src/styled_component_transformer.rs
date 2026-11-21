@@ -4,6 +4,12 @@ use oxc_ast::ast::JSXAttributeItem;
 pub const MERGE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeStyles";
 pub const MERGE_INLINE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeInlineStyles";
 
+// locals of the generated wrapper, prefixed so they don't shadow user variables referenced by
+// captured style functions (e.g. `${() => props.color}` with a module-level `props`)
+pub const COMPONENT_LOCAL_NAME: &str = "__styleThis__comp";
+pub const PROPS_LOCAL_NAME: &str = "__styleThis__props";
+pub const REST_PROPS_LOCAL_NAME: &str = "__styleThis__rest";
+
 /// Inserts `import { mergeStyles as __styleThis__mergeStyles } from "@style-this/core"` after the last import.
 pub fn insert_merge_styles_import<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
@@ -208,7 +214,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                                                                 self.ast_builder
                                                                     .alloc_identifier_reference(
                                                                         span,
-                                                                        self.ast_builder.atom("props"),
+                                                                        self.ast_builder.atom(PROPS_LOCAL_NAME),
                                                                     ),
                                                             ),
                                                             self.ast_builder.identifier_name(
@@ -232,7 +238,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                                                 Expression::Identifier(
                                                     self.ast_builder.alloc_identifier_reference(
                                                         span,
-                                                        self.ast_builder.atom("props"),
+                                                        self.ast_builder.atom(PROPS_LOCAL_NAME),
                                                     ),
                                                 ),
                                                 false,
@@ -273,7 +279,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                 span,
                 Expression::Identifier(
                     self.ast_builder
-                        .alloc_identifier_reference(span, self.ast_builder.atom("props")),
+                        .alloc_identifier_reference(span, self.ast_builder.atom(PROPS_LOCAL_NAME)),
                 ),
                 self.ast_builder
                     .identifier_name(span, self.ast_builder.atom("style")),
@@ -420,7 +426,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                                 Expression::Identifier(
                                     self.ast_builder.alloc_identifier_reference(
                                         span,
-                                        self.ast_builder.atom("comp"),
+                                        self.ast_builder.atom(COMPONENT_LOCAL_NAME),
                                     ),
                                 ),
                                 self.ast_builder
@@ -482,7 +488,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                                 Expression::Identifier(
                                     self.ast_builder.alloc_identifier_reference(
                                         span,
-                                        self.ast_builder.atom("comp"),
+                                        self.ast_builder.atom(COMPONENT_LOCAL_NAME),
                                     ),
                                 ),
                                 self.ast_builder
@@ -516,7 +522,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                 span,
                 Some(Expression::Identifier(
                     self.ast_builder
-                        .alloc_identifier_reference(span, self.ast_builder.atom("comp")),
+                        .alloc_identifier_reference(span, self.ast_builder.atom(COMPONENT_LOCAL_NAME)),
                 )),
             ),
         )

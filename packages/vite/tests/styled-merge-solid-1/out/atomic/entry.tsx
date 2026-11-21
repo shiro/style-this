@@ -7,22 +7,22 @@ import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js
 import "virtual:style-this:/entry.tsx.css";
 export const Base = (() => {
 	let Base = _styleThisClasses.__styleThis_var_Base_4;
-	let comp = (props) => {
-		return <button {...props} class={__styleThis__mergeStyles(Base, props.class)} />;
+	let __styleThis__comp = (__styleThis__props) => {
+		return <button {...__styleThis__props} class={__styleThis__mergeStyles(Base, __styleThis__props.class)} />;
 	};
-	comp.css = Base.css;
-	comp.toString = () => Base;
-	return comp;
+	__styleThis__comp.css = Base.css;
+	__styleThis__comp.toString = () => Base;
+	return __styleThis__comp;
 })();
 // overrides Base's padding, Base merges this component's classes last
 export const Extended = (() => {
 	let Extended = _styleThisClasses.__styleThis_var_Extended_2;
-	let comp = (props) => {
-		return <Base {...props} class={__styleThis__mergeStyles(Extended, props.class)} />;
+	let __styleThis__comp = (__styleThis__props) => {
+		return <Base {...__styleThis__props} class={__styleThis__mergeStyles(Extended, __styleThis__props.class)} />;
 	};
-	comp.css = Extended.css;
-	comp.toString = () => Extended;
-	return comp;
+	__styleThis__comp.css = Extended.css;
+	__styleThis__comp.toString = () => Extended;
+	return __styleThis__comp;
 })();
 export const override = _styleThisClasses.override;
 export const App = () => <Extended class={override}>hi</Extended>;

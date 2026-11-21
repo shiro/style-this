@@ -71,21 +71,12 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
                                 self.base.ast_builder.alloc_array_pattern(
                                     span,
                                     self.base.ast_builder.vec_from_iter([
+                                        None,
                                         Some(self.base.ast_builder.binding_pattern(
                                             BindingPatternKind::BindingIdentifier(
                                                 self.base.ast_builder.alloc_binding_identifier(
                                                     span,
-                                                    self.base.ast_builder.atom("_"),
-                                                ),
-                                            ),
-                                            None as Option<oxc_allocator::Box<_>>,
-                                            false,
-                                        )),
-                                        Some(self.base.ast_builder.binding_pattern(
-                                            BindingPatternKind::BindingIdentifier(
-                                                self.base.ast_builder.alloc_binding_identifier(
-                                                    span,
-                                                    self.base.ast_builder.atom("rest"),
+                                                    self.base.ast_builder.atom(REST_PROPS_LOCAL_NAME),
                                                 ),
                                             ),
                                             None as Option<oxc_allocator::Box<_>>,
@@ -112,7 +103,7 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
                                     oxc_ast::ast::Argument::Identifier(
                                         self.base.ast_builder.alloc_identifier_reference(
                                             span,
-                                            self.base.ast_builder.atom("props"),
+                                            self.base.ast_builder.atom(PROPS_LOCAL_NAME),
                                         ),
                                     ),
                                     oxc_ast::ast::Argument::ArrayExpression(
@@ -149,8 +140,8 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
             None
         };
 
-        // Build attributes - for Solid with splitProps, use "rest" instead of "props"
-        let spread_identifier = if should_filter_props { "rest" } else { "props" };
+        // Build attributes - for Solid with splitProps, spread the rest instead of the props
+        let spread_identifier = if should_filter_props { REST_PROPS_LOCAL_NAME } else { PROPS_LOCAL_NAME };
         let mut attributes = vec![
             self.base.ast_builder.jsx_attribute_item_spread_attribute(
                 span,
@@ -159,7 +150,7 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
                         .alloc_identifier_reference(span, self.base.ast_builder.atom(spread_identifier)),
                 ),
             ),
-            self.base.build_class_attribute(span, &class_variable_name, "props"),
+            self.base.build_class_attribute(span, &class_variable_name, PROPS_LOCAL_NAME),
         ];
 
         if let Some(style_attr) = style_attribute {
@@ -193,7 +184,7 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
                         self.base.ast_builder.binding_pattern(
                             BindingPatternKind::BindingIdentifier(
                                 self.base.ast_builder
-                                    .alloc_binding_identifier(span, self.base.ast_builder.atom("comp")),
+                                    .alloc_binding_identifier(span, self.base.ast_builder.atom(COMPONENT_LOCAL_NAME)),
                             ),
                             None as Option<oxc_allocator::Box<_>>,
                             false,
@@ -214,7 +205,7 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
                                             BindingPatternKind::BindingIdentifier(
                                                 self.base.ast_builder.alloc_binding_identifier(
                                                     span,
-                                                    self.base.ast_builder.atom("props"),
+                                                    self.base.ast_builder.atom(PROPS_LOCAL_NAME),
                                                 ),
                                             ),
                                             None as Option<oxc_allocator::Box<_>>,

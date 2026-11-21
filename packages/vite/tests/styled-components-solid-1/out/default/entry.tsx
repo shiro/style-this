@@ -5,16 +5,24 @@ import { joinStyles as __styleThis__mergeStyles } from "@style-this/core";
 import { mergeInlineStyles as __styleThis__mergeInlineStyles } from "@style-this/core";
 import { splitProps as __styleThis__splitProps } from "solid-js";
 import "virtual:style-this:/entry.tsx.css";
+// must not be shadowed by the generated wrapper's props
+const props = { gap: 4 };
 export const FancyButton = (() => {
 	let FancyButton = "FancyButton-3slijs";
-	let comp = (props) => {
-		const [_, rest] = __styleThis__splitProps(props, ["styleProps", "style"]);
-		return <button {...rest} class={__styleThis__mergeStyles(FancyButton, props.class)} style={__styleThis__mergeInlineStyles({ "--var1-q3ctyv": (({ a }) => a)({
-			...props.styleProps,
-			"props": props
-		}) }, props.style)} />;
+	let __styleThis__comp = (__styleThis__props) => {
+		const [, __styleThis__rest] = __styleThis__splitProps(__styleThis__props, ["styleProps", "style"]);
+		return <button {...__styleThis__rest} class={__styleThis__mergeStyles(FancyButton, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({
+			"--var1-q3ctyv": (({ a }) => a)({
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
+			}),
+			"--var2-pino9q": (() => props.gap)({
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
+			})
+		}, __styleThis__props.style)} />;
 	};
-	comp.toString = () => FancyButton;
-	return comp;
+	__styleThis__comp.toString = () => FancyButton;
+	return __styleThis__comp;
 })();
 const unrelated = "unrelated-96jgdy";

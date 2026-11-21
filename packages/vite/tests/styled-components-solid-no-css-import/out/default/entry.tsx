@@ -5,10 +5,10 @@ import { splitProps as __styleThis__splitProps } from "solid-js";
 import "virtual:style-this:/entry.tsx.css";
 export const FancyButton = (() => {
 	let FancyButton = "FancyButton-izw5mn";
-	let comp = (props) => {
-		return <button {...props} class={__styleThis__mergeStyles(FancyButton, props.class)} />;
+	let __styleThis__comp = (__styleThis__props) => {
+		return <button {...__styleThis__props} class={__styleThis__mergeStyles(FancyButton, __styleThis__props.class)} />;
 	};
-	comp.css = FancyButton.css;
-	comp.toString = () => FancyButton;
-	return comp;
+	__styleThis__comp.css = FancyButton.css;
+	__styleThis__comp.toString = () => FancyButton;
+	return __styleThis__comp;
 })();

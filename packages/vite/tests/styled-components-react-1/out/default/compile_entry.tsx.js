@@ -5,7 +5,8 @@ let __styleThis_var_FancyButton_2 = new String("FancyButton-b05mnk");
 __styleThis_var_FancyButton_2.css = `background: none;
   border: 1px solid blue;
   border-radius: 2px;
-  padding: ${"var(--var1-4lyfgx)"}px;`;
+  padding: ${"var(--var1-4lyfgx)"}px;
+  gap: ${"var(--var2-ngdi74)"}px;`;
 let unrelated = new String("unrelated-hqnklm");
 unrelated.css = `background: none;`;
 return [

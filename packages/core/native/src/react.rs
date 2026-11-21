@@ -2,6 +2,7 @@ use crate::{styled_component_transformer::*, *};
 use oxc_ast::ast::JSXExpression;
 
 const FORWARD_REF_LOCAL_NAME: &str = "__styleThis__forwardRef";
+const REF_LOCAL_NAME: &str = "__styleThis__ref";
 
 struct ReactStyledComponentTransformer<'a, 'alloc> {
     base: StyledComponentTransformer<'a, 'alloc>,
@@ -56,7 +57,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
 
         // For React, filter props only when extending an HTML element (not a custom component) and we have captured expressions
         let should_filter_props = !is_extending_custom_component && !captured_expressions.is_empty();
-        let spread_identifier = if should_filter_props { "rest" } else { "props" };
+        let spread_identifier = if should_filter_props { REST_PROPS_LOCAL_NAME } else { PROPS_LOCAL_NAME };
         
         // Build destructuring statement: const { styleProps, style, ...rest } = props;
         let destructure_statement = if should_filter_props {
@@ -85,7 +86,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                                                 BindingPatternKind::BindingIdentifier(
                                                     self.base.ast_builder.alloc_binding_identifier(
                                                         span,
-                                                        self.base.ast_builder.atom("_styleProps"),
+                                                        self.base.ast_builder.atom("__styleThis__styleProps"),
                                                     ),
                                                 ),
                                                 None as Option<oxc_allocator::Box<_>>,
@@ -107,7 +108,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                                                 BindingPatternKind::BindingIdentifier(
                                                     self.base.ast_builder.alloc_binding_identifier(
                                                         span,
-                                                        self.base.ast_builder.atom("_style"),
+                                                        self.base.ast_builder.atom("__styleThis__style"),
                                                     ),
                                                 ),
                                                 None as Option<oxc_allocator::Box<_>>,
@@ -123,7 +124,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                                             BindingPatternKind::BindingIdentifier(
                                                 self.base.ast_builder.alloc_binding_identifier(
                                                     span,
-                                                    self.base.ast_builder.atom("rest"),
+                                                    self.base.ast_builder.atom(REST_PROPS_LOCAL_NAME),
                                                 ),
                                             ),
                                             None as Option<oxc_allocator::Box<_>>,
@@ -138,7 +139,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                         Some(Expression::Identifier(
                             self.base.ast_builder.alloc_identifier_reference(
                                 span,
-                                self.base.ast_builder.atom("props"),
+                                self.base.ast_builder.atom(PROPS_LOCAL_NAME),
                             ),
                         )),
                         false,
@@ -167,7 +168,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                     span,
                     JSXExpression::Identifier(self.base.ast_builder.alloc_identifier_reference(
                         span,
-                        self.base.ast_builder.atom("ref"),
+                        self.base.ast_builder.atom(REF_LOCAL_NAME),
                     )),
                 )),
             ),
@@ -213,7 +214,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                         self.base.ast_builder.binding_pattern(
                             BindingPatternKind::BindingIdentifier(
                                 self.base.ast_builder
-                                    .alloc_binding_identifier(span, self.base.ast_builder.atom("comp")),
+                                    .alloc_binding_identifier(span, self.base.ast_builder.atom(COMPONENT_LOCAL_NAME)),
                             ),
                             None as Option<oxc_allocator::Box<_>>,
                             false,
@@ -237,7 +238,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                                             span,
                                             oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
                                             self.base.ast_builder.vec_from_iter(
-                                                ["props", "ref"].map(|name| {
+                                                [PROPS_LOCAL_NAME, REF_LOCAL_NAME].map(|name| {
                                                     self.base.ast_builder.formal_parameter(
                                                         span,
                                                         self.base.ast_builder.vec(),

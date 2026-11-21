@@ -2,6 +2,7 @@
 @layer utilities {
 .b-zDIGu { border: 1px solid blue }
 .bg-kG3jH { background: none }
+.gap-FV6x_ { gap: var(--var2-ngdi74)px }
 .p-nUvQb { padding: var(--var1-4lyfgx)px }
 .r-T5iL9 { border-radius: 2px }
 }
