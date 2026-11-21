@@ -27,7 +27,8 @@ and toggle the mode from config.
 
 :::note[Next.js]
 With `@style-this/next`, atomic mode is toggled with the `ATOMIC=1` environment variable instead.
-The entrypoint import and the cascade layer described below are features of the Vite plugin.
+There's no single atomic stylesheet, every file's stylesheet includes the atomic CSS it uses (in the
+same cascade layer). The entrypoint import only fixes the layer order.
 :::
 
 ## Output

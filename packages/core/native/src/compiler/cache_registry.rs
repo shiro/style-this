@@ -1,6 +1,6 @@
 use futures::lock::Mutex as FutureMutex;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use super::dependency_tracker::DependencyTracker;
@@ -21,6 +21,8 @@ pub struct CacheRegistry {
     /// Rust-side atomic CSS class cache - Maps CSS declaration to atomic class name
     /// e.g., "margin-top:10px" -> "a1b2c"
     atomic_css_cache: Rc<RefCell<HashMap<String, String>>>,
+    /// Atomized declarations of each file's latest evaluation
+    file_atomic_declarations: Rc<RefCell<HashMap<String, BTreeSet<String>>>>,
     /// Dependency tracker for variable imports
     dependency_tracker: Rc<RefCell<DependencyTracker>>,
     /// Source of files loaded as dependencies, as of their cached values
@@ -46,6 +48,7 @@ impl CacheRegistry {
             value_cache_ref,
             value_cache: Rc::new(RefCell::new(HashMap::new())),
             atomic_css_cache: Rc::new(RefCell::new(HashMap::new())),
+            file_atomic_declarations: Rc::new(RefCell::new(HashMap::new())),
             dependency_tracker: Rc::new(RefCell::new(DependencyTracker::new())),
             module_code: Rc::new(RefCell::new(HashMap::new())),
         }
@@ -70,6 +73,7 @@ impl CacheRegistry {
             value_cache_ref,
             value_cache: Rc::new(RefCell::new(HashMap::new())),
             atomic_css_cache: Rc::new(RefCell::new(HashMap::new())),
+            file_atomic_declarations: Rc::new(RefCell::new(HashMap::new())),
             dependency_tracker: Rc::new(RefCell::new(DependencyTracker::new())),
             module_code: Rc::new(RefCell::new(HashMap::new())),
         }
@@ -290,10 +294,25 @@ impl CacheRegistry {
             .join("\n")
     }
 
+    pub fn set_file_atomic_declarations(&self, filepath: &str, declarations: BTreeSet<String>) {
+        self.file_atomic_declarations
+            .borrow_mut()
+            .insert(filepath.to_string(), declarations);
+    }
+
+    /// Atomic CSS of the declarations of a file, see `rank_layered_atomic_css`
+    pub fn get_file_atomic_css(&self, filepath: &str) -> String {
+        match self.file_atomic_declarations.borrow().get(filepath) {
+            Some(declarations) => super::atomic::rank_layered_atomic_css(declarations),
+            None => String::new(),
+        }
+    }
+
     /// Clear all caches
     pub fn clear(&self) {
         self.value_cache.borrow_mut().clear();
         self.atomic_css_cache.borrow_mut().clear();
+        self.file_atomic_declarations.borrow_mut().clear();
     }
 
     /// Clear value cache for a specific file

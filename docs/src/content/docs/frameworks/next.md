@@ -57,7 +57,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 - `middleware.ts` is skipped under turbopack.
 - `withStyleThis` currently takes no style-this specific options.
 - Requires Next.js 16.2 or newer.
-- [Atomic mode](/guides/atomic-css/) isn't supported yet.
+- [Atomic mode](/guides/atomic-css/) is enabled with the `ATOMIC=1` environment variable. Every
+  file's stylesheet includes the atomic CSS it uses, Next.js has no step to collect the atomic CSS
+  of all files into one stylesheet.
 
 Example (app router and pages router):
 [`next`](https://github.com/shiro/style-this/tree/master/examples/next).

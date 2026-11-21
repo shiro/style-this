@@ -1226,6 +1226,7 @@ pub async fn evaluate_program<'alloc>(
 
         // Parse each CSS block into atomic + non-atomic classes
         let mut variable_to_atomics: HashMap<String, BTreeSet<String>> = HashMap::new();
+        let mut atomic_declarations = BTreeSet::new();
         let mut module_css = String::new();
 
         for css_var in css_variable_identifiers.iter() {
@@ -1240,12 +1241,13 @@ pub async fn evaluate_program<'alloc>(
 
                 let parse_result = css_parser::parse_css(css_string);
 
-                let atomic_classes: BTreeSet<String> =
-                    dedupe_atomic_declarations(parse_result.atomizable)
-                    .into_iter()
+                let declarations = dedupe_atomic_declarations(parse_result.atomizable);
+                let atomic_classes: BTreeSet<String> = declarations
+                    .iter()
                     .map(|decl| add_atomic(decl.as_str(), &transformer.cache_registry))
                     .filter(|s: &String| !s.is_empty())
                     .collect();
+                atomic_declarations.extend(declarations.into_iter().map(|decl| decl.trim().to_string()));
 
                 variable_to_atomics.insert(css_var.variable_name.clone(), atomic_classes);
 
@@ -1282,6 +1284,10 @@ pub async fn evaluate_program<'alloc>(
         // CSS string already contains all non-atomizable CSS, trim trailing newline
         let css = module_css.trim_end();
 
+        transformer
+            .cache_registry
+            .set_file_atomic_declarations(&program_filepath, atomic_declarations);
+
         // Stage 2: Resolve .style-this.js with atomic exports and .css with non-atomizable CSS.
         if let Some(entries) = &entries {
             entries.resolve_css(&css.into(), &css_variable_identifiers);
@@ -1289,6 +1295,13 @@ pub async fn evaluate_program<'alloc>(
         }
 
         return Ok(());
+    }
+
+    if transformer.atomic && entrypoint {
+        // files with CSS are handled above, the declarations of a previous evaluation are outdated
+        transformer
+            .cache_registry
+            .set_file_atomic_declarations(&program_filepath, BTreeSet::new());
     }
 
     // wrap into promise and hide global symbols

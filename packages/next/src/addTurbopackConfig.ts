@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { WithLinariaConfig } from "./types";
-import { regexFilepathQuery } from "./loaders/consts";
+import { noopAtomicCssFilename, regexFilepathQuery } from "./loaders/consts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,7 +27,7 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
       ...config.turbopack,
       resolveAlias: {
         ...config.turbopack?.resolveAlias,
-        "@style-this/core/atomic": "@style-this/next/style-this.atomic.css",
+        "@style-this/core/atomic": `@style-this/next/${noopAtomicCssFilename}`,
       },
       rules: {
         ...config.turbopack?.rules,
@@ -41,6 +41,16 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
         },
         "style-this.module.css": cssRule,
         "style-this.global.css": cssRule,
+        // serves the atomic class module of `?filepath=`
+        "style-this.atomic-program.js": {
+          condition: { query: regexFilepathQuery },
+          loaders: [
+            {
+              loader: path.resolve(__dirname, "./loaders/atomicProgramLoader.mjs"),
+              options: { bundler: "turbopack" },
+            },
+          ],
+        },
       },
     },
   };

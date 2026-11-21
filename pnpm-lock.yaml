@@ -283,9 +283,6 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
-      '@types/webpack-virtual-modules':
-        specifier: ^0.4.2
-        version: 0.4.2
       next:
         specifier: 16.2.12
         version: 16.2.12(@babel/core@7.29.7(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.90.0)
@@ -295,9 +292,6 @@ importers:
       webpack:
         specifier: ^5.0.0
         version: 5.102.1(esbuild@0.28.1)
-      webpack-virtual-modules:
-        specifier: ^0.6.2
-        version: 0.6.2
 
   packages/react:
     dependencies:
@@ -2569,10 +2563,6 @@ packages:
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
-
-  '@types/webpack-virtual-modules@0.4.2':
-    resolution: {integrity: sha512-0ff/n3TXx1FysQV/kSpF8bxnCXUf7cw3Mp6WbXq0IfrgFK/MBIZqAQFN7VUkGwRzHZb+9DfLPZ3dOI+/L+m9ww==}
-    deprecated: This is a stub types definition. webpack-virtual-modules provides its own type definitions, so you do not need this installed.
 
   '@typescript-eslint/eslint-plugin@8.46.3':
     resolution: {integrity: sha512-sbaQ27XBUopBkRiuY/P9sWGOWUW4rl8fDoHIUmLpZd8uldsTyB4/Zg6bWTegPoTLnKj9Hqgn3QD6cjPNB32Odw==}
@@ -8117,10 +8107,6 @@ snapshots:
   '@types/trusted-types@2.0.7': {}
 
   '@types/unist@3.0.3': {}
-
-  '@types/webpack-virtual-modules@0.4.2':
-    dependencies:
-      webpack-virtual-modules: 0.6.2
 
   '@typescript-eslint/eslint-plugin@8.46.3(@typescript-eslint/parser@8.46.3(eslint@9.39.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@9.39.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:

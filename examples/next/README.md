@@ -6,9 +6,13 @@ Build the packages from the repository root first (`pnpm install && pnpm build`)
 
 ```bash
 pnpm dev                   # dev server (turbopack)
+pnpm dev:atomic            # dev server (turbopack), atomic mode
 pnpm dev:webpack           # dev server (webpack)
+pnpm dev:webpack:atomic    # dev server (webpack), atomic mode
 pnpm build                 # production build (turbopack)
+pnpm build:atomic          # production build (turbopack), atomic mode
 pnpm build:webpack         # production build (webpack)
+pnpm build:webpack:atomic  # production build (webpack), atomic mode
 pnpm start                 # serve the production build
 ```
 

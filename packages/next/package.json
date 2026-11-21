@@ -5,7 +5,8 @@
   "type": "module",
   "files": [
     "dist",
-    "style-this.*.css"
+    "style-this.*.css",
+    "style-this.*.js"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -17,6 +18,7 @@
       "default": "./dist/index.mjs"
     },
     "./style-this.atomic.css": "./style-this.atomic.css",
+    "./style-this.atomic-layers.css": "./style-this.atomic-layers.css",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -32,10 +34,8 @@
   "dependencies": {
     "@style-this/core": "workspace:0.5.0",
     "@types/node": "^24.10.1",
-    "@types/webpack-virtual-modules": "^0.4.2",
     "webpack": "^5.0.0",
-    "next": "16.2.12",
-    "webpack-virtual-modules": "^0.6.2"
+    "next": "16.2.12"
   },
   "peerDependencies": {
     "solid-js": "*",

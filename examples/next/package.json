@@ -4,9 +4,13 @@
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
+    "dev:atomic": "ATOMIC=1 next dev",
     "dev:webpack": "next dev --webpack",
+    "dev:webpack:atomic": "ATOMIC=1 next dev --webpack",
     "build": "next build",
+    "build:atomic": "ATOMIC=1 next build",
     "build:webpack": "next build --webpack",
+    "build:webpack:atomic": "ATOMIC=1 next build --webpack",
     "start": "next start"
   },
   "dependencies": {

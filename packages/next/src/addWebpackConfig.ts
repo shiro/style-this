@@ -4,7 +4,12 @@ import { fileURLToPath } from "url";
 import type * as NextServer from "next/dist/server/config-shared";
 import type * as Webpack from "webpack";
 
-import { noopAtomicCssFile, regexFilepathQuery, regexNoopCss } from "./loaders/consts";
+import {
+  noopAtomicCssFile,
+  regexFilepathQuery,
+  regexNoopAtomicProgram,
+  regexNoopCss,
+} from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -68,10 +73,17 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
       });
 
       config.module.rules.push({
+        test: regexNoopAtomicProgram,
+        resourceQuery: regexFilepathQuery,
+        loader: path.resolve(__dirname, "./loaders/atomicProgramLoader.mjs"),
+        options: {},
+      });
+
+      config.module.rules.push({
         test: [/\.(tsx|ts|js|mjs|jsx)$/],
         loader: path.resolve(__dirname, "./loaders/webpackTransformLoader.mjs"),
         options: {},
-        exclude: /node_modules/,
+        exclude: [/node_modules/, regexNoopAtomicProgram],
       });
     }
 

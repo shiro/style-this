@@ -46,9 +46,3 @@ export function isCssModule(
 export function isCssLoader(rule: Webpack.RuleSetRule): boolean {
   return typeof rule?.loader === 'string' && rule.loader.includes('css-loader');
 }
-
-export function isFSCache(
-  cache: Webpack.Configuration['cache'],
-): cache is Webpack.FileCacheOptions {
-  return typeof cache === 'object' && cache.type === 'filesystem';
-}

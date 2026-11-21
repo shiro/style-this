@@ -8,7 +8,7 @@ use oxc_ast::ast::{
     WithClause,
 };
 use once_cell::sync::Lazy;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
 /// Represents a single CSS declaration (property: value)
@@ -62,6 +62,37 @@ pub fn sort_atomic_rules(rules: &mut [(&String, &String)]) {
             .then_with(|| class_a.cmp(class_b))
             .then_with(|| decl_a.cmp(decl_b))
     });
+}
+
+/// Atomic rules of `declarations`, with every rank (see `property_rank`) in its own cascade layer
+/// (`r0`, `r1`, ...). The order of rules then doesn't matter, so stylesheets sharing declarations
+/// can be loaded in any order and shorthands still lose against their longhands. All rank layers
+/// up to the highest one are declared first, which keeps them ordered across stylesheets.
+pub fn rank_layered_atomic_css<'a>(declarations: impl IntoIterator<Item = &'a String>) -> String {
+    let mut ranks: BTreeMap<usize, Vec<(&String, String)>> = BTreeMap::new();
+    for declaration in declarations {
+        ranks
+            .entry(property_rank(declaration_property(declaration)))
+            .or_default()
+            .push((declaration, generate_atomic_class_name(declaration)));
+    }
+    let Some(&max_rank) = ranks.keys().next_back() else {
+        return String::new();
+    };
+
+    let layers = (0..=max_rank).map(|rank| format!("r{rank}")).collect::<Vec<_>>();
+    let mut css = format!("@layer {};", layers.join(", "));
+    for (rank, rules) in ranks {
+        let mut rules: Vec<(&String, &String)> =
+            rules.iter().map(|(declaration, class)| (*declaration, class)).collect();
+        sort_atomic_rules(&mut rules);
+        css.push_str(&format!("\n@layer r{rank} {{"));
+        for (declaration, class) in rules {
+            css.push_str(&format!("\n.{class} {{ {declaration} }}"));
+        }
+        css.push_str("\n}");
+    }
+    css
 }
 
 /// Generate the atomic class name for a declaration, `<prefix>-<hash>` for supported properties
@@ -446,5 +477,24 @@ mod tests {
         assert!(pos("margin: 0") < pos("margin-top: 1px"));
         assert!(pos("inset: 0") < pos("top: 0"));
         assert!(pos("flex-flow: row") < pos("flex-direction: row"));
+    }
+
+    #[test]
+    fn rank_layers_are_declared_up_to_the_highest_rank() {
+        let decls = ["margin-top: 1px", "border-top-width: 2px", "margin: 0"].map(String::from);
+        let class = generate_atomic_class_name;
+        assert_eq!(
+            rank_layered_atomic_css(&decls),
+            format!(
+                "@layer r0, r1, r2;\n\
+                 @layer r0 {{\n.{} {{ margin: 0 }}\n}}\n\
+                 @layer r1 {{\n.{} {{ margin-top: 1px }}\n}}\n\
+                 @layer r2 {{\n.{} {{ border-top-width: 2px }}\n}}",
+                class("margin: 0"),
+                class("margin-top: 1px"),
+                class("border-top-width: 2px"),
+            )
+        );
+        assert_eq!(rank_layered_atomic_css(&[]), "");
     }
 }

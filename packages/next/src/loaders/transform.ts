@@ -1,24 +1,21 @@
 import type { RawLoaderDefinitionFunction } from "webpack";
 import { initializeStyleThis, Transformer, type CssCachEntry } from "@style-this/core/compiler";
+import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
-import { cacheRegistry, cssFiles } from "../shared";
+import { atomicFiles, cacheRegistry, cssFiles } from "../shared";
 import { makeLoadFile } from "./shared";
-import { resolveVirtualImport } from "./consts";
+import { atomic, resolveVirtualImport, wrapAtomicCss } from "./consts";
 
 type LoaderCtx = ThisParameterType<RawLoaderDefinitionFunction>;
 export type Bundler = "webpack" | "turbopack";
 
 export const cssExtension = "css";
-const mocks = new Map<string, string>();
+export const atomicProgramExtension = "style-this.js";
 const transformers = new Map<Bundler, Promise<Transformer>>();
 
 const getTransformer = (bundler: Bundler, loadFile: ReturnType<typeof makeLoadFile>) => {
   let transformer = transformers.get(bundler);
   if (!transformer) {
-    // needs a loader for the per-file atomic class modules and a way to collect the atomic CSS of
-    // all files (Turbopack has no hook to run after all modules are transformed)
-    if (process.env.ATOMIC === "1") throw new Error("@style-this/next doesn't support atomic mode yet");
-
     transformer = initializeStyleThis().then(
       () =>
         new Transformer({
@@ -30,6 +27,7 @@ const getTransformer = (bundler: Bundler, loadFile: ReturnType<typeof makeLoadFi
           cacheRegistry,
           cssExtension,
           useRequire: bundler === "turbopack",
+          atomic,
         }),
     );
     transformers.set(bundler, transformer);
@@ -37,37 +35,98 @@ const getTransformer = (bundler: Bundler, loadFile: ReturnType<typeof makeLoadFi
   return transformer;
 };
 
-/** Transforms `code`, its CSS is stored in `cssFiles` under `<filepath>.css` for the CSS loader. */
+const createEntry = (code: string) => {
+  let resolve: CssCachEntry["resolve"] | undefined;
+  const entry = new Promise((_resolve) => {
+    resolve = (value: string | Error) => _resolve(value);
+  }) as CssCachEntry;
+  entry.resolve = resolve!;
+  entry.code = code;
+  return entry;
+};
+
+/**
+ * Transforms `code`, its CSS is stored in `cssFiles` under `<filepath>.css` and in atomic mode its
+ * class module in `atomicFiles` under `<filepath>.style-this.js`, for the virtual module loaders.
+ */
 export const transformFile = async (
   ctx: LoaderCtx,
   bundler: Bundler,
   code: string,
   filepath: string,
 ) => {
-  const loadFile = makeLoadFile(ctx, mocks);
+  const loadFile = makeLoadFile(ctx);
   const transformer = await getTransformer(bundler, loadFile);
 
   const cssFilepath = `${filepath}.${cssExtension}`;
-  const skipCssEval = cssFiles.get(cssFilepath)?.code === code;
+  const atomicProgramFilepath = `${filepath}.${atomicProgramExtension}`;
+  const skipCssEval =
+    cssFiles.get(cssFilepath)?.code === code &&
+    (!atomic || atomicFiles.get(atomicProgramFilepath)?.code === code);
 
+  // resolved by the compiler through `cacheRegistry`
   if (!skipCssEval) {
-    let resolve: CssCachEntry["resolve"] | undefined;
-    const entry = new Promise((_resolve) => {
-      resolve = (css: string | Error) => _resolve(css);
-    }) as CssCachEntry;
-    entry.resolve = resolve!;
-    entry.code = code;
-
-    // resolved by the compiler through `cacheRegistry`
-    cssFiles.set(cssFilepath, entry);
+    cssFiles.set(cssFilepath, createEntry(code));
+    if (atomic) atomicFiles.set(atomicProgramFilepath, createEntry(code));
   }
 
   try {
     return await transformer.transform(code, filepath, skipCssEval, loadFile);
   } catch (err) {
-    // the compiler resolves the stored CSS entry with the error, drop it or later transforms would
+    // the compiler resolves the stored entries with the error, drop them or later transforms would
     // skip CSS evaluation and keep serving the error
     cssFiles.delete(cssFilepath);
+    atomicFiles.delete(atomicProgramFilepath);
     throw err;
   }
+};
+
+/** A loader serving a virtual module of the file in `?filepath=`, see `loadVirtualModule`. */
+export const virtualModuleLoader =
+  (
+    load: (ctx: LoaderCtx, bundler: Bundler, filepath: string) => Promise<string>,
+  ): RawLoaderDefinitionFunction<{ bundler?: Bundler }> =>
+  function () {
+    const callback = this.async();
+    // TODO remove this when done
+    this.cacheable(false);
+
+    const bundler = this.getOptions().bundler ?? "webpack";
+    // the loader rules only match imports with `?filepath=`
+    const filepath = new URLSearchParams(this.resourceQuery).get("filepath")!;
+
+    load(this, bundler, filepath).then(
+      (code) => callback(null, code),
+      (err) => callback(err),
+    );
+  };
+
+/**
+ * Loads the virtual module of `filepath` stored in `store` under `key`. Turbopack runs loaders in a
+ * pool of processes, so the file may have been transformed in another process, it's transformed
+ * again if this process has no (or an outdated) module for it.
+ */
+export const loadVirtualModule = async (
+  ctx: LoaderCtx,
+  bundler: Bundler,
+  filepath: string,
+  store: Map<string, CssCachEntry>,
+  key: string,
+) => {
+  ctx.addDependency(filepath);
+  const code = await readFile(filepath, "utf-8").catch(() => undefined);
+
+  if (code !== undefined && store.get(key)?.code !== code) {
+    if (!(await transformFile(ctx, bundler, code, filepath))) return "";
+  }
+
+  const module = await store.get(key);
+  if (module instanceof Error) throw module;
+  return module ?? "";
+};
+
+/** Atomic CSS of the declarations `filepath` uses, as of its latest evaluation in this process. */
+export const fileAtomicCss = async (bundler: Bundler, filepath: string) => {
+  const css = (await transformers.get(bundler))?.get_file_atomic_css(filepath);
+  return css ? wrapAtomicCss(css) : "";
 };

@@ -1,41 +1,9 @@
 import { describe, it, expect } from "vitest";
-import path from "path";
-import { createRequire } from "node:module";
 import webpackTransformLoader from "../src/loaders/webpackTransformLoader";
 import turbopackTransformLoader from "../src/loaders/turbopackTransformLoader";
 import cssLoader from "../src/loaders/cssLoader";
 import { cssFiles } from "../src/shared";
-
-type LoaderResult = { err: Error | null | undefined; result?: string };
-
-const runLoader = (loader: Function, code: string, resource: string) =>
-  new Promise<LoaderResult>((resolve) => {
-    const callback = (err: Error | null | undefined, result?: string | Buffer) =>
-      resolve({ err, result: result?.toString() });
-    const queryStart = resource.indexOf("?");
-    loader.call(
-      {
-        resourcePath: queryStart === -1 ? resource : resource.slice(0, queryStart),
-        resourceQuery: queryStart === -1 ? "" : resource.slice(queryStart),
-        async: () => callback,
-        getOptions: () => ({}),
-        callback,
-        cacheable: () => {},
-        addDependency: () => {},
-        getDependencies: () => [],
-        getResolve:
-          () =>
-          (context: string, request: string, cb: (err: Error | null, result?: string) => void) => {
-            try {
-              cb(null, createRequire(path.join(context, "noop.js")).resolve(request));
-            } catch (err) {
-              cb(err as Error);
-            }
-          },
-      },
-      Buffer.from(code),
-    );
-  });
+import { runLoader, virtualImport } from "./util";
 
 const styled = (color: string) => `import { css } from "@style-this/core";
 export const cls = css\`
@@ -44,12 +12,6 @@ export const cls = css\`
 `;
 
 const SYNTAX_ERROR = "\nconst = ;\n";
-
-/** The CSS import the transform inserted into `filepath`, as a resource for the CSS loader. */
-const cssImport = (filepath: string, code: string) => {
-  const source = code.match(/import "([^"]+\?filepath=[^"]+)"/)![1];
-  return path.resolve(path.dirname(filepath), source);
-};
 
 describe.each([
   ["webpack", webpackTransformLoader],
@@ -72,7 +34,7 @@ describe("next turbopack transform loader errors", () => {
     const css = async (code: string) => {
       const { err, result } = await transform(code);
       expect(err).toBeNull();
-      return runLoader(cssLoader, "", cssImport(filepath, result!));
+      return runLoader(cssLoader, "", virtualImport(filepath, result!, "style-this.module.css"));
     };
 
     expect((await transform(styled("red") + SYNTAX_ERROR)).err).toBeInstanceOf(Error);

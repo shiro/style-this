@@ -11,6 +11,7 @@ export default defineConfig([
     entry: [
       "src/index.ts",
       "src/loaders/cssLoader.ts",
+      "src/loaders/atomicProgramLoader.ts",
       "src/loaders/webpackTransformLoader.ts",
       "src/loaders/turbopackTransformLoader.ts",
     ],

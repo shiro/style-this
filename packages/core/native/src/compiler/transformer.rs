@@ -239,6 +239,12 @@ impl Transformer {
         self.cache_registry.get_all_atomic_css()
     }
 
+    /// Atomic CSS of the declarations `filepath` uses, as of its latest evaluation. For bundlers
+    /// that can't collect the atomic CSS of all files into one stylesheet.
+    pub fn get_file_atomic_css(&self, filepath: &str) -> String {
+        self.cache_registry.get_file_atomic_css(filepath)
+    }
+
     /// Clear value cache for a specific file
     pub fn clear_value_cache(&self, filepath: &str) {
         self.cache_registry.clear_file(filepath);

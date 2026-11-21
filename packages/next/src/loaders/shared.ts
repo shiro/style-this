@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 
 type LoaderCtx = ThisParameterType<RawLoaderDefinitionFunction>;
 
-export const makeLoadFile = (ctx: LoaderCtx, mocks: Map<string, string>) => {
+export const makeLoadFile = (ctx: LoaderCtx) => {
   const resolveSync = ctx.getResolve({ dependencyType: "esm" });
   const cwd = process.cwd();
 
@@ -36,11 +36,6 @@ export const makeLoadFile = (ctx: LoaderCtx, mocks: Map<string, string>) => {
     importSourceId: string,
     importer: string,
   ): Promise<[string, string]> => {
-    if (mocks.has(importSourceId)) {
-      const filepath = require.resolve(importSourceId);
-      return [filepath, mocks.get(importSourceId)!];
-    }
-
     let filepath =
       (await resolve(importSourceId, importer)) ?? importSourceId;
 

@@ -1,0 +1,2 @@
+/* imported instead of `@style-this/core/atomic` in atomic mode, fixes the layer order at the import position */
+@layer theme, base, components, utilities;
