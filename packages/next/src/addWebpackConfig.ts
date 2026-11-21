@@ -9,6 +9,7 @@ import {
   regexFilepathQuery,
   regexNoopAtomicProgram,
   regexNoopCss,
+  regexTransformExtension,
 } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
 
@@ -80,7 +81,7 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
       });
 
       config.module.rules.push({
-        test: [/\.(tsx|ts|js|mjs|jsx)$/],
+        test: regexTransformExtension,
         loader: path.resolve(__dirname, "./loaders/webpackTransformLoader.mjs"),
         options: {},
         exclude: [/node_modules/, regexNoopAtomicProgram],

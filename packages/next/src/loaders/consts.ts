@@ -25,6 +25,10 @@ export const noopAtomicCssFile = path.join(packageRoot, noopAtomicCssFilename);
 /** The atomic class modules of transformed files point at this, the loader serves the module of `?filepath=`. */
 export const noopAtomicProgramFile = path.join(packageRoot, "style-this.atomic-program.js");
 
+/** Extensions of the files the transform loader runs on. */
+export const transformExtensions = ["tsx", "ts", "jsx", "js", "mjs"];
+export const regexTransformExtension = new RegExp(`\\.(${transformExtensions.join("|")})$`);
+
 export const regexNoopCss = /[\\/]style-this\.(module|global)\.css$/;
 export const regexNoopAtomicProgram = /[\\/]style-this\.atomic-program\.js$/;
 export const regexFilepathQuery = /[?&]filepath=/;

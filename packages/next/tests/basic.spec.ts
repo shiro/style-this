@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import type { Configuration } from "webpack";
 import { withStyleThis } from "../src/index";
 
+const transformGlob = "*.{tsx,ts,jsx,js,mjs}";
+
 describe("withStyleThis", () => {
   it("adds its config to the user's config without mutating it", () => {
     const turbopack = { resolveAlias: { foo: "./foo" }, rules: { "*.svg": { loaders: ["svg-loader"] } } };
@@ -16,7 +18,7 @@ describe("withStyleThis", () => {
     });
     expect(Object.keys(config.turbopack?.rules ?? {})).toEqual([
       "*.svg",
-      "*.tsx",
+      transformGlob,
       "style-this.module.css",
       "style-this.global.css",
       "style-this.atomic-program.js",
@@ -27,5 +29,15 @@ describe("withStyleThis", () => {
     config.webpack!(webpackConfig, {} as any);
     expect(userWebpack).toHaveBeenCalledWith(webpackConfig, {});
     expect(webpackConfig.module.rules).toHaveLength(3);
+  });
+
+  it.each([
+    ["rule", { loaders: ["a"] }, [{ loaders: ["a"] }]],
+    ["rules and loaders", ["a", { loaders: ["b"] }], ["a", { loaders: ["b"] }]],
+  ])("runs the transform after the user's %s of the same glob", (_, userRule, expected) => {
+    const rules = withStyleThis({ turbopack: { rules: { [transformGlob]: userRule as any } } }).turbopack?.rules;
+    const transformRule = withStyleThis({}).turbopack?.rules?.[transformGlob];
+
+    expect(rules?.[transformGlob]).toEqual([...expected, transformRule]);
   });
 });

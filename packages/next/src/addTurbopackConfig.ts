@@ -1,14 +1,47 @@
 import path from "path";
 import { fileURLToPath } from "url";
+import type {
+  TurbopackRuleConfigCollection,
+  TurbopackRuleConfigItem,
+} from "next/dist/server/config-shared";
 import { WithLinariaConfig } from "./types";
-import { noopAtomicCssFilename, regexFilepathQuery } from "./loaders/consts";
+import {
+  noopAtomicCssFilename,
+  regexFilepathQuery,
+  regexNoopAtomicProgram,
+  transformExtensions,
+} from "./loaders/consts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const transformGlob = `*.{${transformExtensions.join(",")}}`;
+
+/**
+ * Runs `rule` after the user's rules of the same glob instead of overwriting them. Next turns each
+ * item of an array (rule or loader) into its own rule.
+ */
+const appendRule = (
+  userRule: TurbopackRuleConfigCollection | undefined,
+  rule: TurbopackRuleConfigItem,
+): TurbopackRuleConfigCollection =>
+  userRule ? [...(Array.isArray(userRule) ? userRule : [userRule]), rule] : rule;
+
 export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig {
-  const transformLoader = {
-    loader: path.resolve(__dirname, "./loaders/turbopackTransformLoader.mjs"),
-    options: {},
+  const userRules = config.turbopack?.rules;
+
+  const transformRule: TurbopackRuleConfigItem = {
+    condition: {
+      all: [
+        // same as the `node_modules` exclusion of the webpack rule
+        { not: "foreign" },
+        { not: { path: regexNoopAtomicProgram } },
+        // TODO: can be removed once https://github.com/vercel/next.js/issues/79592 is fixed
+        { not: { path: new RegExp(`middleware\\.(${transformExtensions.join("|")})$`) } },
+      ],
+    },
+    loaders: [
+      { loader: path.resolve(__dirname, "./loaders/turbopackTransformLoader.mjs"), options: {} },
+    ],
   };
 
   // serves the CSS of `?filepath=` for the noop CSS files the transformed files import
@@ -30,15 +63,8 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
         "@style-this/core/atomic": `@style-this/next/${noopAtomicCssFilename}`,
       },
       rules: {
-        ...config.turbopack?.rules,
-        // "*.{ts,tsx,js,jsx}": {
-        "*.tsx": {
-          condition: {
-            // TODO: can be removed once https://github.com/vercel/next.js/issues/79592 is fixed
-            not: { path: /middleware\.(tsx?|jsx?)$/ },
-          },
-          loaders: [transformLoader],
-        },
+        ...userRules,
+        [transformGlob]: appendRule(userRules?.[transformGlob], transformRule),
         "style-this.module.css": cssRule,
         "style-this.global.css": cssRule,
         // serves the atomic class module of `?filepath=`
