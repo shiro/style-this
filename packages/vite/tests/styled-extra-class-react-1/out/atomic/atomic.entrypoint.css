@@ -2,5 +2,6 @@
 @layer utilities {
 .b-zDIGu { border: 1px solid blue }
 .bg-kG3jH { background: none }
+.p-zzm9z { padding: var(--var1-30dyns)px }
 .r-T5iL9 { border-radius: 2px }
 }

@@ -1,8 +1,6 @@
 @layer theme, base, components, utilities;.CounterStyle-zodu74 { /* marker */ }
-.FancyButton-otinw9 {   padding: var(--var1-enc92j); }
-.FancyButton2-wtirkd { margin: var(--var1-1mjodu);
-  min-height: var(--var2-spq7g9);
-  background: var(--var3-wlmjop); }.ContainerStyle-3wxanc { /* marker */ }
+.FancyButton-otinw9 { /* marker */ }
+.FancyButton2-wtirkd { /* marker */ }.ContainerStyle-3wxanc { /* marker */ }
 .colorStyle-v856z4 { /* marker */ }
 .highlightStyle-s1ybc1 { /* marker */ }
 .Global__Main {
@@ -14,15 +12,19 @@
 .bg-BZ0hD { background: lightyellow }
 .bg-LVc4W { background: white }
 .bg-kG3jH { background: none }
+.bg-xETRV { background: var(--var3-wlmjop) }
 .c-E_Zrl { color: crimson }
 .c-JFbUm { color: coral }
 .cursor-AndGx { cursor: pointer }
 .d-W_LRO { display: flex }
 .gap-TC2Nt { gap: 8px }
+.m-LFmNO { margin: var(--var1-1mjodu) }
 .m-afsNG { margin: 4px }
 .p-DTauT { padding: 16px }
+.p-ZQZLf { padding: var(--var1-enc92j) }
 .flex-d-F56Lh { flex-direction: column }
 .items-ib2Uw { align-items: center }
+.min-h-lkJSK { min-height: var(--var2-spq7g9) }
 .r-KyVot { border-radius: 8px }
 .r-T5iL9 { border-radius: 2px }
 }

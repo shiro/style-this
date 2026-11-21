@@ -5,6 +5,7 @@
 .b-zDIGu { border: 1px solid blue }
 .bg-BZ0hD { background: lightyellow }
 .bg-LVc4W { background: white }
+.bg-iBf89 { background: var(--var3-z85yv8) }
 .bg-kG3jH { background: none }
 .c-JFbUm { color: coral }
 .c-aUM_I { color: green }
@@ -12,9 +13,12 @@
 .d-W_LRO { display: flex }
 .gap-TC2Nt { gap: 8px }
 .m-afsNG { margin: 4px }
+.m-htWjh { margin: var(--var1-nspajg) }
+.p-BeiPE { padding: var(--var1-azc1aj) }
 .p-DTauT { padding: 16px }
 .flex-d-F56Lh { flex-direction: column }
 .items-ib2Uw { align-items: center }
+.min-h-YiQC- { min-height: var(--var2-k1yf81) }
 .r-KyVot { border-radius: 8px }
 .r-T5iL9 { border-radius: 2px }
 }

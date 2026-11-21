@@ -1,5 +1,5 @@
 import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-CrOi7Eds.js
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-ByXDYYIY.js
 var ATOMIC_PREFIXES = new Set(Object.values({
 	margin: "m",
 	"margin-top": "mt",
@@ -195,8 +195,8 @@ var mergeStyles = (...classes) => {
 	return [...merged.values()].join(" ");
 };
 var CounterStyle$1 = "CounterStyle-ezk5qn b-zDIGu bg-LVc4W d-W_LRO gap-TC2Nt items-ib2Uw m-afsNG p-DTauT r-KyVot something";
-var __styleThis_var_FancyButton_6 = "FancyButton-diz892 b-zDIGu bg-kG3jH r-T5iL9";
-var __styleThis_var_FancyButton2_4 = "FancyButton2-r4dezo cursor-AndGx";
+var __styleThis_var_FancyButton_6 = "FancyButton-diz892 b-zDIGu bg-kG3jH p-BeiPE r-T5iL9";
+var __styleThis_var_FancyButton2_4 = "FancyButton2-r4dezo bg-iBf89 cursor-AndGx m-htWjh min-h-YiQC-";
 var _tmpl$$1 = [
 	"<div",
 	"><!--$-->",

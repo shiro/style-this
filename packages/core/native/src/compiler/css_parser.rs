@@ -178,17 +178,13 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     segments
 }
 
-/// Check if a declaration is valid (no CSS variables, etc.)
+/// Check if a declaration is a single valid declaration terminated by `;`
 fn is_valid_declaration(decl_text: &str) -> bool {
     let trimmed = decl_text.trim();
 
     let Some(without_semi) = trimmed.strip_suffix(';') else {
         return false;
     };
-
-    if trimmed.contains("var(") {
-        return false;
-    }
 
     let wrapped = format!("a {{ {} }}", without_semi);
 
@@ -233,6 +229,8 @@ mod tests {
             }
             background: something-random-but-valid;
             margin-top: var(--mt);
+            padding: var(--var1-abc)px var(--var2-abc, 2px);
+            --accent: var(--brand);
             margin-bottom: calc( 100% - 20px );
         "};
         let expected = Some(indoc! {"
@@ -240,11 +238,13 @@ mod tests {
             @media (max-width: 600px) {
                 .btn { color: blue; }
             }
-            margin-top: var(--mt);
         "});
         let expected_atomics = HashSet::from([
             "color: red".to_string(),
             "background: something-random-but-valid".to_string(),
+            "margin-top: var(--mt)".to_string(),
+            "padding: var(--var1-abc)px var(--var2-abc, 2px)".to_string(),
+            "--accent: var(--brand)".to_string(),
             "margin-bottom: calc( 100% - 20px )".to_string(),
         ]);
 
@@ -317,6 +317,7 @@ mod tests {
             vec![
                 "grid-template-columns:\n  minmax(0, 1fr)\n  auto".to_string(),
                 "transition:\n  color 0.2s,\n  background 0.2s".to_string(),
+                "margin-top:\n  var(--mt)".to_string(),
             ]
         );
         assert_eq!(
@@ -325,8 +326,6 @@ mod tests {
                 &:hover {
                   color: blue;
                 }
-                margin-top:
-                  var(--mt);
             "})
         );
     }
