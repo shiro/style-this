@@ -9,7 +9,7 @@ import {
 } from "@style-this/core/compiler";
 import { generateCssSourceMap } from "@style-this/core/cssSourceMap";
 import { createRequire } from "node:module";
-import { Filter, filterMatches, timeoutPromise, TIMEOUT } from "./util";
+import { Filter, filterMatches, isInNodeModules, timeoutPromise, TIMEOUT } from "./util";
 import { handleTransformError } from "./util";
 import { initializeSolidMocks } from "./solid";
 import { isSvelteFile, extractSvelteScript, rewrapSvelteScript, normalizeFilepath } from "./svelte";
@@ -325,7 +325,7 @@ const vitePlugin = (options: Options = {}) => {
         if (query !== undefined) return [filepathWithQuery, await readFile(filepath, "utf-8")];
 
         if (
-          !filepath.startsWith(`${cwd}/node_modules/`) &&
+          !isInNodeModules(cwd, filepath) &&
           !id.startsWith("@style-this/")
         ) {
           try {

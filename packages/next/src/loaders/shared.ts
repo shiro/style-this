@@ -7,6 +7,10 @@ const require = createRequire(import.meta.url);
 
 type LoaderCtx = ThisParameterType<RawLoaderDefinitionFunction>;
 
+/** Whether `filepath` is inside `cwd`'s `node_modules`, `/` and `\` separators are both accepted on Windows. */
+export const isInNodeModules = (cwd: string, filepath: string) =>
+  path.relative(cwd, filepath).split(path.sep, 1)[0] === "node_modules";
+
 export const makeLoadFile = (ctx: LoaderCtx) => {
   const resolveSync = ctx.getResolve({ dependencyType: "esm" });
   const cwd = process.cwd();
@@ -47,7 +51,7 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
     let filepath = resolved ?? importSourceId;
 
     if (
-      !filepath.startsWith(`${cwd}/node_modules/`) &&
+      !isInNodeModules(cwd, filepath) &&
       !importSourceId.startsWith("@style-this/")
     ) {
       try {

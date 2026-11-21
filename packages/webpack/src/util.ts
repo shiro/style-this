@@ -1,4 +1,10 @@
+import { relative, sep } from "path";
+
 export type Filter = RegExp | ((filepath: string) => boolean);
+
+/** Whether `filepath` is inside `cwd`'s `node_modules`, `/` and `\` separators are both accepted on Windows. */
+export const isInNodeModules = (cwd: string, filepath: string) =>
+  relative(cwd, filepath).split(sep, 1)[0] === "node_modules";
 
 export const filterMatches = (filter: Filter[], filepath: string) => {
   return (

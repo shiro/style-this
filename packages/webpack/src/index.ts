@@ -1,6 +1,7 @@
 import type { RawLoaderDefinitionFunction } from "webpack";
 import { Transformer, initializeStyleThis, type CssCachEntry } from "@style-this/core/compiler";
 import { cacheRegistry, cssFiles } from "./shared";
+import { isInNodeModules } from "./util";
 import path from "path";
 import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
@@ -84,7 +85,7 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
     let [filepath, _query] = filepathWithQuery.split("?", 2);
 
     if (
-      !filepath.startsWith(`${cwd}/node_modules/`) &&
+      !isInNodeModules(cwd, filepath) &&
       !importSourceId.startsWith("@style-this/")
     ) {
       try {
