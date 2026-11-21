@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { joinStyles, mergeStyles } from '../src/index';
+import { joinStyles, mergeInlineStyles, mergeStyles } from '../src/index';
 import atomicPrefixes from '../src/atomicPrefixes.json';
 
 const prefixes = Object.values(atomicPrefixes);
@@ -212,6 +212,27 @@ describe('joinStyles', () => {
   it('keeps class lists as-is', () => {
     expect(joinStyles('Button-abc123 kG3jH', 'Override-def456')).toBe(
       'Button-abc123 kG3jH Override-def456'
+    );
+  });
+});
+
+describe('mergeInlineStyles', () => {
+  it('merges object styles, the style prop wins', () => {
+    expect(mergeInlineStyles({ '--a': 1, '--b': 'x' }, { '--b': 'y', color: 'red' })).toEqual({
+      '--a': 1,
+      '--b': 'y',
+      color: 'red',
+    });
+  });
+
+  it('handles a missing style prop', () => {
+    expect(mergeInlineStyles({ '--a': 1 }, undefined)).toEqual({ '--a': 1 });
+    expect(mergeInlineStyles({ '--a': 1 }, null)).toEqual({ '--a': 1 });
+  });
+
+  it('prepends the variables to string styles, skipping nullish values', () => {
+    expect(mergeInlineStyles({ '--a': 1, '--b': undefined, '--c': 'x' }, 'color: red')).toBe(
+      '--a:1;--c:x;color: red'
     );
   });
 });

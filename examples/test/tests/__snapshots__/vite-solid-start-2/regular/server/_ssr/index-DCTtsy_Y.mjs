@@ -1,5 +1,5 @@
 import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-gh9uYAqU.js
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-DCTtsy_Y.js
 new Set(Object.values({
 	margin: "m",
 	"margin-top": "mt",
@@ -170,6 +170,19 @@ new Set(Object.values({
 }));
 /** Joins class lists, ignoring falsy values. */
 var joinStyles = (...classes) => classes.filter(Boolean).join(" ");
+/**
+* Merges a styled component's CSS variables with the `style` prop, which wins on conflicts.
+* The `style` prop may be a CSS string (e.g. in Solid), in which case CSS text is returned.
+*/
+var mergeInlineStyles = (vars, style$1) => {
+	if (typeof style$1 !== "string") return {
+		...vars,
+		...style$1
+	};
+	let res = "";
+	for (const [name, value] of Object.entries(vars)) if (value != null) res += `${name}:${value};`;
+	return res + style$1;
+};
 var _tmpl$$1 = [
 	"<div",
 	" class=\"CounterStyle-ezk5qn something\"><!--$-->",
@@ -185,13 +198,10 @@ var FancyButton = (() => {
 				return joinStyles(FancyButton, props.class);
 			},
 			get style() {
-				return {
-					"--var1-azc1aj": (({ a }) => `${a}px`)({
-						...props.styleProps,
-						"props": props
-					}),
-					...props.style ?? {}
-				};
+				return mergeInlineStyles({ "--var1-azc1aj": (({ a }) => `${a}px`)({
+					...props.styleProps,
+					"props": props
+				}) }, props.style);
 			}
 		}), void 0, true);
 	};
@@ -206,7 +216,7 @@ var FancyButton2 = (() => {
 				return joinStyles(FancyButton2, props.class);
 			},
 			get style() {
-				return {
+				return mergeInlineStyles({
 					"--var1-nspajg": (({ b }) => `${b}px`)({
 						...props.styleProps,
 						"props": props
@@ -218,9 +228,8 @@ var FancyButton2 = (() => {
 					"--var3-z85yv8": (({ props }) => props.disabled ? "red" : "green")({
 						...props.styleProps,
 						"props": props
-					}),
-					...props.style ?? {}
-				};
+					})
+				}, props.style);
 			}
 		}));
 	};

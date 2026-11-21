@@ -52,7 +52,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         let css_declaration = self.base.build_css_declaration(span, &class_variable_name, simple_tagged_template_expression);
         
         let style_properties = self.base.build_style_properties(span, &captured_expressions);
-        let style_attribute = self.base.build_style_attribute(span, style_properties, true);
+        let style_attribute = self.base.build_style_attribute(span, style_properties, false);
 
         // For React, filter props only when extending an HTML element (not a custom component) and we have captured expressions
         let should_filter_props = !is_extending_custom_component && !captured_expressions.is_empty();

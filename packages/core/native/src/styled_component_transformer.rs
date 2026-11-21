@@ -2,6 +2,7 @@ use crate::{utils::SeededRandom, *};
 use oxc_ast::ast::JSXAttributeItem;
 
 pub const MERGE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeStyles";
+pub const MERGE_INLINE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeInlineStyles";
 
 /// Inserts `import { mergeStyles as __styleThis__mergeStyles } from "@style-this/core"` after the last import.
 pub fn insert_merge_styles_import<'alloc>(
@@ -254,49 +255,69 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
             .collect()
     }
 
+    /// Builds the `style` attribute merging the CSS variables with `props.style`, either as
+    /// `{...vars, ...props.style ?? {}}` or, when `props.style` may be a string (Solid), as
+    /// `__styleThis__mergeInlineStyles({...vars}, props.style)`.
     pub fn build_style_attribute(
         &self,
         span: oxc_span::Span,
         style_properties: Vec<oxc_ast::ast::ObjectPropertyKind<'alloc>>,
-        include_props_style: bool,
+        use_merge_inline_styles: bool,
     ) -> Option<JSXAttributeItem<'alloc>> {
         if style_properties.is_empty() {
             return None;
         }
 
-        let mut all_style_properties = style_properties;
-        
-        if include_props_style {
-            all_style_properties.push(
-                self.ast_builder.object_property_kind_spread_property(
+        let props_style = Expression::StaticMemberExpression(
+            self.ast_builder.alloc_static_member_expression(
+                span,
+                Expression::Identifier(
+                    self.ast_builder
+                        .alloc_identifier_reference(span, self.ast_builder.atom("props")),
+                ),
+                self.ast_builder
+                    .identifier_name(span, self.ast_builder.atom("style")),
+                false,
+            ),
+        );
+
+        let style_expression = if use_merge_inline_styles {
+            JSXExpression::CallExpression(self.ast_builder.alloc_call_expression(
+                span,
+                Expression::Identifier(self.ast_builder.alloc_identifier_reference(
                     span,
-                    Expression::LogicalExpression(
-                        self.ast_builder.alloc_logical_expression(
+                    self.ast_builder.atom(MERGE_INLINE_STYLES_LOCAL_NAME),
+                )),
+                None as Option<oxc_allocator::Box<_>>,
+                self.ast_builder.vec_from_iter([
+                    oxc_ast::ast::Argument::ObjectExpression(
+                        self.ast_builder.alloc_object_expression(
                             span,
-                            Expression::StaticMemberExpression(
-                                self.ast_builder.alloc_static_member_expression(
-                                    span,
-                                    Expression::Identifier(
-                                        self.ast_builder.alloc_identifier_reference(
-                                            span,
-                                            self.ast_builder.atom("props"),
-                                        ),
-                                    ),
-                                    self.ast_builder
-                                        .identifier_name(span, self.ast_builder.atom("style")),
-                                    false,
-                                ),
-                            ),
-                            oxc_ast::ast::LogicalOperator::Coalesce,
-                            Expression::ObjectExpression(
-                                self.ast_builder
-                                    .alloc_object_expression(span, self.ast_builder.vec()),
-                            ),
+                            self.ast_builder.vec_from_iter(style_properties),
                         ),
                     ),
-                ),
-            );
-        }
+                    props_style.into(),
+                ]),
+                false,
+            ))
+        } else {
+            let mut all_style_properties = style_properties;
+            all_style_properties.push(self.ast_builder.object_property_kind_spread_property(
+                span,
+                Expression::LogicalExpression(self.ast_builder.alloc_logical_expression(
+                    span,
+                    props_style,
+                    oxc_ast::ast::LogicalOperator::Coalesce,
+                    Expression::ObjectExpression(
+                        self.ast_builder.alloc_object_expression(span, self.ast_builder.vec()),
+                    ),
+                )),
+            ));
+            JSXExpression::ObjectExpression(self.ast_builder.alloc_object_expression(
+                span,
+                self.ast_builder.vec_from_iter(all_style_properties),
+            ))
+        };
 
         Some(
             self.ast_builder.jsx_attribute_item_attribute(
@@ -305,10 +326,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                     .jsx_attribute_name_identifier(span, self.ast_builder.atom("style")),
                 Some(self.ast_builder.jsx_attribute_value_expression_container(
                     span,
-                    JSXExpression::ObjectExpression(self.ast_builder.alloc_object_expression(
-                        span,
-                        self.ast_builder.vec_from_iter(all_style_properties),
-                    )),
+                    style_expression,
                 )),
             ),
         )

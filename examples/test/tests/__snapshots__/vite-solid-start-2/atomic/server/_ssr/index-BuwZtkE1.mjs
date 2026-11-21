@@ -1,5 +1,5 @@
 import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-ByXDYYIY.js
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-BuwZtkE1.js
 var ATOMIC_PREFIXES = new Set(Object.values({
 	margin: "m",
 	"margin-top": "mt",
@@ -194,6 +194,19 @@ var mergeStyles = (...classes) => {
 	}
 	return [...merged.values()].join(" ");
 };
+/**
+* Merges a styled component's CSS variables with the `style` prop, which wins on conflicts.
+* The `style` prop may be a CSS string (e.g. in Solid), in which case CSS text is returned.
+*/
+var mergeInlineStyles = (vars, style$1) => {
+	if (typeof style$1 !== "string") return {
+		...vars,
+		...style$1
+	};
+	let res = "";
+	for (const [name, value] of Object.entries(vars)) if (value != null) res += `${name}:${value};`;
+	return res + style$1;
+};
 var CounterStyle$1 = "CounterStyle-ezk5qn b-zDIGu bg-LVc4W d-W_LRO gap-TC2Nt items-ib2Uw m-afsNG p-DTauT r-KyVot something";
 var __styleThis_var_FancyButton_6 = "FancyButton-diz892 b-zDIGu bg-kG3jH p-BeiPE r-T5iL9";
 var __styleThis_var_FancyButton2_4 = "FancyButton2-r4dezo bg-iBf89 cursor-AndGx m-htWjh min-h-YiQC-";
@@ -213,13 +226,10 @@ var FancyButton = (() => {
 				return mergeStyles(FancyButton, props.class);
 			},
 			get style() {
-				return {
-					"--var1-azc1aj": (({ a }) => `${a}px`)({
-						...props.styleProps,
-						"props": props
-					}),
-					...props.style ?? {}
-				};
+				return mergeInlineStyles({ "--var1-azc1aj": (({ a }) => `${a}px`)({
+					...props.styleProps,
+					"props": props
+				}) }, props.style);
 			}
 		}), void 0, true);
 	};
@@ -234,7 +244,7 @@ var FancyButton2 = (() => {
 				return mergeStyles(FancyButton2, props.class);
 			},
 			get style() {
-				return {
+				return mergeInlineStyles({
 					"--var1-nspajg": (({ b }) => `${b}px`)({
 						...props.styleProps,
 						"props": props
@@ -246,9 +256,8 @@ var FancyButton2 = (() => {
 					"--var3-z85yv8": (({ props }) => props.disabled ? "red" : "green")({
 						...props.styleProps,
 						"props": props
-					}),
-					...props.style ?? {}
-				};
+					})
+				}, props.style);
 			}
 		}));
 	};

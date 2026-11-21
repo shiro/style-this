@@ -2,6 +2,7 @@ use crate::{styled_component_transformer::*, *};
 
 struct SolidStyledComponentTransformer<'a, 'alloc> {
     base: StyledComponentTransformer<'a, 'alloc>,
+    uses_merge_inline_styles: bool,
 }
 
 impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
@@ -12,6 +13,7 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
     ) -> Self {
         Self {
             base: StyledComponentTransformer::new(ast_builder, skip_jsx, filepath, "class"),
+            uses_merge_inline_styles: false,
         }
     }
 
@@ -49,7 +51,9 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
         let css_declaration = self.base.build_css_declaration(span, &class_variable_name, simple_tagged_template_expression);
         
         let style_properties = self.base.build_style_properties(span, &captured_expressions);
+        // Solid's `style` prop may be a string, so it can't be spread
         let style_attribute = self.base.build_style_attribute(span, style_properties, true);
+        self.uses_merge_inline_styles |= style_attribute.is_some();
 
         // For Solid, we need to use splitProps to filter out styleProps and style
         // BUT only if we're extending an HTML element, not a custom component
@@ -320,6 +324,16 @@ pub fn solid_js_prepass<'alloc>(
 
     if transformer.base.component_counter > 0 && !transformer.base.skip_jsx {
         insert_merge_styles_import(ast_builder, program);
+    }
+
+    if transformer.uses_merge_inline_styles {
+        insert_named_import(
+            ast_builder,
+            program,
+            "mergeInlineStyles",
+            MERGE_INLINE_STYLES_LOCAL_NAME,
+            LIBRARY_CORE_IMPORT_NAME,
+        );
     }
 
     // Add import for splitProps if we generated any styled components with captured expressions

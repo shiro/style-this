@@ -68,3 +68,22 @@ export const mergeStyles = (...classes: Array<ClassValue>): string => {
   }
   return [...merged.values()].join(" ");
 };
+
+type InlineStyle = Record<string, string | number | undefined>;
+
+/**
+ * Merges a styled component's CSS variables with the `style` prop, which wins on conflicts.
+ * The `style` prop may be a CSS string (e.g. in Solid), in which case CSS text is returned.
+ */
+export const mergeInlineStyles = (
+  vars: InlineStyle,
+  style?: InlineStyle | string | null,
+): InlineStyle | string => {
+  if (typeof style !== "string") return { ...vars, ...style };
+
+  let res = "";
+  for (const [name, value] of Object.entries(vars)) {
+    if (value != null) res += `${name}:${value};`;
+  }
+  return res + style;
+};
