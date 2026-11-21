@@ -965,7 +965,18 @@ pub async fn evaluate_program<'alloc>(
         if !exported_idents.is_empty() {
             value_cache.extend(exported_idents.keys().cloned());
         }
-        
+
+        if let Some(entries) = &entries {
+            // the virtual modules of a previous evaluation with CSS may still be requested, resolve
+            // them as empty so they don't wait forever
+            entries.resolve_all(&"".into());
+            if transformer.atomic {
+                transformer
+                    .cache_registry
+                    .set_file_atomic_declarations(&program_filepath, BTreeSet::new());
+            }
+        }
+
         if let Some(tx) = tx {
             // files only using `mergeStyles` still need the non-atomic rewrite emitted
             let result = (entrypoint && rewrote_merge_styles)

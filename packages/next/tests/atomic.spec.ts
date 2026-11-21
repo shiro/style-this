@@ -73,18 +73,23 @@ export const cls = css\`
 
   it("drops the atomic CSS of previous evaluations", async () => {
     const filepath = `${dir}/drops.tsx`;
-    const styled = `import { css } from "@style-this/core";
+    const styled = await transform(
+      filepath,
+      `import { css } from "@style-this/core";
 export const cls = css\`
   color: blue;
 \`;
-`;
-    const modules = await loadVirtualModules(filepath, await transform(filepath, styled));
-    expect(modules.css).toContain("color: blue");
+`,
+    );
+    expect((await loadVirtualModules(filepath, styled)).css).toContain("color: blue");
 
-    const unstyled = `import { css } from "@style-this/core";\nexport const value = 1;\n`;
-    expect(await loadVirtualModules(filepath, await transform(filepath, unstyled))).toEqual({
-      classes: undefined,
-      css: "",
-    });
+    // the loaders run again on edits, while the virtual modules are still imported
+    for (const unstyled of [
+      `import { css } from "@style-this/core";\nexport const value = 1;\n`,
+      `export const value = 1;\n`,
+    ]) {
+      await transform(filepath, unstyled);
+      expect(await loadVirtualModules(filepath, styled)).toEqual({ classes: "", css: "" });
+    }
   });
 });

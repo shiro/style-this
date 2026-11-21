@@ -645,7 +645,7 @@ const vitePlugin = (options: Options = {}) => {
         );
         if (!transformedResult) {
           watchedFiles.delete(pathForImport);
-          // the compiler never resolves these, they would be taken as cached CSS once the file gains styles
+          // the compiler resolves these as empty, they would be taken as cached CSS once the file gains styles
           cacheRegistry.invalidateModule(pathForImport, cssExtension);
           return;
         }
