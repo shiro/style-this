@@ -286,12 +286,6 @@ importers:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
-      next:
-        specifier: 16.2.12
-        version: 16.2.12(@babel/core@7.29.7(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.90.0)
-      solid-js:
-        specifier: '*'
-        version: 1.9.10
       webpack:
         specifier: ^5.0.0
         version: 5.102.1(esbuild@0.28.1)
@@ -299,6 +293,9 @@ importers:
       '@jridgewell/trace-mapping':
         specifier: ^0.3.31
         version: 0.3.31
+      next:
+        specifier: 16.2.12
+        version: 16.2.12(@babel/core@7.29.7(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.90.0)
 
   packages/react:
     dependencies:
