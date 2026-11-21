@@ -18,7 +18,6 @@ pub struct Transformer {
     pub(crate) cache_registry: CacheRegistry,
     pub(crate) require_ref: Option<String>,
     pub(crate) css_extension: String,
-    pub(crate) wrap_selectors_with_global: bool,
 
     pub(crate) use_require: bool,
     pub(crate) debug: bool,
@@ -76,12 +75,6 @@ impl Transformer {
             .unwrap()
             .as_string()
             .unwrap();
-
-        let wrap_selectors_with_global =
-            js_sys::Reflect::get(&opts, &JsValue::from_str("wrapSelectorsWithGlobal"))
-                .unwrap()
-                .as_bool()
-                .unwrap_or(false);
 
         // Get CacheRegistry from options (passed from Vite)
         let cache_registry_value = js_sys::Reflect::get(&opts, &JsValue::from_str("cacheRegistry"))
@@ -224,7 +217,6 @@ impl Transformer {
             cache_registry,
             require_ref,
             css_extension,
-            wrap_selectors_with_global,
 
             use_require,
             debug,

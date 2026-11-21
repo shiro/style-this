@@ -1137,9 +1137,6 @@ pub async fn evaluate_program<'alloc>(
                     if css_var.classname.starts_with("_Global") {
                         return format!("`${{{var}.css}}\n`");
                     }
-                    if transformer.wrap_selectors_with_global {
-                        return format!("`:global(.{classname}) {{\n${{{var}.css}}\n}}`");
-                    }
 
                     format!("`.{classname} {{\n${{{var}.css}}\n}}`")
                 })

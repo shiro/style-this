@@ -45,7 +45,6 @@ const result = await transformer.transform(code, filepath, false);
 | `atomic` | `boolean` | Atomic output. |
 | `useRequire` | `boolean` | Use `require` in evaluation programs. |
 | `createRequire` | `(filename) => NodeRequire` | Custom `require` factory. |
-| `wrapSelectorsWithGlobal` | `boolean` | Wrap generated selectors in `:global(...)`, for CSS modules pipelines. |
 | `debug` | `boolean` | Verbose logging. |
 | `onDebugVirtualModule` | `(name, code) => void` | Receives every generated evaluation program. |
 

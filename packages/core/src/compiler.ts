@@ -58,8 +58,6 @@ export const Transformer = _Transformer as unknown as new (opts: {
 
   cacheRegistry?: JsCacheRegistry;
 
-  wrapSelectorsWithGlobal?: boolean;
-
   cssExtension: string;
   useRequire?: boolean;
   debug?: boolean;
