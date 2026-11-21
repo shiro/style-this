@@ -32,10 +32,11 @@
     "prepublishOnly": "node -e \"if (!process.env.CI) { console.error('Publishing is only allowed from CI'); process.exit(1) }\""
   },
   "dependencies": {
+    "@jridgewell/remapping": "^2.3.5",
     "@style-this/core": "workspace:0.5.0",
     "@types/node": "^24.10.1",
-    "webpack": "^5.0.0",
-    "next": "16.2.12"
+    "next": "16.2.12",
+    "webpack": "^5.0.0"
   },
   "peerDependencies": {
     "solid-js": "*",
@@ -45,5 +46,8 @@
     "solid-js": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31"
   }
 }

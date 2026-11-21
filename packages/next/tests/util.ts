@@ -1,7 +1,7 @@
 import path from "path";
 import { createRequire } from "node:module";
 
-type LoaderResult = { err: Error | null | undefined; result?: string };
+type LoaderResult = { err: Error | null | undefined; result?: string; map?: unknown };
 type ResolveCallback = (err: Error | null, result?: string) => void;
 
 export const resolveRequest = (context: string, request: string, cb: ResolveCallback) => {
@@ -21,10 +21,11 @@ export const runLoader = (
   resource: string,
   options = {},
   ctx: { addDependency?: (file: string) => void; getResolve?: () => typeof resolveRequest } = {},
+  inputSourceMap?: unknown,
 ) =>
   new Promise<LoaderResult>((resolve) => {
-    const callback = (err: Error | null | undefined, result?: string | Buffer) =>
-      resolve({ err, result: result?.toString() });
+    const callback = (err: Error | null | undefined, result?: string | Buffer, map?: unknown) =>
+      resolve({ err, result: result?.toString(), map });
     const queryStart = resource.indexOf("?");
     loader.call(
       {
@@ -39,6 +40,7 @@ export const runLoader = (
         ...ctx,
       },
       Buffer.from(code),
+      inputSourceMap,
     );
   });
 

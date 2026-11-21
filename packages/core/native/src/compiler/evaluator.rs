@@ -24,6 +24,7 @@ use oxc_ast::ast::{
 use oxc_ast_visit::VisitMut;
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::{ParseOptions, Parser};
+use oxc_sourcemap::ConcatSourceMapBuilder;
 use oxc_span::SourceType;
 use oxc_syntax::identifier::is_identifier_name;
 use oxc_syntax::keyword::is_reserved_keyword_or_global_object;
@@ -84,13 +85,15 @@ fn wrap_eval_program(
     }
 }
 
-/// Helper to get the local name from any import specifier type
 fn codegen_transform_result(program: &Program, program_filepath: &str) -> JsValue {
     let options = CodegenOptions {
         source_map_path: Some(PathBuf::from_str(program_filepath).unwrap()),
         ..Default::default()
     };
     let output_js = Codegen::new().with_options(options).build(program);
+    // shift the mappings below the prepended `// @ts-nocheck` line
+    let sourcemap =
+        ConcatSourceMapBuilder::from_sourcemaps(&[(&output_js.map.unwrap(), 1)]).into_sourcemap();
 
     let result = js_sys::Object::new();
     js_sys::Reflect::set(
@@ -102,12 +105,13 @@ fn codegen_transform_result(program: &Program, program_filepath: &str) -> JsValu
     js_sys::Reflect::set(
         &result,
         &JsValue::from_str("sourcemap"),
-        &JsValue::from_str(&output_js.map.unwrap().to_json_string()),
+        &JsValue::from_str(&sourcemap.to_json_string()),
     )
     .unwrap();
     result.into()
 }
 
+/// Helper to get the local name from any import specifier type
 fn get_import_local_name<'a>(specifier: &'a ImportDeclarationSpecifier<'a>) -> &'a str {
     match specifier {
         ImportDeclarationSpecifier::ImportSpecifier(import) => import.local.name.as_str(),

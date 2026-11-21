@@ -1,4 +1,5 @@
 import { type RawLoaderDefinitionFunction } from "webpack";
+import remapping, { type SourceMapInput } from "@jridgewell/remapping";
 import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
 import path from "path";
@@ -6,6 +7,13 @@ import path from "path";
 const require = createRequire(import.meta.url);
 
 type LoaderCtx = ThisParameterType<RawLoaderDefinitionFunction>;
+type InputSourceMap = Parameters<RawLoaderDefinitionFunction>[1];
+
+/** The transform's `sourcemap`, traced through the map of the loaders that ran before. */
+export const chainSourceMap = (sourcemap: string, inputSourceMap: InputSourceMap) =>
+  inputSourceMap
+    ? remapping([sourcemap, inputSourceMap as SourceMapInput], () => null)
+    : JSON.parse(sourcemap);
 
 /** Whether `filepath` is inside `cwd`'s `node_modules`, `/` and `\` separators are both accepted on Windows. */
 export const isInNodeModules = (cwd: string, filepath: string) =>

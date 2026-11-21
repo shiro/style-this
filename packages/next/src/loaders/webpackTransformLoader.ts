@@ -1,5 +1,6 @@
 import type { RawLoaderDefinitionFunction } from "webpack";
 import { transformFile } from "./transform";
+import { chainSourceMap } from "./shared";
 
 const webpackTransformLoader: RawLoaderDefinitionFunction<{}> = function (code, inputSourceMap) {
   const callback = this.async();
@@ -8,8 +9,10 @@ const webpackTransformLoader: RawLoaderDefinitionFunction<{}> = function (code, 
   this.cacheable(false);
 
   transformFile(this, "webpack", code.toString(), this.resourcePath).then(
-    // TODO sourcemap
-    (result) => (result ? callback(null, result.code) : callback(null, code, inputSourceMap)),
+    (result) =>
+      result
+        ? callback(null, result.code, chainSourceMap(result.sourcemap, inputSourceMap))
+        : callback(null, code, inputSourceMap),
     (err) => callback(err),
   );
 };

@@ -1,7 +1,7 @@
 import type { RawLoaderDefinitionFunction } from "webpack";
 import { Transformer, initializeStyleThis, type CssCachEntry } from "@style-this/core/compiler";
 import { cacheRegistry, cssFiles } from "./shared";
-import { isInNodeModules } from "./util";
+import { chainSourceMap, isInNodeModules } from "./util";
 import path from "path";
 import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
@@ -149,7 +149,7 @@ const webpack5Loader: Loader = function webpack5LoaderPlugin(
       null,
       // `import ${stringifiedRequest};\n${transformedResult.code}`,
       transformedResult.code,
-      // TODO sourcemap
+      chainSourceMap(transformedResult.sourcemap, inputSourceMap),
     );
   })().catch((err) => callback(err));
 };

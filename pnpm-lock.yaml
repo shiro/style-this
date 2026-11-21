@@ -277,6 +277,9 @@ importers:
 
   packages/next:
     dependencies:
+      '@jridgewell/remapping':
+        specifier: ^2.3.5
+        version: 2.3.5
       '@style-this/core':
         specifier: workspace:0.5.0
         version: link:../core
@@ -292,6 +295,10 @@ importers:
       webpack:
         specifier: ^5.0.0
         version: 5.102.1(esbuild@0.28.1)
+    devDependencies:
+      '@jridgewell/trace-mapping':
+        specifier: ^0.3.31
+        version: 0.3.31
 
   packages/react:
     dependencies:
@@ -327,6 +334,9 @@ importers:
 
   packages/webpack:
     dependencies:
+      '@jridgewell/remapping':
+        specifier: ^2.3.5
+        version: 2.3.5
       '@style-this/core':
         specifier: workspace:*
         version: link:../core
