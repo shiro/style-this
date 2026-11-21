@@ -10,11 +10,16 @@ const loadCss = async (plugin: Awaited<ReturnType<typeof setupPlugin>>, filepath
 
 describe("evaluation errors", () => {
   for (const atomic of [false, true]) {
-    test(`imported module throwing is reported (${atomic ? "atomic" : "default"})`, async () => {
+    test(`module throwing is reported (${atomic ? "atomic" : "default"})`, async () => {
       const testDir = `${__dirname}/evaluation-error-in-import`;
       const resolver = await getResolver(testDir);
       const plugin = await setupPlugin(resolver, { atomic, debug: false });
 
+      await expect(loadCss(plugin, `${testDir}/dep.tsx`)).rejects.toMatchObject({
+        message: "failed to compute color",
+      });
+
+      // importers evaluate the failing module again instead of reading its missing exports
       await expect(loadCss(plugin, `${testDir}/entry.tsx`)).rejects.toMatchObject({
         message: "failed to compute color",
       });

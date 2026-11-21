@@ -1203,7 +1203,10 @@ pub async fn evaluate_program<'alloc>(
                 cause,
             }) {
                 Ok(v) => v,
-                Err(err) => return report_error(entries.as_ref(), err),
+                Err(err) => {
+                    value_cache.retain(|ident| !evaluated_exports.contains(ident));
+                    return report_error(entries.as_ref(), err);
+                }
             };
 
         // Await the promise to get the CSS blocks
@@ -1217,6 +1220,7 @@ pub async fn evaluate_program<'alloc>(
                     program: None,
                     cause,
                 };
+                value_cache.retain(|ident| !evaluated_exports.contains(ident));
                 return report_error(entries.as_ref(), err);
             }
         };
