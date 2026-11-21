@@ -969,11 +969,6 @@ pub async fn evaluate_program<'alloc>(
     // Now check if we should return early (no CSS functions imported)
     // But we've already extracted exports, so dependency tracking will work
     if should_return_early {
-        // Populate value cache with exports before returning
-        if !exported_idents.is_empty() {
-            value_cache.extend(exported_idents.keys().cloned());
-        }
-
         if let Some(entries) = &entries {
             // the virtual modules of a previous evaluation with CSS may still be requested, resolve
             // them as empty so they don't wait forever

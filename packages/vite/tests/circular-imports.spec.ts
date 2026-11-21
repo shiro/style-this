@@ -215,6 +215,40 @@ export const bStyle = css\`height: \${size};\`;
     expect(await cssOf("b.tsx")).toContain("height: 8px");
   });
 
+  test("transforms skipping evaluation don't mark dependency values as evaluated", async () => {
+    // the first transform's dependency resolves once released, later ones right away
+    let release!: () => void;
+    const resolutions = [new Promise<string>((resolve) => (release = () => resolve(path("theme.ts"))))];
+    const resolver = {};
+    Object.defineProperty(resolver, "./theme", {
+      enumerable: true,
+      get: () => resolutions.shift() ?? path("theme.ts"),
+    });
+
+    await setup(
+      {
+        "theme.ts": `export const color = "red";\n`,
+        "a.tsx": `${cssImport}
+import { color } from "./theme";
+
+export const aStyle = css\`color: \${color};\`;
+`,
+      },
+      { resolver },
+    );
+
+    // e.g. vite's client and SSR environments, the second transform skips the pending evaluation
+    const code = await readFile(path("a.tsx"), "utf-8");
+    const evaluating = settle(plugin.transform(code, path("a.tsx")), "evaluating transform");
+    await settle(plugin.transform(code, path("a.tsx")), "skipping transform");
+    // the skipping transform returns before walking its dependencies
+    await new Promise((resolve) => setTimeout(resolve));
+
+    release();
+    await evaluating;
+    expect(await cssOf("a.tsx")).toContain("color: red");
+  });
+
   test("files changing while they are evaluated are re-evaluated", async () => {
     let resolving!: () => void;
     const resolvingDependency = new Promise<void>((resolve) => (resolving = resolve));
