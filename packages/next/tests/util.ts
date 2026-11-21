@@ -2,8 +2,26 @@ import path from "path";
 import { createRequire } from "node:module";
 
 type LoaderResult = { err: Error | null | undefined; result?: string };
+type ResolveCallback = (err: Error | null, result?: string) => void;
 
-export const runLoader = (loader: Function, code: string, resource: string, options = {}) =>
+export const resolveRequest = (context: string, request: string, cb: ResolveCallback) => {
+  try {
+    const [file, query] = request.split("?", 2);
+    const resolved = createRequire(path.join(context, "noop.js")).resolve(file);
+    cb(null, query === undefined ? resolved : `${resolved}?${query}`);
+  } catch (err) {
+    cb(err as Error);
+  }
+};
+
+/** `ctx` overrides fields of the loader context. */
+export const runLoader = (
+  loader: Function,
+  code: string,
+  resource: string,
+  options = {},
+  ctx: { addDependency?: (file: string) => void; getResolve?: () => typeof resolveRequest } = {},
+) =>
   new Promise<LoaderResult>((resolve) => {
     const callback = (err: Error | null | undefined, result?: string | Buffer) =>
       resolve({ err, result: result?.toString() });
@@ -17,16 +35,8 @@ export const runLoader = (loader: Function, code: string, resource: string, opti
         callback,
         cacheable: () => {},
         addDependency: () => {},
-        getDependencies: () => [],
-        getResolve:
-          () =>
-          (context: string, request: string, cb: (err: Error | null, result?: string) => void) => {
-            try {
-              cb(null, createRequire(path.join(context, "noop.js")).resolve(request));
-            } catch (err) {
-              cb(err as Error);
-            }
-          },
+        getResolve: () => resolveRequest,
+        ...ctx,
       },
       Buffer.from(code),
     );

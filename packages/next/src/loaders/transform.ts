@@ -46,6 +46,27 @@ const createEntry = (code: string) => {
 };
 
 /**
+ * Invalidates the dependencies `filepath` was evaluated from that changed since, and the virtual
+ * modules of the files affected by the change. Loaders aren't told which files changed (and
+ * Turbopack runs them in several processes, each with its own cache), so they're read again.
+ */
+const refreshDependencies = async (ctx: LoaderCtx, transformer: Transformer, filepath: string) => {
+  const dependencies = transformer.get_evaluated_dependencies(filepath) as string[];
+
+  await Promise.all(
+    dependencies.map(async (dependency) => {
+      // skipped evaluations don't resolve (and add) the dependencies
+      ctx.addDependency(dependency);
+      const code = await readFile(dependency, "utf-8").catch(() => undefined);
+      for (const importer of transformer.invalidate_file(dependency, code) as string[]) {
+        cssFiles.delete(`${importer}.${cssExtension}`);
+        atomicFiles.delete(`${importer}.${atomicProgramExtension}`);
+      }
+    }),
+  );
+};
+
+/**
  * Transforms `code`, its CSS is stored in `cssFiles` under `<filepath>.css` and in atomic mode its
  * class module in `atomicFiles` under `<filepath>.style-this.js`, for the virtual module loaders.
  */
@@ -57,6 +78,7 @@ export const transformFile = async (
 ) => {
   const loadFile = makeLoadFile(ctx);
   const transformer = await getTransformer(bundler, loadFile);
+  await refreshDependencies(ctx, transformer, filepath);
 
   const cssFilepath = `${filepath}.${cssExtension}`;
   const atomicProgramFilepath = `${filepath}.${atomicProgramExtension}`;
@@ -116,12 +138,21 @@ export const loadVirtualModule = async (
   ctx.addDependency(filepath);
   const code = await readFile(filepath, "utf-8").catch(() => undefined);
 
+  // the module is outdated if dependencies changed, even though `filepath` didn't
+  const transformer = await transformers.get(bundler);
+  if (transformer) await refreshDependencies(ctx, transformer, filepath);
+
   if (code !== undefined && store.get(key)?.code !== code) {
     if (!(await transformFile(ctx, bundler, code, filepath))) return "";
   }
 
   const module = await store.get(key);
   if (module instanceof Error) throw module;
+
+  // the transform loader is done before its evaluation resolves (and adds) the dependencies
+  const dependencies = (await transformers.get(bundler))?.get_evaluated_dependencies(filepath) ?? [];
+  for (const dependency of dependencies as string[]) ctx.addDependency(dependency);
+
   return module ?? "";
 };
 

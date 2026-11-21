@@ -222,7 +222,11 @@ fn evaluate_dependencies<'alloc>(
                 // modules with a query are separate modules generated from the file
                 let (code, query_source) = match remote_filepath.split_once('?') {
                     None => (code, None),
-                    Some((source, "raw")) => (raw_module(&code), Some(source)),
+                    Some((source, "raw")) => {
+                        // to find out whether the source changed, see `get_evaluated_dependencies`
+                        transformer.cache_registry.record_module_code(source, &code);
+                        (raw_module(&code), Some(source))
+                    }
                     Some(_) => {
                         return Err(TransformError::UnsupportedImportQuery {
                             filepath: remote_filepath,

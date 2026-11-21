@@ -240,6 +240,23 @@ impl DependencyTracker {
         result
     }
     
+    /// Get all files `importer_file` imports from, directly or through other files
+    pub fn get_transitive_dependencies(&self, importer_file: &str) -> HashSet<String> {
+        let imports = self.file_imports.borrow();
+        let mut result = HashSet::new();
+        let mut to_visit = vec![importer_file.to_string()];
+
+        while let Some(file) = to_visit.pop() {
+            for source_file in imports.get(&file).into_iter().flat_map(|sources| sources.keys()) {
+                if source_file != importer_file && result.insert(source_file.clone()) {
+                    to_visit.push(source_file.clone());
+                }
+            }
+        }
+
+        result
+    }
+
     /// Get what variables `importer_file` imports from `source_file`
     pub fn get_imports_from_file(&self, importer_file: &str, source_file: &str) -> HashSet<String> {
         let imports = self.file_imports.borrow();
@@ -301,6 +318,19 @@ mod tests {
         let changed = HashSet::from(["color".to_string()]);
         let selective = tracker.get_transitive_importers("a.ts", &changed);
         assert_eq!(selective, ["b.tsx", "c.tsx", "d.tsx"].map(String::from).into());
+    }
+
+    #[test]
+    fn test_transitive_dependencies() {
+        let tracker = DependencyTracker::new();
+
+        tracker.register_import("b.tsx", "color", "a.tsx");
+        tracker.register_import("c.ts", "size", "b.tsx");
+        tracker.register_import("a.tsx", "cls", "c.ts");
+        tracker.register_import("d.ts", "unrelated", "e.tsx");
+
+        let dependencies = tracker.get_transitive_dependencies("a.tsx");
+        assert_eq!(dependencies, ["b.tsx", "c.ts"].map(String::from).into());
     }
 
     #[test]

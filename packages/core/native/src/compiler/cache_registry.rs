@@ -376,6 +376,10 @@ impl CacheRegistry {
         self.module_code.borrow().get(filepath).cloned()
     }
 
+    pub fn has_module_code(&self, filepath: &str) -> bool {
+        self.module_code.borrow().contains_key(filepath)
+    }
+
     /// Update the stored source of a file after it changed (`None` if deleted), returns the
     /// previous one
     pub fn update_module_code(&self, filepath: &str, code: Option<String>) -> Option<String> {

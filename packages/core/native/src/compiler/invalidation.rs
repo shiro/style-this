@@ -312,6 +312,25 @@ impl Transformer {
         affected.remove(filepath);
         affected.iter().map(|file| JsValue::from_str(file)).collect()
     }
+
+    /// Files whose cached values the CSS of `filepath` was evaluated from, for bundlers that don't
+    /// report changed files to check them with `invalidate_file`. Modules with a query are left
+    /// out, they're generated from their source file, which is included.
+    pub fn get_evaluated_dependencies(&self, filepath: &str) -> Array {
+        let dependencies = self
+            .cache_registry
+            .dependency_tracker()
+            .borrow()
+            .get_transitive_dependencies(filepath);
+
+        dependencies
+            .into_iter()
+            .filter(|file| !file.contains('?') && self.cache_registry.has_module_code(file))
+            .collect::<BTreeSet<_>>()
+            .iter()
+            .map(|file| JsValue::from_str(file))
+            .collect()
+    }
 }
 
 impl Transformer {

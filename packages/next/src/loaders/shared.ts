@@ -23,7 +23,7 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
         if (err) {
           ok(undefined);
         } else if (result) {
-          ctx.addDependency(result);
+          ctx.addDependency(result.split("?", 1)[0]);
           ok(result);
         } else {
           ok(undefined);
@@ -36,8 +36,15 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
     importSourceId: string,
     importer: string,
   ): Promise<[string, string]> => {
-    let filepath =
-      (await resolve(importSourceId, importer)) ?? importSourceId;
+    const resolved = await resolve(importSourceId, importer);
+    const [resolvedPath, query] = resolved?.split("?", 2) ?? [];
+
+    // modules with a query (e.g. `?raw`) are generated from the file by the compiler
+    if (query !== undefined) {
+      return [resolved!, await readFile(resolvedPath, "utf-8")];
+    }
+
+    let filepath = resolved ?? importSourceId;
 
     if (
       !filepath.startsWith(`${cwd}/node_modules/`) &&
