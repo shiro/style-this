@@ -327,10 +327,10 @@ importers:
   packages/next:
     dependencies:
       '@style-this/core':
-        specifier: workspace:0.6.0
+        specifier: workspace:0.6.1
         version: link:../core
       '@style-this/webpack':
-        specifier: workspace:0.6.0
+        specifier: workspace:0.6.1
         version: link:../webpack
       '@types/node':
         specifier: ^24.10.1
@@ -362,7 +362,7 @@ importers:
   packages/vite:
     dependencies:
       '@style-this/core':
-        specifier: workspace:0.6.0
+        specifier: workspace:0.6.1
         version: link:../core
       solid-js:
         specifier: '*'

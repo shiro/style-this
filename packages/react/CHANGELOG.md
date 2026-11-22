@@ -1,5 +1,14 @@
 # @style-this/react
 
+## 0.6.1
+
+### Patch Changes
+
+- Lockstep release of all packages.
+  - Fix the Vite dev server failing to transform client modules that import optimized deps (`'?raw' is the only supported query`)
+  - Atomic mode: drop longhands followed by their shorthand in `mergeStyles` and within a style, so the shorthand wins like in default mode
+  - Atomic mode: don't atomize `!important` declarations, a layered one beat the `!important` overrides of nested rules
+
 ## 0.6.0
 
 ### Minor Changes
