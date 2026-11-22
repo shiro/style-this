@@ -8,6 +8,18 @@ sidebar:
 All `@style-this/*` packages are released in lockstep since 0.2.0. Use the version picker in the
 header to read the docs of an older release.
 
+## 0.6.1
+
+### Fixes
+
+- Fix the Vite dev server failing to transform client modules that import optimized deps
+  (`'?raw' is the only supported query`)
+- In atomic mode, drop longhands followed by their shorthand (e.g. `margin-bottom` before a
+  `margin` class passed through `className`) in `mergeStyles` and within a style, so the shorthand
+  wins like in default mode
+- Don't atomize `!important` declarations, a layered one beat the `!important` overrides of nested
+  rules like `&.active`
+
 ## 0.6.0
 
 ### Features
