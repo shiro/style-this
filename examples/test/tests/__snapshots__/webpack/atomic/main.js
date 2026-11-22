@@ -200,13 +200,10 @@ const extraClass = (..._classes) => {
 	throw new Error("@style-this: called 'extraClass' at runtime. This indicates an error in the transform.");
 };
 const ATOMIC_PREFIXES = new Set(Object.values(atomicPrefixes_default));
-const ATOMIC_HASH_LENGTH = 5;
+const ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
 const getAtomicPrefix = (className) => {
-	const separatorIdx = className.length - ATOMIC_HASH_LENGTH - 1;
-	if (separatorIdx < 1 || className[separatorIdx] !== "-") return;
-	if (!/[a-zA-Z]/.test(className[separatorIdx + 1])) return;
-	const prefix = className.slice(0, separatorIdx);
-	return ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
+	const prefix = ATOMIC_CLASS.exec(className)?.[1];
+	return prefix && ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
 };
 /** Joins class lists, ignoring falsy values. */
 const joinStyles = (...classes) => classes.filter(Boolean).join(" ");
@@ -276,9 +273,9 @@ const a_exportedColorA = "light" + exportedColorB;
 
 ;// ../../packages/webpack/style-this.atomic-program.js?filepath=%2Fexamples%2Fwebpack%2Fsrc%2FCounter.tsx
 
-const CounterStyle = "CounterStyle-zodu74 b-zDIGu bg-LVc4W d-W_LRO gap-TC2Nt items-ib2Uw m-afsNG p-DTauT r-KyVot something";
-const __styleThis_var_FancyButton_6 = "FancyButton-otinw9 b-zDIGu bg-kG3jH p-ZQZLf r-T5iL9";
-const __styleThis_var_FancyButton2_4 = "FancyButton2-wtirkd bg-xETRV cursor-AndGx m-LFmNO min-h-lkJSK";
+const CounterStyle = "CounterStyle-zodu74 b-ZeplZ bg-LPp8Q d-W_vHB gap-Td5yX items-Im4M1 m-AuUyl p-DLlYK r-K5PNW something";
+const __styleThis_var_FancyButton_6 = "FancyButton-otinw9 b-ZeplZ bg-Kk7Cm p-ZFXvv r-TbAuj";
+const __styleThis_var_FancyButton2_4 = "FancyButton2-wtirkd bg-XgLHP cursor-ALqk3 m-LjJyB min-h-LEqJt";
 
 ;// ./src/Counter.tsx
 
@@ -372,9 +369,9 @@ const counterColor = (/* unused pure expression or super */ null && (exportedCol
 
 ;// ../../packages/webpack/style-this.atomic-program.js?filepath=%2Fexamples%2Fwebpack%2Fsrc%2FMainComponent.tsx
 
-const ContainerStyle = "ContainerStyle-3wxanc d-W_LRO flex-d-F56Lh";
-const colorStyle = "colorStyle-v856z4 bg-BZ0hD c-JFbUm";
-const highlightStyle = "highlightStyle-s1ybc1 c-E_Zrl";
+const ContainerStyle = "ContainerStyle-3wxanc d-W_vHB flex-d-Fbcuz";
+const colorStyle = "colorStyle-v856z4 bg-BX1ye c-JjnMJ";
+const highlightStyle = "highlightStyle-s1ybc1 c-E_XTG";
 const _GlobalMain = "_GlobalMain";
 
 ;// ./src/MainComponent.tsx

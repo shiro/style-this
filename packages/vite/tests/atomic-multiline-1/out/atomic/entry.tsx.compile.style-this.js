@@ -1,1 +1,1 @@
-export const grid = "grid-1ajg1y d-cSCMc grid-cols-G06EK transition-m4VtQ"
+export const grid = "grid-1ajg1y d-CIdxp grid-cols-G1cgt transition-M8OXE"

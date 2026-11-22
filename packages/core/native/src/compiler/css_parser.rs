@@ -361,27 +361,6 @@ mod tests {
     }
 
     #[test]
-    fn test_atomic_hash_deterministic() {
-        use crate::compiler::atomic::generate_atomic_hash;
-
-        // Test that same input produces same output
-        let hash1 = generate_atomic_hash("color: red");
-        let hash2 = generate_atomic_hash("color: red");
-        assert_eq!(hash1, hash2, "Same input should produce same hash");
-
-        // Test that different input produces different output
-        let hash3 = generate_atomic_hash("background: blue");
-        assert_ne!(
-            hash1, hash3,
-            "Different input should produce different hash"
-        );
-
-        // Test hardcoded expected output
-        assert_eq!(hash1, "tMpWo", "color: red should hash to tMpWo");
-        assert_eq!(hash3, "i1jU1", "background: blue should hash to i1jU1");
-    }
-
-    #[test]
     fn multiline_css_grid() {
         let input = indoc! {"
             display: grid;

@@ -120,7 +120,7 @@ var clientViteManifest = {
 		"name": "web"
 	},
 	"src/entry-client.tsx": {
-		"file": "_build/assets/entry-client-wVxT4YFb.js",
+		"file": "_build/assets/entry-client-CGupvn7b.js",
 		"name": "entry-client",
 		"src": "src/entry-client.tsx",
 		"isEntry": true,
@@ -155,7 +155,7 @@ var clientViteManifest = {
 		"imports": ["_web-lT-EAg3V.js", "_dist-CPkBsN0R.js"]
 	},
 	"src/routes/index.tsx?pick=default&pick=$css&lang.tsx": {
-		"file": "_build/assets/index-2pMcRXtY.js",
+		"file": "_build/assets/index-CCdkMaqn.js",
 		"name": "index",
 		"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
 		"isEntry": true,
@@ -1009,8 +1009,8 @@ var solid_start_routes_default = [
 		"page": true,
 		"$component": {
 			"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
-			"build": () => import("./index-Do4TOK3D.mjs"),
-			"import": () => import("./index-Do4TOK3D.mjs")
+			"build": () => import("./index-B8yyB-FO.mjs"),
+			"import": () => import("./index-B8yyB-FO.mjs")
 		},
 		"path": "/"
 	}
@@ -7212,7 +7212,7 @@ function stripBaseUrl(path) {
 * Checks if user has set a redirect status in the response.
 * If not, falls back to the 302 (temporary redirect)
 */
-var AppWrapper$1 = "AppWrapper-12rw9u d-W_LRO flex-d-F56Lh min-h-Zlz3L";
+var AppWrapper$1 = "AppWrapper-12rw9u d-W_vHB flex-d-Fbcuz min-h-ZH67u";
 var _tmpl$ = ["<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link rel=\"icon\" href=\"/favicon.ico\">", "</head>"];
 var _tmpl$2 = [
 	"<html",

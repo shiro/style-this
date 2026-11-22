@@ -120,7 +120,9 @@ pub fn dedupe_atomic_declarations(declarations: Vec<String>) -> Vec<String> {
     result
 }
 
-/// Generate a deterministic 5-character hash from a full CSS declaration statement (e.g., "color: red")
+/// Generate a deterministic 5-character hash from a full CSS declaration statement (e.g., "color: red").
+/// It starts with an uppercase letter, so `mergeStyles` can tell atomic classes apart from
+/// hand-written ones like `bg-light`. Keep in sync with `ATOMIC_CLASS` in `src/index.ts`.
 pub fn generate_atomic_hash(statement: &str) -> String {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -130,13 +132,13 @@ pub fn generate_atomic_hash(statement: &str) -> String {
     input.hash(&mut hasher);
     let hash = hasher.finish();
 
-    let first_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let first_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
     let mut result = String::new();
     let mut n = hash;
 
-    result.push(first_chars.chars().nth((n % 52) as usize).unwrap());
-    n /= 52;
+    result.push(first_chars.chars().nth((n % 26) as usize).unwrap());
+    n /= 26;
 
     for _ in 0..4 {
         result.push(chars.chars().nth((n % 64) as usize).unwrap());
@@ -405,8 +407,8 @@ mod tests {
             generate_atomic_class_name("margin: 8px"),
             format!("m-{}", generate_atomic_hash("margin: 8px"))
         );
-        assert_eq!(generate_atomic_class_name("margin: 8px"), "m-eu2PP");
-        assert_eq!(generate_atomic_class_name("color: red"), "c-tMpWo");
+        assert_eq!(generate_atomic_class_name("margin: 8px"), "m-EY4CD");
+        assert_eq!(generate_atomic_class_name("color: red"), "c-TwPQN");
     }
 
     #[test]
@@ -432,7 +434,7 @@ mod tests {
             let class = generate_atomic_class_name(decl);
             let hash = &class[class.len() - 5..];
             assert_eq!(&class[class.len() - 6..class.len() - 5], "-");
-            assert!(hash.chars().next().unwrap().is_ascii_alphabetic());
+            assert!(hash.chars().next().unwrap().is_ascii_uppercase());
         }
         assert!(generate_atomic_class_name("background: url(a:b)").starts_with("bg-"));
     }

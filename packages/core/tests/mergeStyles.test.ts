@@ -38,99 +38,99 @@ describe('atomicPrefixes', () => {
 describe('mergeStyles', () => {
   describe('same prefix de-duping', () => {
     it('later class wins', () => {
-      expect(mergeStyles('m-aaaaa', 'm-bbbbb')).toBe('m-bbbbb');
+      expect(mergeStyles('m-Aaaaa', 'm-Bbbbb')).toBe('m-Bbbbb');
     });
 
     it('later class wins within a single argument', () => {
-      expect(mergeStyles('m-aaaaa m-bbbbb')).toBe('m-bbbbb');
+      expect(mergeStyles('m-Aaaaa m-Bbbbb')).toBe('m-Bbbbb');
     });
 
     it('winner takes the position of the last occurrence', () => {
-      expect(mergeStyles('m-aaaaa p-aaaaa', 'm-bbbbb')).toBe('p-aaaaa m-bbbbb');
+      expect(mergeStyles('m-Aaaaa p-Aaaaa', 'm-Bbbbb')).toBe('p-Aaaaa m-Bbbbb');
     });
 
     it('de-dupes across many args', () => {
-      expect(mergeStyles('p-aaaaa', 'p-bbbbb', 'p-ccccc', 'p-ddddd', 'p-eeeee')).toBe('p-eeeee');
+      expect(mergeStyles('p-Aaaaa', 'p-Bbbbb', 'p-Ccccc', 'p-Ddddd', 'p-Eeeee')).toBe('p-Eeeee');
     });
 
     it('de-dupes multiple properties independently', () => {
       expect(
-        mergeStyles('m-aaaaa p-aaaaa c-aaaaa', 'p-bbbbb', 'c-bbbbb m-bbbbb', 'p-ccccc')
-      ).toBe('c-bbbbb m-bbbbb p-ccccc');
+        mergeStyles('m-Aaaaa p-Aaaaa c-Aaaaa', 'p-Bbbbb', 'c-Bbbbb m-Bbbbb', 'p-Ccccc')
+      ).toBe('c-Bbbbb m-Bbbbb p-Ccccc');
     });
 
     it('re-adding an earlier class moves it to the end and wins again', () => {
-      expect(mergeStyles('m-aaaaa', 'm-bbbbb', 'm-aaaaa')).toBe('m-aaaaa');
+      expect(mergeStyles('m-Aaaaa', 'm-Bbbbb', 'm-Aaaaa')).toBe('m-Aaaaa');
     });
 
     it('identical atomic classes collapse', () => {
-      expect(mergeStyles('m-aaaaa', 'm-aaaaa')).toBe('m-aaaaa');
+      expect(mergeStyles('m-Aaaaa', 'm-Aaaaa')).toBe('m-Aaaaa');
     });
 
     it.each(prefixes.map((p) => [p]))('de-dupes prefix "%s"', (prefix) => {
-      expect(mergeStyles(`${prefix}-aaaaa`, `${prefix}-Bbbbb`)).toBe(`${prefix}-Bbbbb`);
+      expect(mergeStyles(`${prefix}-Aaaaa`, `${prefix}-Bbbbb`)).toBe(`${prefix}-Bbbbb`);
     });
   });
 
   describe('different properties', () => {
     it('shorthand and longhand are kept', () => {
-      expect(mergeStyles('m-aaaaa', 'mt-bbbbb', 'mb-ccccc')).toBe('m-aaaaa mt-bbbbb mb-ccccc');
+      expect(mergeStyles('m-Aaaaa', 'mt-Bbbbb', 'mb-Ccccc')).toBe('m-Aaaaa mt-Bbbbb mb-Ccccc');
     });
 
     it('prefixes sharing a start are kept', () => {
-      expect(mergeStyles('bg-aaaaa', 'bgc-bbbbb', 'bgcl-ccccc', 'b-ddddd', 'bt-eeeee')).toBe(
-        'bg-aaaaa bgc-bbbbb bgcl-ccccc b-ddddd bt-eeeee'
+      expect(mergeStyles('bg-Aaaaa', 'bgc-Bbbbb', 'bgcl-Ccccc', 'b-Ddddd', 'bt-Eeeee')).toBe(
+        'bg-Aaaaa bgc-Bbbbb bgcl-Ccccc b-Ddddd bt-Eeeee'
       );
     });
 
     it('multi-segment prefixes are distinct from their segments', () => {
-      expect(mergeStyles('min-w-aaaaa', 'w-bbbbb', 'max-w-ccccc')).toBe(
-        'min-w-aaaaa w-bbbbb max-w-ccccc'
+      expect(mergeStyles('min-w-Aaaaa', 'w-Bbbbb', 'max-w-Ccccc')).toBe(
+        'min-w-Aaaaa w-Bbbbb max-w-Ccccc'
       );
-      expect(mergeStyles('gap-aaaaa', 'gap-x-bbbbb', 'gap-y-ccccc')).toBe(
-        'gap-aaaaa gap-x-bbbbb gap-y-ccccc'
+      expect(mergeStyles('gap-Aaaaa', 'gap-x-Bbbbb', 'gap-y-Ccccc')).toBe(
+        'gap-Aaaaa gap-x-Bbbbb gap-y-Ccccc'
       );
     });
   });
 
   describe('hash format', () => {
     it('handles hashes containing dashes and underscores', () => {
-      expect(mergeStyles('m-a-_bc', 'm-Z_-9-')).toBe('m-Z_-9-');
+      expect(mergeStyles('m-A-_bc', 'm-Z_-9-')).toBe('m-Z_-9-');
     });
 
     it('handles multi-segment prefixes with dashes in the hash', () => {
-      expect(mergeStyles('min-w-a-_bc gap-x-Z9-_a', 'min-w-bbbbb', 'gap-x-ccccc')).toBe(
-        'min-w-bbbbb gap-x-ccccc'
+      expect(mergeStyles('min-w-A-_bc gap-x-Z9-_a', 'min-w-Bbbbb', 'gap-x-Ccccc')).toBe(
+        'min-w-Bbbbb gap-x-Ccccc'
       );
     });
 
-    it('a hash starting with a prefix-like segment still resolves the right prefix', () => {
-      // "min-w-m-abc": prefix "min-w", hash "m-abc"
-      expect(mergeStyles('min-w-m-abc', 'm-xxxxx', 'min-w-yyyyy')).toBe('m-xxxxx min-w-yyyyy');
-    });
-
-    it('requires the hash to start with a letter', () => {
+    it('requires the hash to start with an uppercase letter', () => {
+      expect(mergeStyles('bg-light', 'bg-white')).toBe('bg-light bg-white');
       expect(mergeStyles('m-1abcd', 'm-2abcd')).toBe('m-1abcd m-2abcd');
       expect(mergeStyles('m--abcd', 'm-_abcd')).toBe('m--abcd m-_abcd');
     });
 
     it('requires a 5 char hash', () => {
-      expect(mergeStyles('m-abc', 'm-def')).toBe('m-abc m-def');
-      expect(mergeStyles('m-abcdef', 'm-ghijkl')).toBe('m-abcdef m-ghijkl');
+      expect(mergeStyles('m-Abc', 'm-Def')).toBe('m-Abc m-Def');
+      expect(mergeStyles('m-Abcdef', 'm-Ghijkl')).toBe('m-Abcdef m-Ghijkl');
       expect(mergeStyles('m-', 'm-')).toBe('m-');
     });
 
+    it('requires class name safe hash chars', () => {
+      expect(mergeStyles('m-Ab.cd', 'm-Ab:cd')).toBe('m-Ab.cd m-Ab:cd');
+    });
+
     it('requires a dash separator', () => {
-      expect(mergeStyles('mxaaaaa', 'mxbbbbb')).toBe('mxaaaaa mxbbbbb');
-      expect(mergeStyles('m_aaaaa', 'm_bbbbb')).toBe('m_aaaaa m_bbbbb');
+      expect(mergeStyles('mxAaaaa', 'mxBbbbb')).toBe('mxAaaaa mxBbbbb');
+      expect(mergeStyles('m_Aaaaa', 'm_Bbbbb')).toBe('m_Aaaaa m_Bbbbb');
     });
 
     it('is case sensitive for prefixes', () => {
-      expect(mergeStyles('M-aaaaa', 'M-bbbbb')).toBe('M-aaaaa M-bbbbb');
+      expect(mergeStyles('M-Aaaaa', 'M-Bbbbb')).toBe('M-Aaaaa M-Bbbbb');
     });
 
     it('ignores a bare separator + hash', () => {
-      expect(mergeStyles('-aaaaa', '-bbbbb')).toBe('-aaaaa -bbbbb');
+      expect(mergeStyles('-Aaaaa', '-Bbbbb')).toBe('-Aaaaa -Bbbbb');
     });
   });
 
@@ -144,8 +144,8 @@ describe('mergeStyles', () => {
     });
 
     it('keeps classes with unknown prefixes', () => {
-      expect(mergeStyles('btn-large', 'btn-small', 'foo-abcde', 'foo-fghij')).toBe(
-        'btn-large btn-small foo-abcde foo-fghij'
+      expect(mergeStyles('btn-large', 'btn-small', 'foo-Abcde', 'foo-Fghij')).toBe(
+        'btn-large btn-small foo-Abcde foo-Fghij'
       );
     });
 
@@ -157,10 +157,10 @@ describe('mergeStyles', () => {
     it('mixes atomic and non-atomic classes', () => {
       expect(
         mergeStyles(
-          'Button-abc123 kG3jH m-aaaaa p-aaaaa something',
-          'Override-def456 T5iL9 p-bbbbb something'
+          'Button-abc123 kG3jH m-Aaaaa p-Aaaaa something',
+          'Override-def456 T5iL9 p-Bbbbb something'
         )
-      ).toBe('Button-abc123 kG3jH m-aaaaa Override-def456 T5iL9 p-bbbbb something');
+      ).toBe('Button-abc123 kG3jH m-Aaaaa Override-def456 T5iL9 p-Bbbbb something');
     });
   });
 
@@ -171,37 +171,37 @@ describe('mergeStyles', () => {
 
     it('ignores falsy values', () => {
       expect(mergeStyles(undefined, null, false, '')).toBe('');
-      expect(mergeStyles('m-aaaaa', undefined, null, false, '', 'p-aaaaa')).toBe('m-aaaaa p-aaaaa');
+      expect(mergeStyles('m-Aaaaa', undefined, null, false, '', 'p-Aaaaa')).toBe('m-Aaaaa p-Aaaaa');
     });
 
     it('supports conditional usage', () => {
       const active = false;
       const disabled = true;
-      expect(mergeStyles('c-aaaaa', active && 'c-bbbbb', disabled && 'c-ccccc')).toBe('c-ccccc');
+      expect(mergeStyles('c-Aaaaa', active && 'c-Bbbbb', disabled && 'c-Ccccc')).toBe('c-Ccccc');
     });
 
     it('normalizes all kinds of whitespace', () => {
-      expect(mergeStyles('  m-aaaaa\n\tp-aaaaa  ', ' \n ', '\tm-bbbbb\r\n')).toBe('p-aaaaa m-bbbbb');
+      expect(mergeStyles('  m-Aaaaa\n\tp-Aaaaa  ', ' \n ', '\tm-Bbbbb\r\n')).toBe('p-Aaaaa m-Bbbbb');
     });
 
     it('returns a single class untouched', () => {
-      expect(mergeStyles('m-aaaaa')).toBe('m-aaaaa');
+      expect(mergeStyles('m-Aaaaa')).toBe('m-Aaaaa');
       expect(mergeStyles('foo')).toBe('foo');
     });
 
     it('accepts many args', () => {
-      const args = Array.from({ length: 100 }, (_, i) => `p-a${String(i).padStart(4, '0')} x${i}`);
+      const args = Array.from({ length: 100 }, (_, i) => `p-A${String(i).padStart(4, '0')} x${i}`);
       const result = mergeStyles(...args).split(' ');
       expect(result).toHaveLength(101);
-      expect(result.at(-2)).toBe('p-a0099');
-      expect(result.filter((c) => c.startsWith('p-'))).toEqual(['p-a0099']);
+      expect(result.at(-2)).toBe('p-A0099');
+      expect(result.filter((c) => c.startsWith('p-'))).toEqual(['p-A0099']);
     });
   });
 });
 
 describe('joinStyles', () => {
   it('joins args without de-duping', () => {
-    expect(joinStyles('m-aaaaa', 'm-bbbbb', 'a', 'a')).toBe('m-aaaaa m-bbbbb a a');
+    expect(joinStyles('m-Aaaaa', 'm-Bbbbb', 'a', 'a')).toBe('m-Aaaaa m-Bbbbb a a');
   });
 
   it('ignores falsy values', () => {

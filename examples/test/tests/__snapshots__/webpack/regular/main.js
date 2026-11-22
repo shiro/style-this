@@ -200,13 +200,10 @@ const extraClass = (..._classes) => {
 	throw new Error("@style-this: called 'extraClass' at runtime. This indicates an error in the transform.");
 };
 const ATOMIC_PREFIXES = new Set(Object.values(atomicPrefixes_default));
-const ATOMIC_HASH_LENGTH = 5;
+const ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
 const getAtomicPrefix = (className) => {
-	const separatorIdx = className.length - ATOMIC_HASH_LENGTH - 1;
-	if (separatorIdx < 1 || className[separatorIdx] !== "-") return;
-	if (!/[a-zA-Z]/.test(className[separatorIdx + 1])) return;
-	const prefix = className.slice(0, separatorIdx);
-	return ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
+	const prefix = ATOMIC_CLASS.exec(className)?.[1];
+	return prefix && ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
 };
 /** Joins class lists, ignoring falsy values. */
 const joinStyles = (...classes) => classes.filter(Boolean).join(" ");

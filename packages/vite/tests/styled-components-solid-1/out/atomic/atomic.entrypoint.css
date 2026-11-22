@@ -1,8 +1,8 @@
 @layer theme, base, components, utilities;
 @layer utilities {
-.b-zDIGu { border: 1px solid blue }
-.bg-kG3jH { background: none }
-.gap-IP548 { gap: var(--var2-pino9q)px }
-.p-xG40O { padding: var(--var1-q3ctyv)px }
-.r-T5iL9 { border-radius: 2px }
+.b-ZeplZ { border: 1px solid blue }
+.bg-Kk7Cm { background: none }
+.gap-IDb8g { gap: var(--var2-pino9q)px }
+.p-Xk90A { padding: var(--var1-q3ctyv)px }
+.r-TbAuj { border-radius: 2px }
 }

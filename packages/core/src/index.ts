@@ -33,15 +33,13 @@ export const extraClass = (..._classes: string[]): string => {
 };
 
 const ATOMIC_PREFIXES = new Set<string>(Object.values(atomicPrefixes));
-const ATOMIC_HASH_LENGTH = 5;
+// `<prefix>-<hash>`, matching the compiler's `generate_atomic_hash`. The uppercase start rules out
+// hand-written classes like `bg-light`.
+const ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
 
-// atomic classes are `<prefix>-<5 char hash>`, where the hash starts with a letter
 const getAtomicPrefix = (className: string): string | undefined => {
-  const separatorIdx = className.length - ATOMIC_HASH_LENGTH - 1;
-  if (separatorIdx < 1 || className[separatorIdx] !== "-") return;
-  if (!/[a-zA-Z]/.test(className[separatorIdx + 1])) return;
-  const prefix = className.slice(0, separatorIdx);
-  return ATOMIC_PREFIXES.has(prefix) ? prefix : undefined;
+  const prefix = ATOMIC_CLASS.exec(className)?.[1];
+  return prefix && ATOMIC_PREFIXES.has(prefix) ? prefix : undefined;
 };
 
 type ClassValue = string | false | null | undefined;

@@ -1,5 +1,5 @@
 import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-Do4TOK3D.js
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-B8yyB-FO.js
 var ATOMIC_PREFIXES = new Set(Object.values({
 	margin: "m",
 	"margin-top": "mt",
@@ -168,13 +168,10 @@ var ATOMIC_PREFIXES = new Set(Object.values({
 	stroke: "stroke",
 	"stroke-width": "stroke-w"
 }));
-var ATOMIC_HASH_LENGTH = 5;
+var ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
 var getAtomicPrefix = (className) => {
-	const separatorIdx = className.length - ATOMIC_HASH_LENGTH - 1;
-	if (separatorIdx < 1 || className[separatorIdx] !== "-") return;
-	if (!/[a-zA-Z]/.test(className[separatorIdx + 1])) return;
-	const prefix = className.slice(0, separatorIdx);
-	return ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
+	const prefix = ATOMIC_CLASS.exec(className)?.[1];
+	return prefix && ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
 };
 /**
 * Joins class lists, de-duping atomic classes of the same property (e.g. `m-xxxxx`), the last one wins.
@@ -207,9 +204,9 @@ var mergeInlineStyles = (vars, style$1) => {
 	for (const [name, value] of Object.entries(vars)) if (value != null) res += `${name}:${value};`;
 	return res + style$1;
 };
-var CounterStyle$1 = "CounterStyle-ezk5qn b-zDIGu bg-LVc4W d-W_LRO gap-TC2Nt items-ib2Uw m-afsNG p-DTauT r-KyVot something";
-var __styleThis_var_FancyButton_6 = "FancyButton-diz892 b-zDIGu bg-kG3jH p-BeiPE r-T5iL9";
-var __styleThis_var_FancyButton2_4 = "FancyButton2-r4dezo bg-iBf89 cursor-AndGx m-htWjh min-h-YiQC-";
+var CounterStyle$1 = "CounterStyle-ezk5qn b-ZeplZ bg-LPp8Q d-W_vHB gap-Td5yX items-Im4M1 m-AuUyl p-DLlYK r-K5PNW something";
+var __styleThis_var_FancyButton_6 = "FancyButton-diz892 b-ZeplZ bg-Kk7Cm p-BtACh r-TbAuj";
+var __styleThis_var_FancyButton2_4 = "FancyButton2-r4dezo bg-Iavgi cursor-ALqk3 m-HWQDy min-h-YBEdZ";
 var _tmpl$$1 = [
 	"<div",
 	"><!--$-->",
@@ -278,9 +275,9 @@ function Counter() {
 		children: "count me"
 	})));
 }
-var ContainerStyle$1 = "ContainerStyle-3s1eng d-W_LRO flex-d-F56Lh";
-var colorStyle$1 = "colorStyle-gpyfg1 bg-BZ0hD c-JFbUm";
-var highlightStyle$1 = "highlightStyle-r01i7c c-aUM_I";
+var ContainerStyle$1 = "ContainerStyle-3s1eng d-W_vHB flex-d-Fbcuz";
+var colorStyle$1 = "colorStyle-gpyfg1 bg-BX1ye c-JjnMJ";
+var highlightStyle$1 = "highlightStyle-r01i7c c-AMx_p";
 var _tmpl$ = [
 	"<div",
 	" class=\"",

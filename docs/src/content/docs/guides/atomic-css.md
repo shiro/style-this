@@ -55,16 +55,16 @@ const outer = css`
 ```
 
 ```ts title="class names"
-inner === "inner-oty7sd bg-gKimM p-vrRc6";
-outer === "outer-mvwhqz w-YB1lg";
+inner === "inner-oty7sd bg-GsBIw p-VSGpc";
+outer === "outer-mvwhqz w-Yb3Gw";
 ```
 
 ```css title="atomic stylesheet"
 @layer theme, base, components, utilities;
 @layer utilities {
-  .bg-gKimM { background: red }
-  .p-vrRc6 { padding: 10px }
-  .w-YB1lg { width: 100% }
+  .bg-GsBIw { background: red }
+  .p-VSGpc { padding: 10px }
+  .w-Yb3Gw { width: 100% }
 }
 ```
 
@@ -81,7 +81,9 @@ outer === "outer-mvwhqz w-YB1lg";
 }
 ```
 
-- Atomic classes are named `<property prefix>-<hash>`, e.g. `bg-…` for `background`.
+- Atomic classes are named `<property prefix>-<hash>`, e.g. `bg-…` for `background`. The hash
+  starts with an uppercase letter, so `mergeStyles` doesn't mistake hand-written classes like
+  `bg-light` for atomic ones.
 - Every style keeps its unique class (`inner-oty7sd`), so it can still be
   [referenced in selectors](/guides/css/#referencing-other-styles).
 - **Nested rules and at-rules aren't atomized.** They stay in the per-file stylesheet, scoped to the

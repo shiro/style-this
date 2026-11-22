@@ -1,18 +1,18 @@
 @layer theme, base, components, utilities;
 @layer utilities {
-.b-GdxDt { border: 1px solid black }
-.bg-EcIBn { background: pink }
-.bg-JAAIK { background: orange }
-.bg-gKimM { background: red }
-.bg-i1jU1 { background: blue }
-.bg-i73of { background: yellow }
-.bg-yObSb { background: green }
-.c-YRmdu { color: purple }
-.c-YxMsp { color: black }
-.c-aJx1V { color: white }
-.d-W_LRO { display: flex }
-.m-yChpQ { margin: 5px }
-.p-bOc9D { padding: 1rem }
-.p-tQ4Gf { padding: 20px }
-.p-vrRc6 { padding: 10px }
+.b-Gr2fX { border: 1px solid black }
+.bg-EpobL { background: pink }
+.bg-GsBIw { background: red }
+.bg-I2CM3 { background: blue }
+.bg-Ie6Mu { background: yellow }
+.bg-J99pt { background: orange }
+.bg-YAnIn { background: green }
+.c-Aq33O { color: white }
+.c-Y3xVO { color: black }
+.c-YHJqY { color: purple }
+.d-W_vHB { display: flex }
+.m-YczOE { margin: 5px }
+.p-BApie { padding: 1rem }
+.p-TE9kv { padding: 20px }
+.p-VSGpc { padding: 10px }
 }

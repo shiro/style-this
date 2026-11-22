@@ -46,16 +46,16 @@ export const cls = css\`
     const modules = await loadVirtualModules(filepath, transformed);
     expect(modules).toMatchInlineSnapshot(`
       {
-        "classes": "export const cls = "cls-olubkx m-sy5do mt-DB_jf"",
+        "classes": "export const cls = "cls-olubkx m-S4bqM mt-Db_Du"",
         "css": ".cls-olubkx {   &:hover { color: red; } }
       @layer theme, base, components, utilities;
       @layer utilities {
       @layer r0, r1;
       @layer r0 {
-      .m-sy5do { margin: 0 }
+      .m-S4bqM { margin: 0 }
       }
       @layer r1 {
-      .mt-DB_jf { margin-top: 4px }
+      .mt-Db_Du { margin-top: 4px }
       }
       }",
       }

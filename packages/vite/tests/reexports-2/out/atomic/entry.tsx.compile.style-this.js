@@ -1,1 +1,1 @@
-export const box = "box-wt6b8t bc-QIWfg bg-i1jU1 c-XzyY_ caret-PZJzz djSe5 olc-WAZDJ w-e8XqN"
+export const box = "box-wt6b8t DCIta bc-QpRvw bg-I2CM3 c-X75V_ caret-PXr77 olc-W9Xfr w-EgSRy"
