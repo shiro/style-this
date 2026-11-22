@@ -487,6 +487,39 @@ pub fn trim_newlines<'alloc>(
     }
 }
 
+/// Escapes the quasis of a tagged template so that, re-emitted as an untagged template, they
+/// evaluate to the raw text as written. Otherwise CSS escapes like `\2014` or `\f101` would be
+/// interpreted as JS escapes (or be a syntax error).
+pub fn escape_raw_quasis<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    quasis: &mut oxc_allocator::Vec<'alloc, TemplateElement<'alloc>>,
+) {
+    for quasi in quasis.iter_mut() {
+        let raw = quasi.value.raw;
+        if !raw.contains('\\') {
+            quasi.value.cooked = Some(raw);
+            continue;
+        }
+
+        let mut escaped = String::with_capacity(raw.len() + 8);
+        let mut chars = raw.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                escaped.push_str("\\\\");
+                // keep `` \` `` and `\$` escaped, they can't appear unescaped in a template
+                if let Some('`' | '$') = chars.peek() {
+                    escaped.push('\\');
+                }
+            } else {
+                escaped.push(c);
+            }
+        }
+
+        quasi.value.cooked = Some(raw);
+        quasi.value.raw = ast_builder.atom(&escaped);
+    }
+}
+
 struct SpanReplacer<'a, 'alloc> {
     ast_builder: Option<&'a AstBuilder<'alloc>>,
     replacement_points: Option<&'a mut HashMap<Span, Expression<'alloc>>>,

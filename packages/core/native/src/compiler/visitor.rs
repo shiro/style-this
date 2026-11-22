@@ -532,6 +532,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         }
 
         utils::trim_newlines(self.ast_builder, &mut new_quasis);
+        utils::escape_raw_quasis(self.ast_builder, &mut new_quasis);
 
         let mut right =
             self.ast_builder
@@ -1030,6 +1031,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
                     utils::trim_newlines(self.ast_builder, &mut quasis);
+                    utils::escape_raw_quasis(self.ast_builder, &mut quasis);
                     let variable_declarator = ast::build_variable_declarator(
                         self.ast_builder,
                         span,
@@ -1149,6 +1151,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 tag if Some(tag) == self.style_function_name.as_deref() => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
                     utils::trim_newlines(self.ast_builder, &mut quasis);
+                    utils::escape_raw_quasis(self.ast_builder, &mut quasis);
                     let variable_declarator = ast::build_variable_declarator(
                         self.ast_builder,
                         span,
