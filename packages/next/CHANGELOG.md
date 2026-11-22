@@ -1,5 +1,29 @@
 # @style-this/next
 
+## 0.6.0
+
+### Minor Changes
+
+- Lockstep release of all packages.
+  - Support atomic mode in the Next plugin, and fix the Next and webpack plugins (shared loaders, sourcemaps, error reporting, Turbopack rule for all script extensions, CSS invalidation of changed dependencies, location-independent webpack module ids)
+  - Make `next` a peer dependency of `@style-this/next`, and point the next and webpack package types at the built `.d.mts`
+  - Remove the `wrapSelectorsWithGlobal` transformer option
+  - Add a `resolveVirtualImport` transformer option
+  - Svelte: transform both scripts and keep their attributes, transform files under their own path, map sourcemaps to the `.svelte` file and normalize filepaths for HMR
+  - Forward refs in generated React styled components, and merge string style props in Solid styled components
+  - Atomize declarations using `var()`, start atomic class hashes with an uppercase letter, and fix atomic parsing of parentheses and string escapes
+  - Handle circular imports, late imports, star re-exports and `?raw` imports during evaluation
+  - Rewrite `css` inside exported function and class bodies, and fix declaration ordering/inclusion when moving declarations
+  - Evaluate CSS of files that gain styles during dev, drop outdated HMR updates, and fix value caching of dependencies that skip evaluation or fail
+  - Preserve CSS escapes in re-emitted templates, replace `$` in generated class names, and map CSS sourcemap offsets from UTF-8 bytes
+  - Report unknown dependency extensions instead of panicking, and escape file paths in evaluated programs
+
+### Patch Changes
+
+- Updated dependencies
+  - @style-this/core@0.6.0
+  - @style-this/webpack@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes
