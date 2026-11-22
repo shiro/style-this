@@ -1,7 +1,4 @@
-import { atomicFiles } from "../shared";
-import { atomicProgramExtension, loadVirtualModule, virtualModuleLoader } from "./transform";
+import { createAtomicProgramLoader } from "@style-this/webpack/core";
+import { loaderConfig } from "./consts";
 
-/** Serves the atomic class module of the file in `?filepath=`. */
-export default virtualModuleLoader((ctx, bundler, filepath) =>
-  loadVirtualModule(ctx, bundler, filepath, atomicFiles, `${filepath}.${atomicProgramExtension}`),
-);
+export default createAtomicProgramLoader(loaderConfig);

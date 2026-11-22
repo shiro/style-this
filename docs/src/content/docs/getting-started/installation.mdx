@@ -17,7 +17,7 @@ for every `@style-this/*` package.
 | `@style-this/next` | Next.js integration (webpack and turbopack). |
 | `@style-this/react` | `styled` components for React. |
 | `@style-this/solid` | `styled` components for SolidJS. |
-| `@style-this/webpack` | Low-level webpack loader, used by `@style-this/next`. |
+| `@style-this/webpack` | webpack plugin, also used by `@style-this/next`. |
 
 <Steps>
 
@@ -33,6 +33,12 @@ for every `@style-this/*` package.
    <TabItem label="Next.js">
    ```bash
    pnpm add @style-this/core @style-this/next
+   ```
+   </TabItem>
+   <TabItem label="webpack">
+   ```bash
+   pnpm add @style-this/core
+   pnpm add -D @style-this/webpack
    ```
    </TabItem>
    </Tabs>
@@ -80,6 +86,18 @@ for every `@style-this/*` package.
 
    export default withStyleThis(nextConfig);
    ```
+   </TabItem>
+   <TabItem label="webpack">
+   ```js title="webpack.config.js"
+   import { StyleThisPlugin } from "@style-this/webpack";
+
+   export default {
+     // ...
+     plugins: [new StyleThisPlugin()],
+   };
+   ```
+   The generated CSS is imported as `.css` files, so the config needs a CSS rule, see
+   [`@style-this/webpack`](/reference/next-webpack/#style-thiswebpack).
    </TabItem>
    </Tabs>
 

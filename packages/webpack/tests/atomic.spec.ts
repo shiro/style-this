@@ -1,23 +1,19 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mkdirSync, writeFileSync } from "fs";
-import turbopackTransformLoader from "../src/loaders/turbopackTransformLoader";
+import transformLoader from "../src/loaders/transformLoader";
 import atomicProgramLoader from "../src/loaders/atomicProgramLoader";
 import cssLoader from "../src/loaders/cssLoader";
 import { atomicFiles, cssFiles } from "../src/shared";
 import { runLoader, virtualImport } from "./util";
 
-vi.hoisted(() => {
-  process.env.ATOMIC = "1";
-});
-
-const dir = "/tmp/style-this-next-atomic";
+const dir = "/tmp/style-this-webpack-atomic";
 mkdirSync(dir, { recursive: true });
 
-const options = { bundler: "turbopack" };
+const options = { atomic: true };
 
 const transform = async (filepath: string, code: string) => {
   writeFileSync(filepath, code);
-  const { err, result } = await runLoader(turbopackTransformLoader, code, filepath);
+  const { err, result } = await runLoader(transformLoader, code, filepath, options);
   expect(err).toBeNull();
   return result!;
 };
@@ -32,11 +28,11 @@ const loadVirtualModules = async (filepath: string, transformed: string) => {
   };
   return {
     classes: await load(atomicProgramLoader, "style-this.atomic-program.js"),
-    css: await load(cssLoader, "style-this.module.css"),
+    css: await load(cssLoader, "style-this.css"),
   };
 };
 
-describe("next atomic mode", () => {
+describe("atomic mode", () => {
   it("serves the class modules and the CSS with the atomic CSS each file uses", async () => {
     const filepath = `${dir}/serves.tsx`;
     const code = `import { css } from "@style-this/core";
@@ -50,8 +46,8 @@ export const cls = css\`
     const modules = await loadVirtualModules(filepath, transformed);
     expect(modules).toMatchInlineSnapshot(`
       {
-        "classes": "export const cls = "cls-uzcx2b m-sy5do mt-DB_jf"",
-        "css": ".cls-uzcx2b {   &:hover { color: red; } }
+        "classes": "export const cls = "cls-olubkx m-sy5do mt-DB_jf"",
+        "css": ".cls-olubkx {   &:hover { color: red; } }
       @layer theme, base, components, utilities;
       @layer utilities {
       @layer r0, r1;
@@ -65,7 +61,7 @@ export const cls = css\`
       }
     `);
 
-    // Turbopack runs loaders in several processes, the loaders transform the file again if this one didn't
+    // Turbopack runs loaders in several processes, the virtual module loaders transform the file again if this one didn't
     cssFiles.clear();
     atomicFiles.clear();
     expect(await loadVirtualModules(filepath, transformed)).toEqual(modules);

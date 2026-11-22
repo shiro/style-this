@@ -1,24 +1,22 @@
 import { describe, it, expect } from "vitest";
 import { mkdirSync, writeFileSync } from "fs";
-import turbopackTransformLoader from "../src/loaders/turbopackTransformLoader";
+import transformLoader from "../src/loaders/transformLoader";
 import cssLoader from "../src/loaders/cssLoader";
 import { resolveRequest, runLoader, virtualImport } from "./util";
 
-const dir = "/tmp/style-this-next-hmr";
+const dir = "/tmp/style-this-webpack-hmr";
 mkdirSync(dir, { recursive: true });
 
-const options = { bundler: "turbopack" };
-
-describe("next dev edits", () => {
+describe("dev edits", () => {
   it("serves the CSS of files gaining and losing styles", async () => {
     const filepath = `${dir}/gaining.tsx`;
     const transform = async (code: string) => {
       writeFileSync(filepath, code);
-      const { err, result } = await runLoader(turbopackTransformLoader, code, filepath, options);
+      const { err, result } = await runLoader(transformLoader, code, filepath);
       expect(err).toBeNull();
       return result!;
     };
-    const css = async (cssImport: string) => runLoader(cssLoader, "", cssImport, options);
+    const css = async (cssImport: string) => runLoader(cssLoader, "", cssImport);
     const styled = (color: string) => `import { css } from "@style-this/core";
 export const cls = css\`
   color: ${color};
@@ -27,7 +25,7 @@ export const cls = css\`
     const unstyled = `export const value = 1;\n`;
 
     expect(await transform(unstyled)).toBe(unstyled);
-    const cssImport = virtualImport(filepath, await transform(styled("red")), "style-this.module.css");
+    const cssImport = virtualImport(filepath, await transform(styled("red")), "style-this.css");
     expect(await css(cssImport)).toEqual({ err: null, result: expect.stringContaining("color: red") });
 
     // the CSS loader runs again on edits, while the stylesheet is still imported
@@ -61,13 +59,13 @@ export const cls = css\`
     const allDependencies = ["importer.tsx", "palette.ts", "size.txt", "theme.ts"].map((name) => `${dir}/${name}`);
 
     const transform = async (ctx = {}) => {
-      const { err, result } = await runLoader(turbopackTransformLoader, code, filepath, options, ctx);
+      const { err, result } = await runLoader(transformLoader, code, filepath, {}, ctx);
       expect(err).toBeNull();
       return result!;
     };
     const css = async () => {
       dependencies.clear();
-      const { err, result } = await runLoader(cssLoader, "", cssImport, options, { addDependency });
+      const { err, result } = await runLoader(cssLoader, "", cssImport, {}, { addDependency });
       expect(err).toBeNull();
       return result;
     };
@@ -77,7 +75,7 @@ export const cls = css\`
     const paletteResolvable = new Promise<void>((resolve) => (resolvePalette = resolve));
     const getResolve = () => (context: string, request: string, cb: Parameters<typeof resolveRequest>[2]) =>
       request.includes("palette") ? paletteResolvable.then(() => resolveRequest(context, request, cb)) : resolveRequest(context, request, cb);
-    const cssImport = virtualImport(filepath, await transform({ getResolve }), "style-this.module.css");
+    const cssImport = virtualImport(filepath, await transform({ getResolve }), "style-this.css");
     const cssResult = css();
     resolvePalette();
     expect(await cssResult).toMatch(/color: red;\s+width: 1px;/);

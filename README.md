@@ -33,7 +33,7 @@ export const Card = () => <div className={card}>Hello</div>;
 | [`@style-this/next`](packages/next) | Next.js integration |
 | [`@style-this/react`](packages/react) | `styled` components for React |
 | [`@style-this/solid`](packages/solid) | `styled` components for SolidJS |
-| [`@style-this/webpack`](packages/webpack) | Low-level webpack loader |
+| [`@style-this/webpack`](packages/webpack) | webpack plugin |
 
 All packages are released in lockstep, use the same version for each of them.
 

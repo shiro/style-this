@@ -6,11 +6,11 @@ import type {
 } from "next/dist/server/config-shared";
 import { WithLinariaConfig } from "./types";
 import {
-  noopAtomicCssFilename,
   regexFilepathQuery,
   regexNoopAtomicProgram,
   transformExtensions,
-} from "./loaders/consts";
+} from "@style-this/webpack/core";
+import { noopAtomicCssFilename } from "./loaders/consts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

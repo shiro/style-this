@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Configuration } from "webpack";
 import { withStyleThis } from "../src/index";
+import { loaderConfig } from "../src/loaders/consts";
 
 const transformGlob = "*.{tsx,ts,jsx,js,mjs}";
 
@@ -39,5 +40,14 @@ describe("withStyleThis", () => {
     const transformRule = withStyleThis({}).turbopack?.rules?.[transformGlob];
 
     expect(rules?.[transformGlob]).toEqual([...expected, transformRule]);
+  });
+});
+
+describe("loaderConfig", () => {
+  it("imports the CSS of the pages router's `_app` as global CSS", () => {
+    const { resolveVirtualImport } = loaderConfig({ bundler: "turbopack" });
+
+    expect(resolveVirtualImport("css", "/app/src/pages/_app.tsx")).toMatch(/style-this\.global\.css\?filepath=/);
+    expect(resolveVirtualImport("css", "/app/src/pages/index.tsx")).toMatch(/style-this\.module\.css\?filepath=/);
   });
 });

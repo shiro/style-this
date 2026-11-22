@@ -1,0 +1,34 @@
+{
+  "name": "example/webpack",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "webpack serve --mode development",
+    "dev:atomic": "ATOMIC=1 webpack serve --mode development",
+    "build": "webpack --mode production",
+    "build:atomic": "ATOMIC=1 webpack --mode production"
+  },
+  "dependencies": {
+    "@style-this/core": "workspace:",
+    "@style-this/react": "workspace:",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@style-this/webpack": "workspace:",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "css-loader": "^7.1.2",
+    "esbuild-loader": "^4.3.0",
+    "html-webpack-plugin": "^5.6.3",
+    "mini-css-extract-plugin": "^2.9.2",
+    "typescript": "~6.0.2",
+    "webpack": "^5.102.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

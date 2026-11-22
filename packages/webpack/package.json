@@ -4,13 +4,23 @@
   "description": "CSS-in-JS library for the modern web - webpack plugin",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "style-this.*"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs",
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.mts",
+      "import": "./dist/core.mjs",
+      "default": "./dist/core.mjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -30,12 +40,9 @@
     "webpack": "^5.0.0"
   },
   "peerDependencies": {
-    "solid-js": "*",
     "webpack": "^5.0.0"
   },
-  "peerDependenciesMeta": {
-    "solid-js": {
-      "optional": true
-    }
+  "devDependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31"
   }
 }

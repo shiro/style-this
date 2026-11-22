@@ -5,12 +5,11 @@ import type * as NextServer from "next/dist/server/config-shared";
 import type * as Webpack from "webpack";
 
 import {
-  noopAtomicCssFile,
   regexFilepathQuery,
   regexNoopAtomicProgram,
-  regexNoopCss,
   regexTransformExtension,
-} from "./loaders/consts";
+} from "@style-this/webpack/core";
+import { noopAtomicCssFile, regexNoopCss } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

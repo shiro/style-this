@@ -8,7 +8,13 @@ export default defineConfig([
     },
     target: "esnext",
     format: "esm",
-    entry: ["src/index.ts", "src/cssLoader.ts"],
+    entry: [
+      "src/index.ts",
+      "src/core.ts",
+      "src/loaders/transformLoader.ts",
+      "src/loaders/cssLoader.ts",
+      "src/loaders/atomicProgramLoader.ts",
+    ],
     plugins: [wasm({ maxFileSize: 10000000 })],
   },
 ]);

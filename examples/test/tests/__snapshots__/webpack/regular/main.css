@@ -1,0 +1,40 @@
+/* empty file for masking virtual imports */
+
+.CounterStyle-zodu74 {
+display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  margin: 4px;
+  border: 1px solid blue;
+  border-radius: 8px;
+  background: white;
+  
+}
+.FancyButton-otinw9 {
+background: none;
+  border: 1px solid blue;
+  border-radius: 2px;
+  padding: var(--var1-enc92j);
+}
+.FancyButton2-wtirkd {
+margin: var(--var1-1mjodu);
+  min-height: var(--var2-spq7g9);
+  cursor: pointer;
+  background: var(--var3-wlmjop);
+}
+.ContainerStyle-3wxanc {
+display: flex;
+  flex-direction: column;
+}
+.colorStyle-v856z4 {
+color: coral;
+  background: lightyellow;
+}
+.highlightStyle-s1ybc1 {
+color: crimson;
+}
+.Global__Main {
+    background: lightyellow;
+  }
+

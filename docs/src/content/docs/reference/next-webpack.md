@@ -28,26 +28,38 @@ Wraps a Next.js config:
 
 ## `@style-this/webpack`
 
-:::caution
-The standalone webpack package is experimental. It provides the low-level loader, there's no
-turn-key plugin yet. For Next.js use `@style-this/next`.
-:::
-
 ```ts
-import styleThisLoader, { NextCSSLoader } from "@style-this/webpack";
+import { StyleThisPlugin } from "@style-this/webpack";
+
+new StyleThisPlugin(options?: StyleThisPluginOptions)
 ```
 
-| Export | Description |
-| --- | --- |
-| `default` | webpack 5 loader transforming JS/TS modules |
-| `NextCSSLoader` | path of the companion loader that serves the generated CSS |
+Adds the transform loader for `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs` outside `node_modules`, which
+runs before the loaders of your own rules (e.g. `esbuild-loader`, `babel-loader`), and the loaders
+serving the generated CSS and atomic class modules.
 
-```ts
-type LoaderOptions = {
-  extension?: string;
-  prefixer?: boolean;
-  sourceMap?: boolean;
+The generated CSS is imported as `.css` files, so it goes through your CSS rule:
+
+```js title="webpack.config.js"
+import MiniCssExtractPlugin from "mini-css-extract-plugin";
+import { StyleThisPlugin } from "@style-this/webpack";
+
+export default {
+  module: {
+    rules: [
+      { test: /\.[jt]sx?$/, loader: "esbuild-loader", options: { jsx: "automatic" } },
+      { test: /\.css$/, use: [MiniCssExtractPlugin.loader, "css-loader"] },
+    ],
+  },
+  plugins: [new StyleThisPlugin(), new MiniCssExtractPlugin()],
 };
 ```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `atomic` | `false` | enables [atomic mode](/guides/atomic-css/) |
+| `useRequire` | `false` | same as the [vite option](/reference/vite/#userequire) |
+
+In atomic mode, the CSS of every file includes the atomic rules it uses.
 
 Peer dependency: `webpack ^5`.

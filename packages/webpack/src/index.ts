@@ -1,157 +1,55 @@
-import type { RawLoaderDefinitionFunction } from "webpack";
-import { Transformer, initializeStyleThis, type CssCachEntry } from "@style-this/core/compiler";
-import { cacheRegistry, cssFiles } from "./shared";
-import { chainSourceMap, isInNodeModules } from "./util";
 import path from "path";
-import { readFile } from "fs/promises";
-import { createRequire } from "node:module";
+import { fileURLToPath } from "url";
+import type { Compiler } from "webpack";
+import {
+  noopAtomicCssFile,
+  regexFilepathQuery,
+  regexNoopAtomicProgram,
+  regexNoopCss,
+  regexTransformExtension,
+  type LoaderOptions,
+} from "./loaders/consts";
 
-const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export type LoaderOptions = {
-  extension?: string;
-  prefixer?: boolean;
-  sourceMap?: boolean;
-};
-type Loader = RawLoaderDefinitionFunction<LoaderOptions>;
+export type StyleThisPluginOptions = LoaderOptions;
 
-// const cache = new TransformCacheCollection();
+/**
+ * Transforms the JS/TS modules outside `node_modules`. Their CSS is imported as `.css` files, so it
+ * goes through the CSS rules of the config (e.g. `css-loader` with `mini-css-extract-plugin`).
+ */
+export class StyleThisPlugin {
+  constructor(private options: StyleThisPluginOptions = {}) {}
 
-let cssLoader: string;
-try {
-  // Try to resolve from dist (when built)
-  cssLoader = require.resolve("../dist/cssLoader.mjs");
-} catch {
-  // Fall back to src (for development, though this won't work at runtime)
-  cssLoader = require.resolve("./cssLoader");
+  apply(compiler: Compiler) {
+    const { module, resolve } = compiler.options;
+    const options = this.options;
+
+    resolve.alias = {
+      ...(resolve.alias as Record<string, string>),
+      "@style-this/core/atomic$": noopAtomicCssFile(options.atomic ?? false),
+    };
+
+    // runs before the loaders of the config's rules for the same files
+    module.rules.push(
+      {
+        test: regexNoopCss,
+        resourceQuery: regexFilepathQuery,
+        loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"),
+        options,
+      },
+      {
+        test: regexNoopAtomicProgram,
+        resourceQuery: regexFilepathQuery,
+        loader: path.resolve(__dirname, "./loaders/atomicProgramLoader.mjs"),
+        options,
+      },
+      {
+        test: regexTransformExtension,
+        loader: path.resolve(__dirname, "./loaders/transformLoader.mjs"),
+        options,
+        exclude: [/node_modules/, regexNoopAtomicProgram],
+      },
+    );
+  }
 }
-
-export const NextCSSLoader = cssLoader;
-
-let styleThis: Transformer;
-const filesContainingStyledTemplates = new Set<string>();
-const cssExtension = "style.css";
-const mocks = new Map<string, string>();
-
-const webpack5Loader: Loader = function webpack5LoaderPlugin(
-  code,
-  inputSourceMap,
-) {
-  // tell Webpack this loader is async
-  const callback = this.async();
-
-  // TODO remove this when done
-  this.cacheable(false);
-
-  // const outputFileName = this.resourcePath.replace(/\.[^.]+$/, extension);
-  const resolveSync = this.getResolve({ dependencyType: "esm" });
-
-  const resolve = (
-    token: string,
-    importer: string,
-  ): Promise<string | undefined> => {
-    const context = path.isAbsolute(importer)
-      ? path.dirname(importer)
-      : path.join(process.cwd(), path.dirname(importer));
-    return new Promise((resolvePromise) => {
-      resolveSync(context, token, (err, result) => {
-        if (err) {
-          resolvePromise(undefined);
-        } else if (result) {
-          this.addDependency(result);
-          resolvePromise(result);
-        } else {
-          resolvePromise(undefined);
-        }
-      });
-    });
-  };
-
-  const cwd = process.cwd();
-
-  const loadFile = async (
-    importSourceId: string,
-  ): Promise<[string, string]> => {
-    if (mocks.has(importSourceId)) {
-      const filepath = require.resolve(importSourceId);
-      return [filepath, mocks.get(importSourceId)!];
-    }
-
-    let filepathWithQuery = await resolve(importSourceId, "./index.ts");
-
-    if (!filepathWithQuery)
-      throw new Error(`webpack failed to resolve import '${importSourceId}'`);
-
-    let [filepath, _query] = filepathWithQuery.split("?", 2);
-
-    if (
-      !isInNodeModules(cwd, filepath) &&
-      !importSourceId.startsWith("@style-this/")
-    ) {
-      try {
-        const raw = await readFile(filepath, "utf-8");
-        return [filepath, raw];
-      } catch (err) {}
-    }
-
-    // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
-    // bundled one (that might not yet exist on disk)
-    // also do not load the contents, the transformer should require(...) it as-is
-    filepath = require.resolve(importSourceId);
-    return [filepath, ""];
-  };
-
-  (async () => {
-    if (!styleThis) {
-      await initializeStyleThis();
-      styleThis = new Transformer({
-        cwd,
-        ignoredImports: {},
-        loadFile,
-        cacheRegistry,
-        cssExtension,
-      });
-    }
-
-    const filepath = this.resourcePath;
-    const cssFilepath = `${filepath}.${cssExtension}`;
-
-    // resolved by the compiler through `cacheRegistry`
-    let resolve: CssCachEntry["resolve"] | undefined;
-    const entry = new Promise((_resolve) => {
-      resolve = _resolve;
-    }) as CssCachEntry;
-    entry.resolve = resolve!;
-    entry.code = code.toString();
-    cssFiles.set(cssFilepath, entry);
-
-    // console.log("LOAD style-this", this.resourcePath);
-    // console.log(code);
-
-    // const request = `${cssFilepath}!=!${cssLoader}!${filepath}`;
-
-    const transformedResult = await styleThis.transform(
-      code.toString(),
-      filepath,
-      false,
-    );
-
-    if (!transformedResult) {
-      filesContainingStyledTemplates.delete(filepath);
-      this.callback(null, code, inputSourceMap);
-      return;
-    }
-    filesContainingStyledTemplates.add(filepath);
-
-    // console.log(transformedResult.code);
-
-    this.callback(
-      null,
-      // `import ${stringifiedRequest};\n${transformedResult.code}`,
-      transformedResult.code,
-      chainSourceMap(transformedResult.sourcemap, inputSourceMap),
-    );
-  })().catch((err) => callback(err));
-};
-
-export default webpack5Loader;

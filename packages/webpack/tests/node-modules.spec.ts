@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { isInNodeModules } from "../src/util";
+import { isInNodeModules } from "../src/loaders/shared";
 
 // simulate Windows: `process.cwd()` and webpack's resolved paths use `\`
 vi.mock("path", async (importOriginal) => {

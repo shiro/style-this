@@ -1,19 +1,53 @@
-type LoaderResult = { err: Error | null | undefined; result?: string; map?: unknown };
+import path from "path";
+import { createRequire } from "node:module";
+import type { LoaderOptions } from "../src/loaders/consts";
 
-export const runLoader = (loader: Function, code: string, resourcePath: string, inputSourceMap?: unknown) =>
+type LoaderResult = { err: Error | null | undefined; result?: string; map?: unknown };
+type ResolveCallback = (err: Error | null, result?: string) => void;
+
+export const resolveRequest = (context: string, request: string, cb: ResolveCallback) => {
+  try {
+    const [file, query] = request.split("?", 2);
+    const resolved = createRequire(path.join(context, "noop.js")).resolve(file);
+    cb(null, query === undefined ? resolved : `${resolved}?${query}`);
+  } catch (err) {
+    cb(err as Error);
+  }
+};
+
+/** `ctx` overrides fields of the loader context. */
+export const runLoader = (
+  loader: Function,
+  code: string,
+  resource: string,
+  options: LoaderOptions = {},
+  ctx: { addDependency?: (file: string) => void; getResolve?: () => typeof resolveRequest } = {},
+  inputSourceMap?: unknown,
+) =>
   new Promise<LoaderResult>((resolve) => {
     const callback = (err: Error | null | undefined, result?: string | Buffer, map?: unknown) =>
       resolve({ err, result: result?.toString(), map });
+    const queryStart = resource.indexOf("?");
     loader.call(
       {
-        resourcePath,
+        resourcePath: queryStart === -1 ? resource : resource.slice(0, queryStart),
+        resourceQuery: queryStart === -1 ? "" : resource.slice(queryStart),
         async: () => callback,
+        // vitest's module runner doesn't support the dynamic `import()` of evaluations
+        getOptions: () => ({ useRequire: true, ...options }),
         callback,
         cacheable: () => {},
         addDependency: () => {},
-        getResolve: () => () => {},
+        getResolve: () => resolveRequest,
+        ...ctx,
       },
       Buffer.from(code),
       inputSourceMap,
     );
   });
+
+/** The virtual module import the transform inserted into `filepath`, as a resource for its loader. */
+export const virtualImport = (filepath: string, code: string, noopFile: string) => {
+  const source = code.match(new RegExp(`"([^"]+${noopFile.replaceAll(".", "\\.")}\\?filepath=[^"]+)"`))![1];
+  return path.resolve(path.dirname(filepath), source);
+};
