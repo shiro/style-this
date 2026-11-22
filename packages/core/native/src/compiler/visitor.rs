@@ -1425,12 +1425,17 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     .insert(id.name.to_string(), None);
             }
         } else {
-            if let Statement::FunctionDeclaration(function) = it {
-                self.visit_function_declaration(function, ScopeFlags::Function);
-            }
-
-            if let Statement::ClassDeclaration(class) = it {
-                self.visit_class_declaration(class);
+            // these walk the declaration themselves
+            match it {
+                Statement::FunctionDeclaration(function) => {
+                    self.visit_function_declaration(function, ScopeFlags::Function);
+                    return;
+                }
+                Statement::ClassDeclaration(class) => {
+                    self.visit_class_declaration(class);
+                    return;
+                }
+                _ => {}
             }
         }
 
