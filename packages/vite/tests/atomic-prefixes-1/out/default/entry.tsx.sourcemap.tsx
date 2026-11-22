@@ -5,31 +5,33 @@
 //     "/packages/vite/tests/atomic-prefixes-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { css, mergeStyles } from \"@style-this/core\";\nimport \"@style-this/core/atomic\";\n\n// duplicate properties: the last declaration wins in atomic mode too\nconst duplicates = css`\n  padding: 16px;\n  color: red;\n  padding: 8px;\n  -webkit-line-clamp: 2;\n`;\n\n// shorthands must be emitted before longhands\nconst shorthands = css`\n  margin-top: 4px;\n  margin: 8px;\n  background-color: blue;\n  background: none;\n  border-top: 1px solid red;\n  border: 0;\n`;\n\n// same declaration => same class as in `shorthands`\nconst sameDeclaration = css`\n  margin: 8px;\n`;\n\nexport const merged = mergeStyles(duplicates, shorthands, sameDeclaration);\n\nexport { duplicates, shorthands, sameDeclaration };\n"
+//     "import { css, mergeStyles } from \"@style-this/core\";\nimport \"@style-this/core/atomic\";\n\n// duplicate properties and longhands followed by their shorthand: the last declaration wins in\n// atomic mode too\nconst duplicates = css`\n  padding: 16px;\n  color: red;\n  padding-left: 4px;\n  padding: 8px;\n  -webkit-line-clamp: 2;\n`;\n\n// shorthands must be emitted before longhands\nconst shorthands = css`\n  margin: 8px;\n  margin-top: 4px;\n  background: none;\n  background-color: blue;\n  border: 0;\n  border-top: 1px solid red;\n`;\n\n// same declaration => same class as in `shorthands`\nconst sameDeclaration = css`\n  margin: 8px;\n`;\n\nexport const merged = mergeStyles(duplicates, shorthands, sameDeclaration);\n\nexport { duplicates, shorthands, sameDeclaration };\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAImB;;;;;;AAQA;;;;;;;;AAUK"
+//   "mappings": "AAKmB;;;;;;;AASA;;;;;;;;AAUK"
 // }
 
 import { css, mergeStyles } from "@style-this/core";
 import "@style-this/core/atomic";
 
-// duplicate properties: the last declaration wins in atomic mode too
+// duplicate properties and longhands followed by their shorthand: the last declaration wins in
+// atomic mode too
 const duplicates = css`
   padding: 16px;
   color: red;
+  padding-left: 4px;
   padding: 8px;
   -webkit-line-clamp: 2;
 `;
 
 // shorthands must be emitted before longhands
 const shorthands = css`
-  margin-top: 4px;
   margin: 8px;
-  background-color: blue;
+  margin-top: 4px;
   background: none;
-  border-top: 1px solid red;
+  background-color: blue;
   border: 0;
+  border-top: 1px solid red;
 `;
 
 // same declaration => same class as in `shorthands`

@@ -184,6 +184,37 @@ var atomicPrefixes_default = {
 };
 
 //#endregion
+//#region src/atomicShorthands.json
+var atomicShorthands_default = {
+	margin: "margin-top margin-right margin-bottom margin-left margin-inline margin-block margin-inline-start margin-inline-end margin-block-start margin-block-end",
+	"margin-inline": "margin-inline-start margin-inline-end",
+	"margin-block": "margin-block-start margin-block-end",
+	padding: "padding-top padding-right padding-bottom padding-left padding-inline padding-block padding-inline-start padding-inline-end padding-block-start padding-block-end",
+	"padding-inline": "padding-inline-start padding-inline-end",
+	"padding-block": "padding-block-start padding-block-end",
+	inset: "top right bottom left inset-inline inset-block",
+	overflow: "overflow-x overflow-y",
+	flex: "flex-grow flex-shrink flex-basis",
+	"flex-flow": "flex-direction flex-wrap",
+	gap: "row-gap column-gap",
+	"place-items": "align-items justify-items",
+	"place-content": "align-content justify-content",
+	"place-self": "align-self justify-self",
+	grid: "grid-template grid-template-columns grid-template-rows grid-template-areas grid-auto-flow grid-auto-columns grid-auto-rows",
+	"grid-template": "grid-template-columns grid-template-rows grid-template-areas",
+	"grid-area": "grid-column grid-row grid-column-start grid-column-end grid-row-start grid-row-end",
+	"grid-column": "grid-column-start grid-column-end",
+	"grid-row": "grid-row-start grid-row-end",
+	font: "font-family font-size font-weight font-style font-variant line-height",
+	"list-style": "list-style-type",
+	background: "background-color background-image background-size background-position background-repeat background-clip background-attachment background-origin",
+	border: "border-top border-right border-bottom border-left border-inline border-block border-width border-style border-color",
+	"border-radius": "border-top-left-radius border-top-right-radius border-bottom-right-radius border-bottom-left-radius",
+	outline: "outline-width outline-style outline-color",
+	transition: "transition-property transition-duration transition-timing-function transition-delay"
+};
+
+//#endregion
 //#region src/index.ts
 const css = (..._raw) => {
 	throw new Error("@style-this: called 'css' at runtime. This indicates an error in the transform.");
@@ -200,6 +231,9 @@ const extraClass = (..._classes) => {
 	throw new Error("@style-this: called 'extraClass' at runtime. This indicates an error in the transform.");
 };
 const ATOMIC_PREFIXES = new Set(Object.values(atomicPrefixes_default));
+const prefixOf = (property) => atomicPrefixes_default[property];
+/** Prefix of a shorthand -> prefixes of the longhands it overrides, e.g. `m` -> `mt`, `mb`, ... */
+const LONGHAND_PREFIXES = new Map(Object.entries(atomicShorthands_default).map(([shorthand, longhands]) => [prefixOf(shorthand), longhands.split(" ").map(prefixOf)]));
 const ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
 const getAtomicPrefix = (className) => {
 	const prefix = ATOMIC_CLASS.exec(className)?.[1];
@@ -209,7 +243,8 @@ const getAtomicPrefix = (className) => {
 const joinStyles = (...classes) => classes.filter(Boolean).join(" ");
 /**
 * Joins class lists, de-duping atomic classes of the same property (e.g. `m-xxxxx`), the last one wins.
-* Other classes are only de-duped if identical. Falsy values are ignored.
+* Atomic classes of longhands followed by their shorthand (e.g. `mt-xxxxx` before `m-xxxxx`) are dropped
+* too, longhands would win otherwise. Other classes are only de-duped if identical. Falsy values are ignored.
 * In non-atomic mode the transform replaces this with `joinStyles`.
 */
 const mergeStyles = (...classes) => {
@@ -218,7 +253,9 @@ const mergeStyles = (...classes) => {
 		if (!classList) continue;
 		for (const className of classList.split(/\s+/)) {
 			if (!className) continue;
-			const key = getAtomicPrefix(className) ?? className;
+			const prefix = getAtomicPrefix(className);
+			if (prefix) for (const longhand of LONGHAND_PREFIXES.get(prefix) ?? []) merged.delete(longhand);
+			const key = prefix ?? className;
 			merged.delete(key);
 			merged.set(key, className);
 		}

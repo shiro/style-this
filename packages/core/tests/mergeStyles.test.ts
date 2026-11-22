@@ -73,8 +73,14 @@ describe('mergeStyles', () => {
   });
 
   describe('different properties', () => {
-    it('shorthand and longhand are kept', () => {
+    it('shorthand and later longhands are kept', () => {
       expect(mergeStyles('m-Aaaaa', 'mt-Bbbbb', 'mb-Ccccc')).toBe('m-Aaaaa mt-Bbbbb mb-Ccccc');
+    });
+
+    it('longhands followed by their shorthand are dropped', () => {
+      expect(mergeStyles('mt-Aaaaa ms-Aaaaa p-Aaaaa', 'r-Bbbbb', 'm-Ccccc mb-Ccccc', 'b-Ddddd')).toBe(
+        'p-Aaaaa r-Bbbbb m-Ccccc mb-Ccccc b-Ddddd'
+      );
     });
 
     it('prefixes sharing a start are kept', () => {

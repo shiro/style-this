@@ -54,7 +54,8 @@ const mergeStyles: (...classes: Array<string | false | null | undefined>) => str
 ```
 
 Joins class lists. Atomic classes (`<prefix>-<uppercase letter + 4 chars>`) of the same property are
-de-duplicated, the last one wins. Other classes are de-duplicated only if identical. Replaced by
+de-duplicated, the last one wins, and longhands followed by their shorthand are dropped. Other
+classes are de-duplicated only if identical. Replaced by
 `joinStyles` in default mode. See [Merging styles](/guides/merging-styles/).
 
 ## `joinStyles`

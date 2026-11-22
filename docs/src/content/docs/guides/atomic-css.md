@@ -121,9 +121,10 @@ import { mergeStyles } from "@style-this/core";
 Styled components do this automatically for `className` / `class` and for
 [extended components](/guides/styled-components/#extending-components).
 
-Shorthands and longhands are different properties and aren't de-duplicated against each other.
-Longhands always win: with `padding: 0` and `padding-top: 8px` on one element, the top padding is
-`8px` regardless of order.
+Shorthands and longhands are emitted so that longhands win, which matches regular CSS when the
+longhand comes later. When the shorthand comes later, both `mergeStyles` and the compiler (within a
+style) drop the earlier longhands it overrides: `padding-top: 8px` followed by `padding: 0` gives
+`padding: 0`, like in default mode.
 
 ## Cascade layers
 

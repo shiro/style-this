@@ -37,8 +37,8 @@ describe("atomic mode", () => {
     const filepath = `${dir}/serves.tsx`;
     const code = `import { css } from "@style-this/core";
 export const cls = css\`
-  margin-top: 4px;
   margin: 0;
+  margin-top: 4px;
   &:hover { color: red; }
 \`;
 `;

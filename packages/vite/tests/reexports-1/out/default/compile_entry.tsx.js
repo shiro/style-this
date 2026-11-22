@@ -44,8 +44,8 @@ let box = new String("box-qnol2j");
 box.css = `color: ${color};
   background: ${renamed};
   outline-color: ${secondary};
-  border-color: ${fromC};
   border: ${border};
+  border-color: ${fromC};
   gap: ${getGap()};
   padding: ${pad({ gap: 2 })}px;
 

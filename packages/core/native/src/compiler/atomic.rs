@@ -18,14 +18,25 @@ pub struct CssDeclaration {
     pub value: String,
 }
 
-/// Property -> class prefix table, shared with the TS runtime (`mergeStyles`).
-/// The JSON is a flat object without escapes, so every quoted string is either a key or a value.
-static ATOMIC_PREFIXES: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
-    let json = include_str!("../../../src/atomicPrefixes.json");
+/// Entries of a JSON table shared with the TS runtime (`mergeStyles`). The JSON is a flat object
+/// of strings without escapes, so every quoted string is either a key or a value.
+fn flat_json_entries(json: &'static str) -> Vec<(&'static str, &'static str)> {
     let strings: Vec<&'static str> = json.split('"').skip(1).step_by(2).collect();
     strings
         .chunks_exact(2)
         .map(|pair| (pair[0], pair[1]))
+        .collect()
+}
+
+/// Property -> class prefix
+static ATOMIC_PREFIXES: Lazy<HashMap<&'static str, &'static str>> =
+    Lazy::new(|| flat_json_entries(include_str!("../../../src/atomicPrefixes.json")).into_iter().collect());
+
+/// Shorthand -> the longhands it fully overrides, transitively (`margin` includes `margin-inline-start`)
+static ATOMIC_SHORTHANDS: Lazy<HashMap<&'static str, Vec<&'static str>>> = Lazy::new(|| {
+    flat_json_entries(include_str!("../../../src/atomicShorthands.json"))
+        .into_iter()
+        .map(|(shorthand, longhands)| (shorthand, longhands.split(' ').collect()))
         .collect()
 });
 
@@ -105,15 +116,27 @@ pub fn generate_atomic_class_name(statement: &str) -> String {
     }
 }
 
-/// Keep only the last declaration of each prefixed property, mirroring `mergeStyles` semantics.
+/// Keep only the last declaration of each prefixed property and drop longhands followed by their
+/// shorthand (`margin-top` before `margin`), mirroring `mergeStyles` semantics. Longhands always
+/// win against shorthands in the atomic CSS (see `property_rank`), so they can't be kept.
 pub fn dedupe_atomic_declarations(declarations: Vec<String>) -> Vec<String> {
-    let mut seen = HashSet::new();
+    // prefixed properties set by a later declaration
+    let mut overridden = HashSet::new();
     let mut result: Vec<String> = declarations
         .into_iter()
         .rev()
-        .filter(|decl| match atomic_prefix(declaration_property(decl)) {
-            Some(prefix) => seen.insert(prefix),
-            None => true,
+        .filter(|decl| {
+            let property = declaration_property(decl).to_ascii_lowercase();
+            if atomic_prefix(&property).is_none() {
+                return true;
+            }
+            if !overridden.insert(property.clone()) {
+                return false;
+            }
+            if let Some(longhands) = ATOMIC_SHORTHANDS.get(property.as_str()) {
+                overridden.extend(longhands.iter().map(|longhand| longhand.to_string()));
+            }
+            true
         })
         .collect();
     result.reverse();
@@ -465,6 +488,39 @@ mod tests {
                 "-webkit-line-clamp: 3",
             ]
         );
+    }
+
+    #[test]
+    fn dedupe_drops_longhands_followed_by_their_shorthand() {
+        let result = dedupe_atomic_declarations(
+            [
+                "margin-inline-start: 1px",
+                "margin-top: 2px",
+                "border-radius: 4px",
+                "margin: 0",
+                "margin-bottom: 8px",
+                "border: 0",
+            ]
+            .map(String::from)
+            .to_vec(),
+        );
+        assert_eq!(result, vec!["border-radius: 4px", "margin: 0", "margin-bottom: 8px", "border: 0"]);
+    }
+
+    #[test]
+    fn shorthand_table_is_consistent() {
+        for (shorthand, longhands) in ATOMIC_SHORTHANDS.iter() {
+            assert!(atomic_prefix(shorthand).is_some(), "'{shorthand}' has no prefix");
+            for longhand in longhands {
+                assert!(atomic_prefix(longhand).is_some(), "'{longhand}' has no prefix");
+                // a longhand must win against its shorthand in the atomic CSS
+                assert!(property_rank(longhand) > property_rank(shorthand), "'{longhand}' ranks below '{shorthand}'");
+                // transitive, so de-duping only has to look up the shorthand
+                for nested in ATOMIC_SHORTHANDS.get(longhand).into_iter().flatten() {
+                    assert!(longhands.contains(nested), "'{shorthand}' is missing '{nested}' of '{longhand}'");
+                }
+            }
+        }
     }
 
     #[test]

@@ -1,4 +1,5 @@
 import atomicPrefixes from "./atomicPrefixes.json";
+import atomicShorthands from "./atomicShorthands.json";
 
 export type CSSProperties = {
   [key: string]: string | number | CSSProperties;
@@ -33,6 +34,14 @@ export const extraClass = (..._classes: string[]): string => {
 };
 
 const ATOMIC_PREFIXES = new Set<string>(Object.values(atomicPrefixes));
+const prefixOf = (property: string) => (atomicPrefixes as Record<string, string>)[property];
+/** Prefix of a shorthand -> prefixes of the longhands it overrides, e.g. `m` -> `mt`, `mb`, ... */
+const LONGHAND_PREFIXES = new Map<string, string[]>(
+  Object.entries(atomicShorthands).map(([shorthand, longhands]) => [
+    prefixOf(shorthand),
+    longhands.split(" ").map(prefixOf),
+  ]),
+);
 // `<prefix>-<hash>`, matching the compiler's `generate_atomic_hash`. The uppercase start rules out
 // hand-written classes like `bg-light`.
 const ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
@@ -50,7 +59,8 @@ export const joinStyles = (...classes: Array<ClassValue>): string =>
 
 /**
  * Joins class lists, de-duping atomic classes of the same property (e.g. `m-xxxxx`), the last one wins.
- * Other classes are only de-duped if identical. Falsy values are ignored.
+ * Atomic classes of longhands followed by their shorthand (e.g. `mt-xxxxx` before `m-xxxxx`) are dropped
+ * too, longhands would win otherwise. Other classes are only de-duped if identical. Falsy values are ignored.
  * In non-atomic mode the transform replaces this with `joinStyles`.
  */
 export const mergeStyles = (...classes: Array<ClassValue>): string => {
@@ -59,7 +69,9 @@ export const mergeStyles = (...classes: Array<ClassValue>): string => {
     if (!classList) continue;
     for (const className of classList.split(/\s+/)) {
       if (!className) continue;
-      const key = getAtomicPrefix(className) ?? className;
+      const prefix = getAtomicPrefix(className);
+      if (prefix) for (const longhand of LONGHAND_PREFIXES.get(prefix) ?? []) merged.delete(longhand);
+      const key = prefix ?? className;
       merged.delete(key);
       merged.set(key, className);
     }
