@@ -94,6 +94,9 @@ outer === "outer-mvwhqz w-Yb3Gw";
   class. Same for [global styles](/guides/css/#global-styles).
 - Dynamic declarations of [styled components](/guides/styled-components/#dynamic-styles-with-styleprops)
   are atomized too, e.g. `.p-NM_En { padding: var(--var1-4lyfgx) }`.
+- **`!important` declarations aren't atomized.** [Layers](#cascade-layers) reverse the cascade of
+  `!important`, so a layered one would beat the unlayered `!important` of nested rules like
+  `&.active { … }` that are meant to override it.
 
 ### Where the atomic CSS is loaded
 

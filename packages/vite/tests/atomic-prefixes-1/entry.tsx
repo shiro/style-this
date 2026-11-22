@@ -26,6 +26,14 @@ const sameDeclaration = css`
   margin: 8px;
 `;
 
+// `!important` declarations aren't atomized, a layered one would beat the nested override
+const important = css`
+  color: red !important;
+  &.active {
+    color: blue !important;
+  }
+`;
+
 export const merged = mergeStyles(duplicates, shorthands, sameDeclaration);
 
-export { duplicates, shorthands, sameDeclaration };
+export { duplicates, shorthands, sameDeclaration, important };

@@ -1,11 +1,11 @@
-.duplicates-bcdq7s {
+.duplicates-ijw9ev {
 padding: 16px;
   color: red;
   padding-left: 4px;
   padding: 8px;
   -webkit-line-clamp: 2;
 }
-.shorthands-rc1qzs {
+.shorthands-bcdq7s {
 margin: 8px;
   margin-top: 4px;
   background: none;
@@ -13,6 +13,12 @@ margin: 8px;
   border: 0;
   border-top: 1px solid red;
 }
-.sameDeclaration-v4pm30 {
+.sameDeclaration-rc1qzs {
 margin: 8px;
+}
+.important-v4pm30 {
+color: red !important;
+  &.active {
+    color: blue !important;
+  }
 }

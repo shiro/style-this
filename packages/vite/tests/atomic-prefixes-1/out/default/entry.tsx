@@ -4,10 +4,12 @@ import "@style-this/core/atomic";
 import "virtual:style-this:/entry.tsx.css";
 // duplicate properties and longhands followed by their shorthand: the last declaration wins in
 // atomic mode too
-const duplicates = "duplicates-bcdq7s";
+const duplicates = "duplicates-ijw9ev";
 // shorthands must be emitted before longhands
-const shorthands = "shorthands-rc1qzs";
+const shorthands = "shorthands-bcdq7s";
 // same declaration => same class as in `shorthands`
-const sameDeclaration = "sameDeclaration-v4pm30";
+const sameDeclaration = "sameDeclaration-rc1qzs";
+// `!important` declarations aren't atomized, a layered one would beat the nested override
+const important = "important-v4pm30";
 export const merged = mergeStyles(duplicates, shorthands, sameDeclaration);
-export { duplicates, shorthands, sameDeclaration };
+export { duplicates, shorthands, sameDeclaration, important };

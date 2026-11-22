@@ -1,3 +1,7 @@
-.duplicates-bcdq7s { /* marker */ }
-.shorthands-rc1qzs { /* marker */ }
-.sameDeclaration-v4pm30 { /* marker */ }
+.duplicates-ijw9ev { /* marker */ }
+.shorthands-bcdq7s { /* marker */ }
+.sameDeclaration-rc1qzs { /* marker */ }
+.important-v4pm30 { color: red !important;
+  &.active {
+    color: blue !important;
+  } }

@@ -10,5 +10,7 @@ const duplicates = _styleThisClasses.duplicates;
 const shorthands = _styleThisClasses.shorthands;
 // same declaration => same class as in `shorthands`
 const sameDeclaration = _styleThisClasses.sameDeclaration;
+// `!important` declarations aren't atomized, a layered one would beat the nested override
+const important = _styleThisClasses.important;
 export const merged = mergeStyles(duplicates, shorthands, sameDeclaration);
-export { duplicates, shorthands, sameDeclaration };
+export { duplicates, shorthands, sameDeclaration, important };

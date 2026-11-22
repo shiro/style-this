@@ -29,7 +29,7 @@ pub fn parse_css(css: &str) -> ParseCssResult {
 
     for segment in split_top_level_segments(&stripped) {
         match segment {
-            TopLevelSegment::Declaration(decl_text) if is_valid_declaration(decl_text) => {
+            TopLevelSegment::Declaration(decl_text) if is_atomizable_declaration(decl_text) => {
                 let normalized = decl_text.trim().trim_end_matches(';').to_string();
                 atomizable.retain(|existing| existing != &normalized);
                 atomizable.push(normalized);
@@ -178,8 +178,10 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     segments
 }
 
-/// Check if a declaration is a single valid declaration terminated by `;`
-fn is_valid_declaration(decl_text: &str) -> bool {
+/// Check if a declaration is a single valid declaration terminated by `;`, without `!important`.
+/// Layers reverse the cascade of `!important` declarations, layered (atomic) ones would beat the
+/// unlayered ones of nested rules that are meant to override them.
+fn is_atomizable_declaration(decl_text: &str) -> bool {
     let trimmed = decl_text.trim();
 
     let Some(without_semi) = trimmed.strip_suffix(';') else {
@@ -208,7 +210,9 @@ fn is_valid_declaration(decl_text: &str) -> bool {
     }
 
     match &stylesheet.rules.0[0] {
-        CssRule::Style(style_rule) => style_rule.rules.0.is_empty(),
+        CssRule::Style(style_rule) => {
+            style_rule.rules.0.is_empty() && style_rule.declarations.important_declarations.is_empty()
+        }
         _ => false,
     }
 }
@@ -224,6 +228,8 @@ mod tests {
         let input = indoc! {"
             color: red;
             invalid-something;
+            background: var(--bg) !important;
+            --accent: red ! IMPORTANT;
             @media (max-width: 600px) {
                 .btn { color: blue; }
             }
@@ -235,6 +241,8 @@ mod tests {
         "};
         let expected = Some(indoc! {"
             invalid-something;
+            background: var(--bg) !important;
+            --accent: red ! IMPORTANT;
             @media (max-width: 600px) {
                 .btn { color: blue; }
             }

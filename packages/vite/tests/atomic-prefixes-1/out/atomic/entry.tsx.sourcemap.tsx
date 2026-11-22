@@ -5,10 +5,10 @@
 //     "/packages/vite/tests/atomic-prefixes-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { css, mergeStyles } from \"@style-this/core\";\nimport \"@style-this/core/atomic\";\n\n// duplicate properties and longhands followed by their shorthand: the last declaration wins in\n// atomic mode too\nconst duplicates = css`\n  padding: 16px;\n  color: red;\n  padding-left: 4px;\n  padding: 8px;\n  -webkit-line-clamp: 2;\n`;\n\n// shorthands must be emitted before longhands\nconst shorthands = css`\n  margin: 8px;\n  margin-top: 4px;\n  background: none;\n  background-color: blue;\n  border: 0;\n  border-top: 1px solid red;\n`;\n\n// same declaration => same class as in `shorthands`\nconst sameDeclaration = css`\n  margin: 8px;\n`;\n\nexport const merged = mergeStyles(duplicates, shorthands, sameDeclaration);\n\nexport { duplicates, shorthands, sameDeclaration };\n"
+//     "import { css, mergeStyles } from \"@style-this/core\";\nimport \"@style-this/core/atomic\";\n\n// duplicate properties and longhands followed by their shorthand: the last declaration wins in\n// atomic mode too\nconst duplicates = css`\n  padding: 16px;\n  color: red;\n  padding-left: 4px;\n  padding: 8px;\n  -webkit-line-clamp: 2;\n`;\n\n// shorthands must be emitted before longhands\nconst shorthands = css`\n  margin: 8px;\n  margin-top: 4px;\n  background: none;\n  background-color: blue;\n  border: 0;\n  border-top: 1px solid red;\n`;\n\n// same declaration => same class as in `shorthands`\nconst sameDeclaration = css`\n  margin: 8px;\n`;\n\n// `!important` declarations aren't atomized, a layered one would beat the nested override\nconst important = css`\n  color: red !important;\n  &.active {\n    color: blue !important;\n  }\n`;\n\nexport const merged = mergeStyles(duplicates, shorthands, sameDeclaration);\n\nexport { duplicates, shorthands, sameDeclaration, important };\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAKmB;AASA;AAUK"
+//   "mappings": "AAKmB;AASA;AAUK;AAKN"
 // }
 
 import { css, mergeStyles } from "@style-this/core";
@@ -39,6 +39,14 @@ const sameDeclaration = css`
   margin: 8px;
 `;
 
+// `!important` declarations aren't atomized, a layered one would beat the nested override
+const important = css`
+  color: red !important;
+  &.active {
+    color: blue !important;
+  }
+`;
+
 export const merged = mergeStyles(duplicates, shorthands, sameDeclaration);
 
-export { duplicates, shorthands, sameDeclaration };
+export { duplicates, shorthands, sameDeclaration, important };
