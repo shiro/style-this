@@ -15,17 +15,17 @@ const test3 = _styleThisClasses.test3;
 const test4 = _styleThisClasses.test4;
 // Child styled component extends parent, both have extraClass
 const ParentStyled = (() => {
-	let ParentStyled = _styleThisClasses.__styleThis_var_ParentStyled_4;
-	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <div {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(ParentStyled, __styleThis__props.className)} />);
-	__styleThis__comp.css = ParentStyled.css;
-	__styleThis__comp.toString = () => ParentStyled;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_ParentStyled_4;
+	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <div {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.className)} />);
+	__styleThis__comp.css = __styleThis__class.css;
+	__styleThis__comp.toString = () => __styleThis__class;
 	return __styleThis__comp;
 })();
 const ChildStyled = (() => {
-	let ChildStyled = _styleThisClasses.__styleThis_var_ChildStyled_2;
-	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <ParentStyled {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(ChildStyled, __styleThis__props.className)} />);
-	__styleThis__comp.css = ChildStyled.css;
-	__styleThis__comp.toString = () => ChildStyled;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_ChildStyled_2;
+	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <ParentStyled {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.className)} />);
+	__styleThis__comp.css = __styleThis__class.css;
+	__styleThis__comp.toString = () => __styleThis__class;
 	return __styleThis__comp;
 })();
 // Multiple spaces and mixed positioning

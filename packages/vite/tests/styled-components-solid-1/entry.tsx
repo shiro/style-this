@@ -12,6 +12,18 @@ export const FancyButton = styled.button<{ a: number }>`
   gap: ${() => props.gap}px;
 `;
 
+// must not be shadowed by the generated wrapper's class variable
+const ui = {
+  accent: "red",
+  Card: styled.div`
+    color: ${() => ui.accent};
+  `,
+};
+
+export default styled.div`
+  color: ${() => ui.accent};
+`;
+
 const unrelated = css`
   background: none;
 `;

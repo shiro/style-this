@@ -1009,8 +1009,8 @@ var solid_start_routes_default = [
 		"page": true,
 		"$component": {
 			"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
-			"build": () => import("./index-CP0FDbP0.mjs"),
-			"import": () => import("./index-CP0FDbP0.mjs")
+			"build": () => import("./index-DkDhO50V.mjs"),
+			"import": () => import("./index-DkDhO50V.mjs")
 		},
 		"path": "/"
 	}

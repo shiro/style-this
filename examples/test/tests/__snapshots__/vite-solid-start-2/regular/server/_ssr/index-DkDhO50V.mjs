@@ -1,6 +1,6 @@
 import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
-//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-B8yyB-FO.js
-var ATOMIC_PREFIXES = new Set(Object.values({
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-DkDhO50V.js
+new Set(Object.values({
 	margin: "m",
 	"margin-top": "mt",
 	"margin-right": "mr",
@@ -168,29 +168,8 @@ var ATOMIC_PREFIXES = new Set(Object.values({
 	stroke: "stroke",
 	"stroke-width": "stroke-w"
 }));
-var ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
-var getAtomicPrefix = (className) => {
-	const prefix = ATOMIC_CLASS.exec(className)?.[1];
-	return prefix && ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
-};
-/**
-* Joins class lists, de-duping atomic classes of the same property (e.g. `m-xxxxx`), the last one wins.
-* Other classes are only de-duped if identical. Falsy values are ignored.
-* In non-atomic mode the transform replaces this with `joinStyles`.
-*/
-var mergeStyles = (...classes) => {
-	const merged = /* @__PURE__ */ new Map();
-	for (const classList of classes) {
-		if (!classList) continue;
-		for (const className of classList.split(/\s+/)) {
-			if (!className) continue;
-			const key = getAtomicPrefix(className) ?? className;
-			merged.delete(key);
-			merged.set(key, className);
-		}
-	}
-	return [...merged.values()].join(" ");
-};
+/** Joins class lists, ignoring falsy values. */
+var joinStyles = (...classes) => classes.filter(Boolean).join(" ");
 /**
 * Merges a styled component's CSS variables with the `style` prop, which wins on conflicts.
 * The `style` prop may be a CSS string (e.g. in Solid), in which case CSS text is returned.
@@ -204,23 +183,19 @@ var mergeInlineStyles = (vars, style$1) => {
 	for (const [name, value] of Object.entries(vars)) if (value != null) res += `${name}:${value};`;
 	return res + style$1;
 };
-var CounterStyle$1 = "CounterStyle-ezk5qn b-ZeplZ bg-LPp8Q d-W_vHB gap-Td5yX items-Im4M1 m-AuUyl p-DLlYK r-K5PNW something";
-var __styleThis_var_FancyButton_6 = "FancyButton-diz892 b-ZeplZ bg-Kk7Cm p-BtACh r-TbAuj";
-var __styleThis_var_FancyButton2_4 = "FancyButton2-r4dezo bg-Iavgi cursor-ALqk3 m-HWQDy min-h-YBEdZ";
 var _tmpl$$1 = [
 	"<div",
-	"><!--$-->",
+	" class=\"CounterStyle-ezk5qn something\"><!--$-->",
 	"<!--/--><!--$-->",
 	"<!--/--></div>"
 ];
-var CounterStyle = CounterStyle$1;
 var FancyButton = (() => {
-	let FancyButton = __styleThis_var_FancyButton_6;
+	let __styleThis__class = "FancyButton-diz892";
 	let __styleThis__comp = (__styleThis__props) => {
 		const [, __styleThis__rest] = splitProps(__styleThis__props, ["styleProps", "style"]);
 		return ssrElement("button", mergeProps(__styleThis__rest, {
 			get ["class"]() {
-				return mergeStyles(FancyButton, __styleThis__props.class);
+				return joinStyles(__styleThis__class, __styleThis__props.class);
 			},
 			get style() {
 				return mergeInlineStyles({ "--var1-azc1aj": (({ a }) => `${a}px`)({
@@ -230,15 +205,15 @@ var FancyButton = (() => {
 			}
 		}), void 0, true);
 	};
-	__styleThis__comp.toString = () => FancyButton;
+	__styleThis__comp.toString = () => __styleThis__class;
 	return __styleThis__comp;
 })();
 var FancyButton2 = (() => {
-	let FancyButton2 = __styleThis_var_FancyButton2_4;
+	let __styleThis__class = "FancyButton2-r4dezo";
 	let __styleThis__comp = (__styleThis__props) => {
 		return createComponent(FancyButton, mergeProps(__styleThis__props, {
 			get ["class"]() {
-				return mergeStyles(FancyButton2, __styleThis__props.class);
+				return joinStyles(__styleThis__class, __styleThis__props.class);
 			},
 			get style() {
 				return mergeInlineStyles({
@@ -258,12 +233,12 @@ var FancyButton2 = (() => {
 			}
 		}));
 	};
-	__styleThis__comp.toString = () => FancyButton2;
+	__styleThis__comp.toString = () => __styleThis__class;
 	return __styleThis__comp;
 })();
 function Counter() {
 	const [count, setCount] = createSignal(0);
-	return ssr(_tmpl$$1, ssrHydrationKey() + ssrAttribute("class", escape(CounterStyle, true), false), escape(count()), escape(createComponent(FancyButton2, {
+	return ssr(_tmpl$$1, ssrHydrationKey(), escape(count()), escape(createComponent(FancyButton2, {
 		styleProps: {
 			a: 8,
 			b: 16
@@ -275,21 +250,16 @@ function Counter() {
 		children: "count me"
 	})));
 }
-var ContainerStyle$1 = "ContainerStyle-3s1eng d-W_vHB flex-d-Fbcuz";
-var colorStyle$1 = "colorStyle-gpyfg1 bg-BX1ye c-JjnMJ";
-var highlightStyle$1 = "highlightStyle-r01i7c c-AMx_p";
 var _tmpl$ = [
 	"<div",
-	" class=\"",
-	"\"><!--$-->",
+	" class=\"ContainerStyle-3s1eng Global__Main\"><!--$-->",
 	"<!--/-->hello<span",
 	">world</span></div>"
 ];
-var ContainerStyle = ContainerStyle$1;
-var colorStyle = colorStyle$1;
-var highlightStyle = highlightStyle$1;
+var colorStyle = "colorStyle-gpyfg1";
+var highlightStyle = "highlightStyle-r01i7c";
 function Main() {
-	return ssr(_tmpl$, ssrHydrationKey(), `${escape(ContainerStyle, true)} Global__Main`, escape(createComponent(Counter, {})), ssrAttribute("class", escape(mergeStyles(colorStyle, highlightStyle), true), false));
+	return ssr(_tmpl$, ssrHydrationKey(), escape(createComponent(Counter, {})), ssrAttribute("class", escape(joinStyles(colorStyle, highlightStyle), true), false));
 }
 var id$$ = "src/routes/index.tsx?pick=default&pick=$css&lang.tsx";
 var index_tsx_pick_default_pick_$css_lang_default = Main;

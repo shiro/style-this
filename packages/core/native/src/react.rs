@@ -26,7 +26,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         is_extending_custom_component: bool,
     ) {
         self.base.component_counter += 1;
-        let class_variable_name = self.base.get_class_variable_name();
+        let class_display_name = self.base.get_class_display_name();
         let span = expression.span();
 
         let Expression::TaggedTemplateExpression(tagged_template_expression) = &mut *expression
@@ -50,7 +50,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
             return;
         }
 
-        let css_declaration = self.base.build_css_declaration(span, &class_variable_name, simple_tagged_template_expression);
+        let css_declaration = self.base.build_css_declaration(span, class_display_name, simple_tagged_template_expression);
         
         let style_properties = self.base.build_style_properties(span, &captured_expressions);
         let style_attribute = self.base.build_style_attribute(span, style_properties, false);
@@ -172,7 +172,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
                     )),
                 )),
             ),
-            self.base.build_class_attribute(span, &class_variable_name, spread_identifier),
+            self.base.build_class_attribute(span, spread_identifier),
         ];
 
         if let Some(style_attr) = style_attribute {
@@ -281,10 +281,10 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         let mut function_body_statements = vec![css_declaration, define_jsx_element_statement];
 
         if captured_expressions.is_empty() {
-            function_body_statements.push(self.base.build_assign_css_statement(span, &class_variable_name));
+            function_body_statements.push(self.base.build_assign_css_statement(span));
         }
 
-        function_body_statements.push(self.base.build_assign_to_string_statement(span, &class_variable_name));
+        function_body_statements.push(self.base.build_assign_to_string_statement(span));
         function_body_statements.push(self.base.build_return_statement(span));
 
         *expression = self.base.wrap_in_iife(span, function_body_statements);
@@ -355,9 +355,11 @@ pub fn react_prepass<'alloc>(
     filepath: String,
     program: &mut Program<'alloc>,
     skip_jsx: bool,
+    class_display_names: &mut ClassDisplayNames,
 ) -> bool {
     let mut transformer = ReactStyledComponentTransformer::new(ast_builder, skip_jsx, filepath);
     transformer.visit_program(program);
+    class_display_names.extend(std::mem::take(&mut transformer.base.class_display_names));
 
     if transformer.base.component_counter > 0 && !transformer.base.skip_jsx {
         insert_merge_styles_import(ast_builder, program);

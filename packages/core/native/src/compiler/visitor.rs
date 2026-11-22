@@ -6,6 +6,7 @@ use super::types::{CssVariableIdentifier, VirtualProgramInsert};
 use crate::PREFIX;
 use crate::ast;
 use crate::error_mapping::get_pos_from_offset;
+use crate::styled_component_transformer::ClassDisplayNames;
 use crate::utils::{
     self, binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
     replace_in_expression_using_identifiers, replace_in_expression_using_spans,
@@ -35,6 +36,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     style_function_name: Option<String>,
     css_function_name: Option<String>,
     extra_class_function_name: Option<String>,
+    class_display_names: ClassDisplayNames,
 
     store: String,
     referenced_idents: Vec<HashSet<String>>,
@@ -77,6 +79,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         css_function_name: Option<String>,
         style_function_name: Option<String>,
         extra_class_function_name: Option<String>,
+        class_display_names: ClassDisplayNames,
         atomic: bool,
     ) -> Self {
         Self {
@@ -91,6 +94,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             css_function_name,
             style_function_name,
             extra_class_function_name,
+            class_display_names,
 
             store: store.to_string(),
             referenced_idents: vec![referenced_idents],
@@ -277,6 +281,14 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         });
 
         class_name
+    }
+
+    /// Name used for the class name and atomic export key of a declaration, the styled wrapper's
+    /// class binding uses the component's display name instead of the binding name.
+    fn get_display_name<'b>(&'b self, init_span: Span, binding_name: &'b str) -> &'b str {
+        self.class_display_names
+            .get(&init_span)
+            .map_or(binding_name, String::as_str)
     }
 
     fn get_alias(&self, name: &str) -> Option<&str> {
@@ -1080,7 +1092,12 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let alias = if self.scope_depth == 1 {
                     None
                 } else {
-                    Some(format!("{PREFIX}_var_{ident}_{}", self.unique_number()))
+                    let display_name = it
+                        .init
+                        .as_ref()
+                        .map_or(ident.as_str(), |init| self.get_display_name(init.span(), &ident))
+                        .to_string();
+                    Some(format!("{PREFIX}_var_{display_name}_{}", self.unique_number()))
                 };
 
                 self.aliases.last_mut().unwrap().insert(ident, alias);
@@ -1125,7 +1142,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             match tag {
                 tag if Some(tag) == self.css_function_name.as_deref() => {
-                    let class_name = self.create_virtual_css_template(variable_name);
+                    let display_name = self.get_display_name(span, variable_name).to_string();
+                    let class_name = self.create_virtual_css_template(&display_name);
                     let extra_classes = self.extract_extra_classes(template);
 
                     self.insert_into_virtual_program_css(

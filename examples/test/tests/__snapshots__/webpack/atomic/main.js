@@ -323,24 +323,24 @@ var __objRest = (source, exclude) => {
 const spacing = 16;
 const Counter_CounterStyle = CounterStyle;
 const FancyButton = (() => {
-  let FancyButton3 = __styleThis_var_FancyButton_6;
+  let __styleThis__class = __styleThis_var_FancyButton_6;
   let __styleThis__comp = (0,react.forwardRef)((__styleThis__props, __styleThis__ref) => {
     var _b;
     const _a = __styleThis__props, { styleProps: __styleThis__styleProps, style: __styleThis__style } = _a, __styleThis__rest = __objRest(_a, ["styleProps", "style"]);
-    return /* @__PURE__ */ (0,jsx_runtime.jsx)("button", __spreadProps(__spreadValues({}, __styleThis__rest), { ref: __styleThis__ref, className: mergeStyles(FancyButton3, __styleThis__rest.className), style: __spreadValues({
+    return /* @__PURE__ */ (0,jsx_runtime.jsx)("button", __spreadProps(__spreadValues({}, __styleThis__rest), { ref: __styleThis__ref, className: mergeStyles(__styleThis__class, __styleThis__rest.className), style: __spreadValues({
       "--var1-enc92j": (({ a }) => `${a}px`)(__spreadProps(__spreadValues({}, __styleThis__props.styleProps), {
         "props": __styleThis__props
       }))
     }, (_b = __styleThis__props.style) != null ? _b : {}) }));
   });
-  __styleThis__comp.toString = () => FancyButton3;
+  __styleThis__comp.toString = () => __styleThis__class;
   return __styleThis__comp;
 })();
 const FancyButton2 = (() => {
-  let FancyButton22 = __styleThis_var_FancyButton2_4;
+  let __styleThis__class = __styleThis_var_FancyButton2_4;
   let __styleThis__comp = (0,react.forwardRef)((__styleThis__props, __styleThis__ref) => {
     var _a;
-    return /* @__PURE__ */ (0,jsx_runtime.jsx)(FancyButton, __spreadProps(__spreadValues({}, __styleThis__props), { ref: __styleThis__ref, className: mergeStyles(FancyButton22, __styleThis__props.className), style: __spreadValues({
+    return /* @__PURE__ */ (0,jsx_runtime.jsx)(FancyButton, __spreadProps(__spreadValues({}, __styleThis__props), { ref: __styleThis__ref, className: mergeStyles(__styleThis__class, __styleThis__props.className), style: __spreadValues({
       "--var1-1mjodu": (({ b }) => `${b}px`)(__spreadProps(__spreadValues({}, __styleThis__props.styleProps), {
         "props": __styleThis__props
       })),
@@ -352,7 +352,7 @@ const FancyButton2 = (() => {
       }))
     }, (_a = __styleThis__props.style) != null ? _a : {}) }));
   });
-  __styleThis__comp.toString = () => FancyButton22;
+  __styleThis__comp.toString = () => __styleThis__class;
   return __styleThis__comp;
 })();
 function Counter() {

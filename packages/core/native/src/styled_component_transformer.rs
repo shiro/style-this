@@ -9,6 +9,12 @@ pub const MERGE_INLINE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeInlineStyles
 pub const COMPONENT_LOCAL_NAME: &str = "__styleThis__comp";
 pub const PROPS_LOCAL_NAME: &str = "__styleThis__props";
 pub const REST_PROPS_LOCAL_NAME: &str = "__styleThis__rest";
+// the class name is derived from the display name instead, see `ClassDisplayNames`
+pub const CLASS_LOCAL_NAME: &str = "__styleThis__class";
+
+/// Span of a generated `let __styleThis__class = css\`...\`` template -> name the compiler uses
+/// for its class name and atomic export key (e.g. `Button` for `const Button = styled.button`).
+pub type ClassDisplayNames = HashMap<oxc_span::Span, String>;
 
 /// Inserts `import { mergeStyles as __styleThis__mergeStyles } from "@style-this/core"` after the last import.
 pub fn insert_merge_styles_import<'alloc>(
@@ -83,6 +89,7 @@ pub struct StyledComponentTransformer<'a, 'alloc> {
     filepath: String,
     pub component_counter: usize,
     class_prop_name: &'static str,
+    pub class_display_names: ClassDisplayNames,
 }
 
 impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
@@ -101,10 +108,11 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
             anonymous_component_name_counter: 0,
             component_counter: 0,
             class_prop_name,
+            class_display_names: Default::default(),
         }
     }
 
-    pub fn get_class_variable_name(&mut self) -> String {
+    pub fn get_class_display_name(&mut self) -> String {
         self.variable_name.clone().unwrap_or_else(|| {
             let name = format!("component_{}", self.anonymous_component_name_counter);
             self.anonymous_component_name_counter += 1;
@@ -150,11 +158,14 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     }
 
     pub fn build_css_declaration(
-        &self,
+        &mut self,
         span: oxc_span::Span,
-        class_variable_name: &str,
+        class_display_name: String,
         simple_tagged_template_expression: oxc_allocator::Box<'alloc, TaggedTemplateExpression<'alloc>>,
     ) -> Statement<'alloc> {
+        self.class_display_names
+            .insert(simple_tagged_template_expression.span, class_display_name);
+
         Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
             span,
             VariableDeclarationKind::Let,
@@ -165,7 +176,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                     BindingPatternKind::BindingIdentifier(
                         self.ast_builder.alloc_binding_identifier(
                             span,
-                            self.ast_builder.atom(class_variable_name),
+                            self.ast_builder.atom(CLASS_LOCAL_NAME),
                         ),
                     ),
                     None as Option<oxc_allocator::Box<_>>,
@@ -343,7 +354,6 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     pub fn build_class_attribute(
         &self,
         span: oxc_span::Span,
-        class_variable_name: &str,
         props_identifier: &str,
     ) -> JSXAttributeItem<'alloc> {
         self.ast_builder.jsx_attribute_item_attribute(
@@ -365,7 +375,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                         oxc_ast::ast::Argument::Identifier(
                             self.ast_builder.alloc_identifier_reference(
                                 span,
-                                self.ast_builder.atom(class_variable_name),
+                                self.ast_builder.atom(CLASS_LOCAL_NAME),
                             ),
                         ),
                         oxc_ast::ast::Argument::StaticMemberExpression(
@@ -411,7 +421,6 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     pub fn build_assign_to_string_statement(
         &self,
         span: oxc_span::Span,
-        class_variable_name: &str,
     ) -> Statement<'alloc> {
         Statement::ExpressionStatement(
             self.ast_builder.alloc_expression_statement(
@@ -456,7 +465,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                                             Expression::Identifier(
                                                 self.ast_builder.alloc_identifier_reference(
                                                     span,
-                                                    self.ast_builder.atom(class_variable_name),
+                                                    self.ast_builder.atom(CLASS_LOCAL_NAME),
                                                 ),
                                             ),
                                         ),
@@ -473,7 +482,6 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     pub fn build_assign_css_statement(
         &self,
         span: oxc_span::Span,
-        class_variable_name: &str,
     ) -> Statement<'alloc> {
         Statement::ExpressionStatement(
             self.ast_builder.alloc_expression_statement(
@@ -502,7 +510,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                                 Expression::Identifier(
                                     self.ast_builder.alloc_identifier_reference(
                                         span,
-                                        self.ast_builder.atom(class_variable_name),
+                                        self.ast_builder.atom(CLASS_LOCAL_NAME),
                                     ),
                                 ),
                                 self.ast_builder

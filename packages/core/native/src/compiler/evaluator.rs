@@ -9,6 +9,7 @@ use crate::compiler::atomic::{add_atomic, dedupe_atomic_declarations, rewrite_me
 use crate::error_mapping;
 use crate::react::react_prepass;
 use crate::solid_js::solid_js_prepass;
+use crate::styled_component_transformer::ClassDisplayNames;
 use crate::utils::{self, transpile_ts_to_js};
 use crate::{
     LIBRARY_CORE_IMPORT_NAME, LIBRARY_REACT_IMPORT_NAME, LIBRARY_SOLID_JS_IMPORT_NAME, PREFIX,
@@ -834,15 +835,26 @@ pub(crate) fn slice_program<'alloc>(
         .to_string();
 
     let mut transformed_styled_components = false;
+    let mut class_display_names = ClassDisplayNames::new();
 
     if solid_prepass {
-        transformed_styled_components |=
-            solid_js_prepass(ast_builder, relative_program_filepath.clone(), program, false);
+        transformed_styled_components |= solid_js_prepass(
+            ast_builder,
+            relative_program_filepath.clone(),
+            program,
+            false,
+            &mut class_display_names,
+        );
     }
 
     if react_prepass_enabled {
-        transformed_styled_components |=
-            react_prepass(ast_builder, relative_program_filepath, program, false);
+        transformed_styled_components |= react_prepass(
+            ast_builder,
+            relative_program_filepath,
+            program,
+            false,
+            &mut class_display_names,
+        );
     }
 
     // the prepasses rewrite styled templates into `css` templates, which need to be picked up even
@@ -868,6 +880,7 @@ pub(crate) fn slice_program<'alloc>(
         css_function_name,
         style_function_name,
         extra_class_function_name,
+        class_display_names,
         transformer.atomic,
     );
     css_transformer.visit_program(program);
