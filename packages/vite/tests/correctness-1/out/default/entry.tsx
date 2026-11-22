@@ -2,6 +2,17 @@
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
 import "virtual:style-this:/entry.tsx.css";
+// locals shadowing the top level names used below
+const Button = ({ variant }) => {
+	const color = variant === "primary" ? "blue" : "gray";
+	function mutate() {
+		return variant;
+	}
+	function gap() {
+		return 4;
+	}
+	return [mutate() ?? color, "__styleThis_13-zwper0"];
+};
 const mutate = (v) => v;
 const a1 = () => {
 	const a2 = () => {

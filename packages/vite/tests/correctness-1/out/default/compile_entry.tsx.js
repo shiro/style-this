@@ -17,11 +17,16 @@ class __global__export__ {
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
-// /packages/vite/tests/correctness-1/entry.tsx: {"__styleThis_11", "__styleThis_3", "__styleThis_6", "a", "a1", "b", "color", "comp", "css", "mib", "mutate", "s2", "st", "style", "unrelated"}
+// /packages/vite/tests/correctness-1/entry.tsx: {"__styleThis_11", "__styleThis_13", "__styleThis_3", "__styleThis_6", "a", "a1", "b", "color", "comp", "css", "mib", "mutate", "s2", "st", "style", "unrelated"}
 "use strict";
 const a = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"];
 const mib = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
 let { css } = require("/packages/core/dist/index.mjs");
+function gap() {
+	return 4;
+}
+let __styleThis_13 = new String("__styleThis_13-zwper0");
+__styleThis_13.css = `gap: ${gap()}px;`;
 let mutate = (v) => v;
 let __styleThis_11 = new String("__styleThis_11-abwhir");
 __styleThis_11.css = `background: black;`;
@@ -75,6 +80,9 @@ let unrelated = new String("unrelated-5y7cxe");
 unrelated.css = `background: none;
   ${a.foo.css}`;
 return [
+`.__styleThis_13-zwper0 {
+${__styleThis_13.css}
+}`,
 `.__styleThis_11-abwhir {
 ${__styleThis_11.css}
 }`,

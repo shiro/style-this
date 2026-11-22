@@ -468,20 +468,21 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         None
     }
 
-    fn reference_variable(&mut self, name: String) {
-        for (depth, alias_map) in self.aliases.iter().enumerate().rev() {
-            if alias_map.contains_key(&name) {
-                self.referenced_idents.get_mut(depth).unwrap().insert(name);
-                return;
-            }
-        }
+    /// Depth of the innermost scope declaring the name, the global scope for unknown names.
+    fn declaring_depth(&self, name: &str) -> usize {
+        self.aliases
+            .iter()
+            .rposition(|alias_map| alias_map.contains_key(name))
+            .unwrap_or(0)
+    }
 
-        // if there's no known variable, use the global scope as fallback
-        self.referenced_idents.first_mut().unwrap().insert(name);
+    fn reference_variable(&mut self, name: String) {
+        let depth = self.declaring_depth(&name);
+        self.referenced_idents[depth].insert(name);
     }
 
     fn is_variable_referenced(&self, name: &str) -> bool {
-        self.referenced_idents.iter().any(|set| set.contains(name))
+        self.referenced_idents[self.declaring_depth(name)].contains(name)
     }
 
     /// checks if the variable exits in the current scope or any scope above it
@@ -1410,7 +1411,20 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
-        if !self.scan_pass {
+        if self.scan_pass {
+            let id = match it {
+                Statement::FunctionDeclaration(function) => function.id.as_ref(),
+                Statement::ClassDeclaration(class) => class.id.as_ref(),
+                _ => None,
+            };
+            // not aliased, they keep their name in the virtual program
+            if let Some(id) = id {
+                self.aliases
+                    .last_mut()
+                    .unwrap()
+                    .insert(id.name.to_string(), None);
+            }
+        } else {
             if let Statement::FunctionDeclaration(function) = it {
                 self.visit_function_declaration(function, ScopeFlags::Function);
             }

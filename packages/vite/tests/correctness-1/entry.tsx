@@ -1,6 +1,18 @@
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
 
+// locals shadowing the top level names used below
+const Button = ({ variant }) => {
+  const color = variant === "primary" ? "blue" : "gray";
+  function mutate() {
+    return variant;
+  }
+  function gap() {
+    return 4;
+  }
+  return [mutate() ?? color, css`gap: ${gap()}px;`];
+};
+
 const mutate = (v) => v;
 
 const a1 = () => {
