@@ -539,9 +539,6 @@ export const Toolbar = css\`
 `,
     };
 
-    /** Svelte files are transformed and cached as their script. */
-    const svelteCssOf = (name: string) => cssOf(name.replace(/\.svelte$/, ".ts"));
-
     beforeEach(async () => {
       for (const [name, code] of Object.entries(svelteFiles)) {
         await writeFile(path(name), code);
@@ -552,8 +549,8 @@ export const Toolbar = css\`
 
       await transform("Card.svelte");
       await transform("Badge.svelte");
-      expect(await svelteCssOf("Card.svelte")).toContain("color: red");
-      expect(await svelteCssOf("Badge.svelte")).toContain("font-weight: bold");
+      expect(await cssOf("Card.svelte")).toContain("color: red");
+      expect(await cssOf("Badge.svelte")).toContain("font-weight: bold");
     });
 
     test("edits invalidate the Svelte file", async () => {
@@ -562,8 +559,8 @@ export const Toolbar = css\`
 
       await transform("Card.svelte");
       await transform("Badge.svelte");
-      expect(await svelteCssOf("Card.svelte")).toContain("padding: 2px");
-      expect(await svelteCssOf("Badge.svelte")).toContain("font-weight: 300");
+      expect(await cssOf("Card.svelte")).toContain("padding: 2px");
+      expect(await cssOf("Badge.svelte")).toContain("font-weight: 300");
     });
 
     test("markup edits don't invalidate importers of the script", async () => {
@@ -577,19 +574,31 @@ export const Toolbar = css\`
       expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["Card.svelte", "theme.ts"]);
 
       await transform("Card.svelte");
-      expect(await svelteCssOf("Card.svelte")).toContain("color: blue");
+      expect(await cssOf("Card.svelte")).toContain("color: blue");
     });
 
-    test("Svelte files that lose their script stop being watched", async () => {
+    test("Svelte files that lose their script and regain it", async () => {
       expect(await edit("Card.svelte", (code) => code.replace(/<script[\s\S]*<\/script>/, ""))).toEqual(
         ["Card.svelte"],
       );
       expect(await transform("Card.svelte")).toBeUndefined();
-      expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["theme.ts"]);
+      // import registrations are kept so that cached values of dependencies stay invalidated
+      expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["Card.svelte", "theme.ts"]);
 
       await writeFile(path("Card.svelte"), svelteFiles["Card.svelte"]);
       await transform("Card.svelte");
-      expect(await svelteCssOf("Card.svelte")).toContain("color: blue");
+      expect(await cssOf("Card.svelte")).toContain("color: blue");
+    });
+
+    test("Svelte files are cached separately from a script with the same name", async () => {
+      await writeFile(path("Card.ts"), `${cssImport}\n\nexport const card = ${css("margin: 3px;")};\n`);
+      environment.addModule(path("Card.ts"));
+      await transform("Card.ts");
+      expect(await cssOf("Card.ts")).toContain("margin: 3px");
+      expect(await cssOf("Card.svelte")).toContain("color: red");
+
+      expect(await edit("Card.ts", (code) => code.replace("3px", "4px"))).toEqual(["Card.ts"]);
+      expect(await edit("Card.svelte", (code) => code.replace(`"1px"`, `"2px"`))).toEqual(["Card.svelte"]);
     });
 
     test("deleting a Svelte file invalidates it", async () => {

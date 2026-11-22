@@ -12,7 +12,7 @@ import { createRequire } from "node:module";
 import { Filter, filterMatches, isInNodeModules, timeoutPromise, TIMEOUT } from "./util";
 import { handleTransformError } from "./util";
 import { initializeSolidMocks } from "./solid";
-import { isSvelteFile, extractSvelteScript, rewrapSvelteScript, normalizeFilepath } from "./svelte";
+import { isSvelteFile, extractSvelteScript, rewrapSvelteScript } from "./svelte";
 import { CacheRegistry } from "./cacheRegistry";
 
 /**
@@ -109,8 +109,8 @@ const vitePlugin = (options: Options = {}) => {
   // Default noop callback for non-debug mode
   const noopCallback = () => { };
 
-  /** Files that contain styled templates, by normalized filepath (see `normalizeFilepath`) to source filepath. */
-  const watchedFiles = new Map<string, string>();
+  /** Files that contain styled templates. */
+  const watchedFiles = new Set<string>();
   type Resolve = (id: string, importer: string) => Promise<string | undefined>;
   let createLoadFile: (resolve: Resolve) => (id: string, importer: string) => Promise<[string, string]>;
   let server: ViteDevServer | undefined;
@@ -177,14 +177,13 @@ const vitePlugin = (options: Options = {}) => {
   const hmrUpdates = new Map<string, { timestamp: number; files: Promise<string[] | undefined> }>();
 
   /** Invalidates the changed file and the importers affected by the change, returns them. */
-  const invalidateForHotUpdate = async (sourceFile: string, type: string, read: () => string | Promise<string>) => {
-    const file = normalizeFilepath(sourceFile);
+  const invalidateForHotUpdate = async (file: string, type: string, read: () => string | Promise<string>) => {
     if (!watchedFiles.has(file) && !styleThis.has_importers(file)) return;
 
     if (type === "delete") watchedFiles.delete(file);
     // unreadable files are invalidated like deleted ones
     let code = type === "delete" ? undefined : await Promise.resolve(read()).catch(() => undefined);
-    if (code !== undefined && isSvelteFile(sourceFile)) code = extractSvelteScript(code, sourceFile)?.codeToTransform;
+    if (code !== undefined && isSvelteFile(file)) code = extractSvelteScript(code) ?? undefined;
     const importers = styleThis.invalidate_file(file, code) as string[];
 
     const files = [file, ...importers];
@@ -377,7 +376,7 @@ const vitePlugin = (options: Options = {}) => {
           // wait for pending atomic modules, ones that aren't transformed yet trigger a reload once
           // they resolve (see `scheduleAtomicCssUpdate`)
           await Promise.all(
-            Array.from(watchedFiles.keys(), (file) => cacheRegistry.getAtomicModule(`${file}.style-this.js`)),
+            Array.from(watchedFiles, (file) => cacheRegistry.getAtomicModule(`${file}.style-this.js`)),
           );
 
           const atomicCss = styleThis.get_atomic_css();
@@ -553,7 +552,7 @@ const vitePlugin = (options: Options = {}) => {
       const result = new Set(modules);
 
       for (const filepath of files) {
-        for (const mod of moduleGraph.getModulesByFile(watchedFiles.get(filepath) ?? filepath) ?? []) result.add(mod);
+        for (const mod of moduleGraph.getModulesByFile(filepath) ?? []) result.add(mod);
 
         // CSS modules are self-accepting and would be requested before the re-transform, they
         // get reloaded from `transform` once ready instead
@@ -584,20 +583,18 @@ const vitePlugin = (options: Options = {}) => {
       }
 
       let codeToTransform = code;
-      let pathForImport = filepath;
 
       if (isSvelteFile(filepath)) {
-        const svelteScript = extractSvelteScript(code, filepath);
-        if (!svelteScript) {
-          watchedFiles.delete(normalizeFilepath(filepath));
+        const svelteScript = extractSvelteScript(code);
+        if (svelteScript === null) {
+          watchedFiles.delete(filepath);
           return;
         }
-        codeToTransform = svelteScript.codeToTransform;
-        pathForImport = svelteScript.normalizedFilepath;
+        codeToTransform = svelteScript;
       }
 
-      const cssFilepath = `${pathForImport}.${cssExtension}`;
-      const atomicProgramFilepath = `${pathForImport}.style-this.js`;
+      const cssFilepath = `${filepath}.${cssExtension}`;
+      const atomicProgramFilepath = `${filepath}.style-this.js`;
 
       const skipCssEval = cacheRegistry.hasCssModule(cssFilepath) && (!atomic || cacheRegistry.hasAtomicModule(atomicProgramFilepath));
 
@@ -614,20 +611,20 @@ const vitePlugin = (options: Options = {}) => {
 
         const transformedResult = await styleThis.transform(
           codeToTransform,
-          pathForImport,
+          filepath,
           skipCssEval,
           // resolve within this transform's own environment/context, other contexts may resolve
           // differently or be disposed already
           createLoadFile(async (id, importer) => id ? (await this.resolve(id, importer))?.id : undefined),
         );
         if (!transformedResult) {
-          watchedFiles.delete(pathForImport);
+          watchedFiles.delete(filepath);
           // the compiler resolves these as empty, they would be taken as cached CSS once the file gains styles
-          cacheRegistry.invalidateModule(pathForImport, cssExtension);
+          cacheRegistry.invalidateModule(filepath, cssExtension);
           return;
         }
         debugLog(`transformed ${filepath} in ${(performance.now() - startTime).toFixed(1)}ms`);
-        watchedFiles.set(pathForImport, filepath);
+        watchedFiles.add(filepath);
 
         if (server && !skipCssEval) {
           for (const environment of Object.values(server.environments)) {
@@ -649,7 +646,7 @@ const vitePlugin = (options: Options = {}) => {
           map: transformedResult.sourcemap,
         };
       } catch (err) {
-        watchedFiles.set(pathForImport, filepath);
+        watchedFiles.add(filepath);
         handleTransformError(filepath, code, err);
       }
     },

@@ -1,11 +1,11 @@
 use crate::compiler::{evaluate_program, resolve_virtual_modules_with_error};
 
 pub use crate::compiler::{TransformError, Transformer};
+use crate::utils::transformed_source_type;
 use crate::*;
 use oxc_allocator::Allocator;
 use oxc_ast::AstBuilder;
 use oxc_parser::{ParseOptions, Parser};
-use oxc_span::SourceType;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -41,7 +41,7 @@ impl Transformer {
                 let _ = tx.send(Err(err));
             };
 
-            let Ok(source_type) = SourceType::from_path(&filepath) else {
+            let Some(source_type) = transformed_source_type(&filepath) else {
                 report(
                     tx,
                     TransformError::UknownExtension {

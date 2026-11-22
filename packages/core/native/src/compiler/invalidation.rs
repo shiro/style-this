@@ -10,6 +10,7 @@ use super::evaluator::{program_imports, slice_program};
 use super::transformer::Transformer;
 use crate::utils::{
     binding_pattern_kind_get_idents, expression_get_references, statement_get_references,
+    transformed_source_type,
 };
 use js_sys::Array;
 use oxc_allocator::{Allocator, CloneIn};
@@ -83,7 +84,7 @@ fn slice_exports(
     code: &str,
     exports: &HashSet<String>,
 ) -> HashMap<String, ExportSlice> {
-    let Ok(source_type) = SourceType::from_path(filepath) else {
+    let Some(source_type) = transformed_source_type(filepath) else {
         return HashMap::new();
     };
 

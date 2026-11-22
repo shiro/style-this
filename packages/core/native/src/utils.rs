@@ -11,6 +11,14 @@ pub fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
+/// The source type of a transformed file, Svelte files are transformed as their (TS) script.
+pub fn transformed_source_type(filepath: &str) -> Option<SourceType> {
+    if filepath.ends_with(".svelte") {
+        return Some(SourceType::ts());
+    }
+    SourceType::from_path(filepath).ok()
+}
+
 pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> HashSet<String> {
     let mut idents = HashSet::new();
     match kind {
