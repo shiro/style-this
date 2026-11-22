@@ -12,7 +12,15 @@ import { createRequire } from "node:module";
 import { Filter, filterMatches, isInNodeModules, timeoutPromise, TIMEOUT } from "./util";
 import { handleTransformError } from "./util";
 import { initializeSolidMocks } from "./solid";
-import { isSvelteFile, extractSvelteScript, rewrapSvelteScript } from "./svelte";
+import {
+  isSvelteFile,
+  extractSvelteScript,
+  rewrapSvelteScript,
+  svelteSources,
+  svelteByteOffsetMapper,
+  remapSvelteSourcemap,
+  type SvelteSources,
+} from "./svelte";
 import { CacheRegistry } from "./cacheRegistry";
 
 /**
@@ -194,7 +202,11 @@ const vitePlugin = (options: Options = {}) => {
     return files;
   };
 
-  const createCachePromise = (originalSource: string): CssCachEntry => {
+  /** `mapOffset` maps UTF-8 byte offsets in the transformed code to ones in `originalSource`. */
+  const createCachePromise = (
+    originalSource: string,
+    mapOffset: (offset: number) => number = (offset) => offset,
+  ): CssCachEntry => {
     let resolve: CssCachEntry["resolve"] | undefined;
     let settled = false;
     const entry = new Promise((_resolve, _reject) => {
@@ -214,7 +226,11 @@ const vitePlugin = (options: Options = {}) => {
           filepath
         ) {
           cssSourceMapMetadata.set(filepath, {
-            sourcemapData,
+            sourcemapData: sourcemapData.map((entry) => ({
+              ...entry,
+              start: mapOffset(entry.start),
+              end: mapOffset(entry.end),
+            })),
             originalSource,
           });
         }
@@ -583,14 +599,17 @@ const vitePlugin = (options: Options = {}) => {
       }
 
       let codeToTransform = code;
+      let svelte: SvelteSources | undefined;
+      let mapOffset: ((offset: number) => number) | undefined;
 
       if (isSvelteFile(filepath)) {
-        const svelteScript = extractSvelteScript(code);
-        if (svelteScript === null) {
+        svelte = svelteSources(code) ?? undefined;
+        if (!svelte) {
           watchedFiles.delete(filepath);
           return;
         }
-        codeToTransform = svelteScript;
+        codeToTransform = svelte.program;
+        mapOffset = svelteByteOffsetMapper(svelte);
       }
 
       const cssFilepath = `${filepath}.${cssExtension}`;
@@ -602,11 +621,11 @@ const vitePlugin = (options: Options = {}) => {
         const startTime = performance.now();
 
         if (atomic && !cacheRegistry.hasAtomicModule(atomicProgramFilepath)) {
-          cacheRegistry.setAtomicModule(atomicProgramFilepath, createCachePromise(code));
+          cacheRegistry.setAtomicModule(atomicProgramFilepath, createCachePromise(code, mapOffset));
         }
 
         if (!cacheRegistry.hasCssModule(cssFilepath)) {
-          cacheRegistry.setCssModule(cssFilepath, createCachePromise(code));
+          cacheRegistry.setCssModule(cssFilepath, createCachePromise(code, mapOffset));
         }
 
         const transformedResult = await styleThis.transform(
@@ -636,13 +655,13 @@ const vitePlugin = (options: Options = {}) => {
           if (atomic) cacheRegistry.getAtomicModule(atomicProgramFilepath)?.then(scheduleAtomicCssUpdate);
         }
 
-        let resultCode = transformedResult.code;
-        if (isSvelteFile(filepath)) {
-          resultCode = rewrapSvelteScript(code, transformedResult.code);
+        if (svelte) {
+          const rewrapped = rewrapSvelteScript(code, transformedResult.code);
+          return { code: rewrapped.file, map: remapSvelteSourcemap(transformedResult.sourcemap, svelte, rewrapped) };
         }
 
         return {
-          code: resultCode,
+          code: transformedResult.code,
           map: transformedResult.sourcemap,
         };
       } catch (err) {
