@@ -147,15 +147,9 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "style-this-json-"));
-    const resolver: Record<string, string> = { "@style-this/core": "" };
-    for (const [name, code] of Object.entries(files)) {
-      await writeFile(path(name), code);
-      resolver[`./${name}`] = path(name);
-    }
-    resolver["./tokens.ts?raw"] = `${path("tokens.ts")}?raw`;
-    resolver["./tokens.ts?url"] = `${path("tokens.ts")}?url`;
+    for (const [name, code] of Object.entries(files)) await writeFile(path(name), code);
 
-    plugin = await setupPlugin(resolver, { atomic, debug: false });
+    plugin = await setupPlugin({ "@style-this/core": "" }, { atomic, debug: false });
     (plugin.configureServer as Function)({ environments: {} });
   });
 

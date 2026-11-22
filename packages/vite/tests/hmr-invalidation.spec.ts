@@ -238,13 +238,9 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "style-this-hmr-invalidation-"));
-    const resolver: Record<string, string> = { "@style-this/core": "", "@style-this/solid": "" };
-    for (const [name, code] of Object.entries(files)) {
-      await writeFile(path(name), code);
-      resolver[`./${name.replace(/\.tsx?$/, "")}`] = path(name);
-    }
+    for (const [name, code] of Object.entries(files)) await writeFile(path(name), code);
 
-    plugin = await setupPlugin(resolver, { atomic, debug: false });
+    plugin = await setupPlugin({ "@style-this/core": "", "@style-this/solid": "" }, { atomic, debug: false });
     environment = createEnvironment();
     (plugin.configureServer as Function)({ environments: { client: environment } });
 
@@ -492,10 +488,7 @@ export const Toolbar = css\`
 \`;
 `,
     );
-    plugin = await setupPlugin(
-      { "@style-this/core": "", "./button": path("button.tsx") },
-      { atomic, debug: false },
-    );
+    plugin = await setupPlugin({ "@style-this/core": "" }, { atomic, debug: false });
     (plugin.configureServer as Function)({ environments: { client: environment } });
     environment.addModule(path("button.tsx"));
     environment.addModule(path("toolbar.tsx"));
@@ -554,10 +547,7 @@ export const Toolbar = css\`
         await writeFile(path(name), code);
         environment.addModule(path(name));
       }
-      plugin = await setupPlugin(
-        { "@style-this/core": "", "./theme": path("theme.ts"), "./Badge.svelte": path("Badge.svelte") },
-        { atomic, debug: false },
-      );
+      plugin = await setupPlugin({ "@style-this/core": "" }, { atomic, debug: false });
       (plugin.configureServer as Function)({ environments: { client: environment } });
 
       await transform("Card.svelte");

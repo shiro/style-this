@@ -3,8 +3,8 @@ import { afterEach } from "vitest";
 import type { OutputOptions } from "rollup";
 import type { BundleObject } from "rollup";
 import vitePlugin from "../../src/index";
-import { readdir, readFile } from "fs/promises";
-import { join, resolve } from "path";
+import { readFile, stat } from "fs/promises";
+import { dirname, isAbsolute, join, resolve } from "path";
 import { expect } from "vitest";
 import { test } from "vitest";
 
@@ -65,23 +65,22 @@ const snapshotAtomicEntrypoint = async (
   );
 };
 
-export const getResolver = async (
-  testDir: string,
-  options?: Record<string, unknown>,
-) => {
-  const resolver = (await readdir(testDir, { withFileTypes: true }))
-    .filter((dirent) => dirent.isFile())
-    .reduce(
-      (acc, file) => {
-        const nameWithoutExt = file.name.slice(0, file.name.lastIndexOf("."));
-        const absFilepath = join(testDir, file.name);
-        return { ...acc, [`./${nameWithoutExt}`]: absFilepath };
-      },
-      {} as Record<string, string>,
-    );
-  resolver["@style-this/core"] = "";
-  resolver["@style-this/solid"] = "";
-  return resolver;
+// relative imports are resolved from the filesystem, the resolver only maps bare specifiers and overrides
+export const getResolver = async (): Promise<Record<string, string>> => ({
+  "@style-this/core": "",
+  "@style-this/solid": "",
+});
+
+// vite's default `resolve.extensions`, tried after the exact path
+const resolveExtensions = ["", ".mjs", ".js", ".mts", ".ts", ".jsx", ".tsx", ".json"];
+
+const resolveFile = async (id: string) => {
+  const queryIndex = id.indexOf("?");
+  const [filepath, query] = queryIndex === -1 ? [id, ""] : [id.slice(0, queryIndex), id.slice(queryIndex)];
+  for (const extension of resolveExtensions) {
+    const stats = await stat(filepath + extension).catch(() => undefined);
+    if (stats?.isFile()) return filepath + extension + query;
+  }
 };
 
 const evaluateProgramWithMode = async (
@@ -331,7 +330,7 @@ export const setupPlugin = async (
   const plugin = vitePlugin(pluginOptions as Parameters<typeof vitePlugin>[0]);
 
   const ctx = {
-    async resolve(id: string) {
+    async resolve(id: string, importer?: string) {
       // First try plugin's resolveId for virtual modules
       if (id.startsWith('virtual:style-this:')) {
         const resolved = plugin.resolveId?.call(ctx, id, '');
@@ -344,8 +343,12 @@ export const setupPlugin = async (
         }
       }
 
-      // Then try the test resolver, resolutions can be delayed by passing a promise
-      const resolved = await resolver[id];
+      // like vite, relative imports resolve against the importer, the test resolver can override the resolved
+      // path (without extension), resolutions can be delayed by passing a promise
+      const key = importer && /^\.\.?\//.test(id) ? resolve(dirname(importer), id) : id;
+      const resolved = await (Object.hasOwn(resolver, key)
+        ? resolver[key]
+        : isAbsolute(key) ? resolveFile(key) : undefined);
       if (resolved == undefined) return undefined;
       return Promise.resolve({
         id: resolved,

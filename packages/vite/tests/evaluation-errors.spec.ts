@@ -12,7 +12,7 @@ describe("evaluation errors", () => {
   for (const atomic of [false, true]) {
     test(`module throwing is reported (${atomic ? "atomic" : "default"})`, async () => {
       const testDir = `${__dirname}/evaluation-error-in-import`;
-      const resolver = await getResolver(testDir);
+      const resolver = await getResolver();
       const plugin = await setupPlugin(resolver, { atomic, debug: false });
 
       await expect(loadCss(plugin, `${testDir}/dep.tsx`)).rejects.toMatchObject({

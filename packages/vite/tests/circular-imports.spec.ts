@@ -57,11 +57,7 @@ describe.each([false, true])("circular imports (atomic: %s)", (atomic) => {
     { resolver = {}, debug = false }: { resolver?: Record<string, string | Promise<string>>; debug?: boolean } = {},
   ) => {
     resolver["@style-this/core"] = "";
-    for (const [name, code] of Object.entries(files)) {
-      await writeFile(path(name), code);
-      const id = `./${name.replace(/\.tsx?$/, "")}`;
-      if (!Object.hasOwn(resolver, id)) resolver[id] = path(name);
-    }
+    for (const [name, code] of Object.entries(files)) await writeFile(path(name), code);
     plugin = await setupPlugin(resolver, { atomic, debug });
     (plugin.configureServer as Function)({ environments: { client: environment } });
   };
@@ -220,7 +216,7 @@ export const bStyle = css\`height: \${size};\`;
     let release!: () => void;
     const resolutions = [new Promise<string>((resolve) => (release = () => resolve(path("theme.ts"))))];
     const resolver = {};
-    Object.defineProperty(resolver, "./theme", {
+    Object.defineProperty(resolver, path("theme"), {
       enumerable: true,
       get: () => resolutions.shift() ?? path("theme.ts"),
     });
@@ -257,7 +253,7 @@ export const aStyle = css\`color: \${color};\`;
 
     // `m.ts` waits for its dependency to resolve until released
     const resolver = {};
-    Object.defineProperty(resolver, "./n", {
+    Object.defineProperty(resolver, path("n"), {
       enumerable: true,
       get: () => {
         resolving();

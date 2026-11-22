@@ -5,7 +5,7 @@ import { readFile } from "fs/promises";
 describe("deep transitive dependency tracking", () => {
   test("4-level-deep-chain", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name.replace("4-level-deep-chain", "deep-transitive-4-levels")}`;
-    const resolver = await getResolver(testDir);
+    const resolver = await getResolver();
     
     // Create plugin in non-atomic mode
     const plugin = await setupPlugin(resolver, { atomic: false });
@@ -132,7 +132,7 @@ describe("deep transitive dependency tracking", () => {
 
   test("verify-initial-snapshots", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name.replace("verify-initial-snapshots", "deep-transitive-4-levels")}`;
-    const resolver = await getResolver(testDir);
+    const resolver = await getResolver();
     
     // Test both atomic and non-atomic modes
     const modes = [

@@ -5,14 +5,14 @@ import { join } from "path";
 describe("edge-cases", () => {
   test("edge-cases-1", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name}`;
-    const resolver = await getResolver(testDir);
+    const resolver = await getResolver();
 
     await evaluateProgramBothModesMultiFile(testDir, ["entry-1.tsx", "shared.tsx", "entry-2.tsx"], resolver);
   });
 
   test("edge-cases-library-imports", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name}`;
-    const resolver = await getResolver(testDir);
+    const resolver = await getResolver();
     resolver["some_lib"] = join(testDir, "node_modules/some_lib/index.js");
 
     await evaluateProgramBothModesMultiFile(testDir, ["entry.tsx"], resolver);
@@ -20,14 +20,14 @@ describe("edge-cases", () => {
 
   test("edge-cases-unused-css-import", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name}`;
-    const resolver = await getResolver(testDir);
+    const resolver = await getResolver();
 
     await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });
 
   test("edge-cases-dollar-names", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name}`;
-    const resolver = await getResolver(testDir);
+    const resolver = await getResolver();
 
     await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });

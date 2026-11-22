@@ -108,10 +108,7 @@ export const cStyle = css\`
 `,
       );
 
-      const plugin = await setupPlugin(
-        { "./a": a, "./b": b, "./c": c, "@style-this/core": "" },
-        { atomic: true, debug: false },
-      );
+      const plugin = await setupPlugin({ "@style-this/core": "" }, { atomic: true, debug: false });
 
       const client = createEnvironment("client", "client");
       const ssr = createEnvironment("ssr", "server");
@@ -278,7 +275,7 @@ export const style = css\`
 \`;
 `;
 
-        const plugin = await setupPlugin({ "./b": b, "@style-this/core": "" }, { atomic, debug: false });
+        const plugin = await setupPlugin({ "@style-this/core": "" }, { atomic, debug: false });
         const client = createEnvironment("client", "client");
         (plugin.configureServer as Function)({ environments: { client } });
         client.addModule(a);
