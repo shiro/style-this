@@ -66,10 +66,6 @@ export interface ExtraFields {
   __mocks: Map<string, string>;
   __getDebugVirtualModules: () => Record<string, string>;
   getTransitiveImporters(filepath: string, changedExports: string[]): string[];
-  getFileExports(filepath: string): string[];
-  clearFileImports(filepath: string): void;
-  clearValueCache(filepath: string): void;
-  invalidateModule(filepath: string): void;
 }
 
 const vitePlugin = (options: Options = {}) => {
@@ -239,29 +235,10 @@ const vitePlugin = (options: Options = {}) => {
     __mocks: mocks,
     __getDebugVirtualModules: () => Object.fromEntries(debugVirtualModules),
 
-    // Expose dependency tracking methods for testing
+    // Expose dependency tracking for testing
     getTransitiveImporters(filepath: string, changedExports: string[]) {
       if (!styleThis) return [];
       return styleThis.get_transitive_importers(filepath, changedExports);
-    },
-
-    getFileExports(filepath: string) {
-      if (!styleThis) return [];
-      return styleThis.get_file_exports(filepath);
-    },
-
-    clearFileImports(filepath: string) {
-      if (!styleThis) return;
-      styleThis.clear_file_imports(filepath);
-    },
-
-    clearValueCache(filepath: string) {
-      if (!styleThis) return;
-      styleThis.clear_value_cache(filepath);
-    },
-
-    invalidateModule(filepath: string) {
-      cacheRegistry.invalidateModule(filepath);
     },
 
     configureServer(viteServer) {

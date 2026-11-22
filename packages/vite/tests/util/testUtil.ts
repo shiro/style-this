@@ -388,10 +388,6 @@ export const setupPlugin = async (
         bundle,
       ),
     getTransitiveImporters: plugin.getTransitiveImporters?.bind(plugin),
-    getFileExports: plugin.getFileExports?.bind(plugin),
-    clearFileImports: plugin.clearFileImports?.bind(plugin),
-    clearValueCache: plugin.clearValueCache?.bind(plugin),
-    invalidateModule: plugin.invalidateModule?.bind(plugin),
     hotUpdate: plugin.hotUpdate,
     configureServer: plugin.configureServer,
   };

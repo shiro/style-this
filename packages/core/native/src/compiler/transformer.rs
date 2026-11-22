@@ -237,11 +237,6 @@ impl Transformer {
         self.cache_registry.get_file_atomic_css(filepath)
     }
 
-    /// Clear value cache for a specific file
-    pub fn clear_value_cache(&self, filepath: &str) {
-        self.cache_registry.clear_file(filepath);
-    }
-
     /// Get files that import changed exports from the given file
     /// Returns a JS Array of filepaths that need to be invalidated
     ///
@@ -307,33 +302,6 @@ impl Transformer {
             .borrow()
             .get_all_importers(filepath)
             .is_empty()
-    }
-
-    /// Clear import registrations for a file
-    pub fn clear_file_imports(&self, filepath: &str) {
-        self.cache_registry
-            .dependency_tracker()
-            .borrow()
-            .clear_file_imports(filepath);
-    }
-
-    /// Get the current exports for a file from the value cache
-    /// Returns a JS Array of export names
-    pub fn get_file_exports(&self, filepath: &str) -> Array {
-        let cache = self.cache_registry.value_cache.borrow();
-
-        if let Some(mutex_ref) = cache.get(filepath) {
-            // Try to lock synchronously - if we can't, return empty array
-            if let Some(guard) = mutex_ref.try_lock() {
-                let arr = Array::new();
-                for export_name in guard.iter() {
-                    arr.push(&JsValue::from_str(export_name));
-                }
-                return arr;
-            }
-        }
-
-        Array::new()
     }
 
     /// loads file contents and id
