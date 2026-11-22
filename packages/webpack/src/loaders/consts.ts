@@ -28,12 +28,21 @@ export const regexNoopCss = /[\\/]style-this\.css$/;
 export const regexNoopAtomicProgram = /[\\/]style-this\.atomic-program\.js$/;
 export const regexFilepathQuery = /[?&]filepath=/;
 
-/** Import of `noopFile` from `filepath`, its loader serves the virtual module of `filepath`. */
+/**
+ * Import of `noopFile` from `filepath`, its loader serves the virtual module of `filepath`. The query holds
+ * `filepath` relative to `noopFile`, webpack keeps queries as-is in module identifiers (and the ids derived
+ * from them), so these would otherwise depend on the project's location.
+ */
 export const noopFileImport = (noopFile: string, filepath: string) => {
   let noopFilepath = path.relative(path.dirname(filepath), noopFile);
   if (!noopFilepath.startsWith(".")) noopFilepath = `./${noopFilepath}`;
-  return `${noopFilepath}?filepath=${encodeURIComponent(filepath)}`;
+  const query = path.relative(path.dirname(noopFile), filepath).replaceAll(path.sep, "/");
+  return `${noopFilepath}?filepath=${encodeURIComponent(query)}`;
 };
+
+/** The `filepath` of a `noopFileImport` request, from the loader context of its noop file. */
+export const noopFileImportFilepath = (resourcePath: string, resourceQuery: string) =>
+  path.resolve(path.dirname(resourcePath), new URLSearchParams(resourceQuery).get("filepath")!);
 
 export type LoaderOptions = { atomic?: boolean; useRequire?: boolean };
 

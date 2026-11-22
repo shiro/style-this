@@ -81,8 +81,6 @@ async function walkAndAssert(
           }
           content = content.replaceAll(MONOREPO_ROOT_DIR, "");
         }
-        // e.g. in webpack's module comments of style-this's `?filepath=` imports
-        content = content.replaceAll(encodeURIComponent(MONOREPO_ROOT_DIR), "");
       } catch {
         content = `[Binary file - ${statSync(fullPath).size} bytes]`;
       }

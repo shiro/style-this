@@ -8,6 +8,7 @@ import {
 import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
 import { atomicFiles, cacheRegistry, cssFiles } from "../shared";
+import { noopFileImportFilepath } from "./consts";
 import { chainSourceMap, makeLoadFile } from "./shared";
 
 type LoaderCtx = ThisParameterType<RawLoaderDefinitionFunction>;
@@ -141,7 +142,7 @@ const virtualModuleLoader =
     this.cacheable(false);
 
     // the loader rules only match imports with `?filepath=`
-    const filepath = new URLSearchParams(this.resourceQuery).get("filepath")!;
+    const filepath = noopFileImportFilepath(this.resourcePath, this.resourceQuery);
 
     load(this, getConfig(this.getOptions()), filepath).then(
       (code) => callback(null, code),

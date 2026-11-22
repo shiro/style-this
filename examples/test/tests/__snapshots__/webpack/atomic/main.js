@@ -2,7 +2,7 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
-/***/ 516:
+/***/ 791:
 /***/ ((__unused_webpack_module, __unused_webpack___webpack_exports__, __webpack_require__) => {
 
 
@@ -271,7 +271,7 @@ const exportedColorB = "yellow";
 const exportedNumberA = exportedNumberB * 2;
 const a_exportedColorA = "light" + exportedColorB;
 
-;// ../../packages/webpack/style-this.atomic-program.js?filepath=%2Fexamples%2Fwebpack%2Fsrc%2FCounter.tsx
+;// ../../packages/webpack/style-this.atomic-program.js?filepath=..%2F..%2Fexamples%2Fwebpack%2Fsrc%2FCounter.tsx
 
 const CounterStyle = "CounterStyle-zodu74 b-ZeplZ bg-LPp8Q d-W_vHB gap-Td5yX items-Im4M1 m-AuUyl p-DLlYK r-K5PNW something";
 const __styleThis_var_FancyButton_6 = "FancyButton-otinw9 b-ZeplZ bg-Kk7Cm p-ZFXvv r-TbAuj";
@@ -367,7 +367,7 @@ function Counter() {
 }
 const counterColor = (/* unused pure expression or super */ null && (exportedColorA));
 
-;// ../../packages/webpack/style-this.atomic-program.js?filepath=%2Fexamples%2Fwebpack%2Fsrc%2FMainComponent.tsx
+;// ../../packages/webpack/style-this.atomic-program.js?filepath=..%2F..%2Fexamples%2Fwebpack%2Fsrc%2FMainComponent.tsx
 
 const ContainerStyle = "ContainerStyle-3wxanc d-W_vHB flex-d-Fbcuz";
 const colorStyle = "colorStyle-v856z4 bg-BX1ye c-JjnMJ";
@@ -541,7 +541,7 @@ function App() {
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module depends on other loaded chunks and execution need to be delayed
-/******/ 	var __webpack_exports__ = __webpack_require__.O(undefined, [96], () => (__webpack_require__(516)))
+/******/ 	var __webpack_exports__ = __webpack_require__.O(undefined, [96], () => (__webpack_require__(791)))
 /******/ 	__webpack_exports__ = __webpack_require__.O(__webpack_exports__);
 /******/ 	
 /******/ })()
