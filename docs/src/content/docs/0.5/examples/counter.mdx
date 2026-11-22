@@ -1,0 +1,225 @@
+---
+title: Counter
+description: The counter used by the example projects, covering most of the API.
+sidebar:
+  order: 1
+slug: 0.5/examples/counter
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+A simplified version of the component used by every project under
+[`examples/`](https://github.com/shiro/style-this/tree/master/examples). It touches most of the
+API: `css`, imported values, `extraClass`, `styled`, `styleProps`, extension and `mergeStyles`.
+
+```ts title="tokens.ts"
+export const spacing = 16;
+export const accent = "lightyellow";
+```
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx title="Counter.tsx"
+    import { useState } from "react";
+    import { css, extraClass } from "@style-this/core";
+    import { styled } from "@style-this/react";
+    import { spacing } from "./tokens";
+
+    export const counter = css`
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: ${spacing}px;
+      border: 1px solid blue;
+      border-radius: ${spacing / 2}px;
+      ${extraClass("counter")}
+    `;
+
+    export const FancyButton = styled.button<{ a: number }>`
+      background: none;
+      border: 1px solid blue;
+      padding: ${({ a }) => `${a}px`};
+    `;
+
+    export const FancyButton2 = styled(FancyButton)<{ b: number }>`
+      margin: ${({ b }) => `${b}px`};
+      cursor: pointer;
+      background: ${({ props }) => (props.disabled ? "red" : "green")};
+    `;
+
+    export default function Counter() {
+      const [count, setCount] = useState(0);
+      return (
+        <div className={counter}>
+          {count}
+          <FancyButton2
+            styleProps={{ a: 8, b: 16 }}
+            onClick={() => setCount(count + 1)}
+            disabled={count >= 3}
+          >
+            count me
+          </FancyButton2>
+        </div>
+      );
+    }
+    ```
+
+    ```tsx title="Main.tsx"
+    import { css, mergeStyles } from "@style-this/core";
+    import Counter from "./Counter";
+    import { accent } from "./tokens";
+
+    const container = css`
+      display: flex;
+      flex-direction: column;
+    `;
+
+    const color = css`
+      color: coral;
+      background: ${accent};
+    `;
+
+    const highlight = css`
+      color: crimson;
+    `;
+
+    export default function Main() {
+      return (
+        <div className={container}>
+          <Counter />
+          <span className={mergeStyles(color, highlight)}>world</span>
+        </div>
+      );
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Solid">
+    ```tsx title="Counter.tsx"
+    import { createSignal } from "solid-js";
+    import { css, extraClass } from "@style-this/core";
+    import { styled } from "@style-this/solid";
+    import { spacing } from "./tokens";
+
+    export const counter = css`
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: ${spacing}px;
+      border: 1px solid blue;
+      border-radius: ${spacing / 2}px;
+      ${extraClass("counter")}
+    `;
+
+    export const FancyButton = styled.button<{ a: number }>`
+      background: none;
+      border: 1px solid blue;
+      padding: ${({ a }) => `${a}px`};
+    `;
+
+    export const FancyButton2 = styled(FancyButton)<{ b: number }>`
+      margin: ${({ b }) => `${b}px`};
+      cursor: pointer;
+      background: ${({ props }) => (props.disabled ? "red" : "green")};
+    `;
+
+    export default function Counter() {
+      const [count, setCount] = createSignal(0);
+      return (
+        <div class={counter}>
+          {count()}
+          <FancyButton2
+            styleProps={{ a: 8, b: 16 }}
+            onClick={() => setCount(count() + 1)}
+            disabled={count() >= 3}
+          >
+            count me
+          </FancyButton2>
+        </div>
+      );
+    }
+    ```
+
+    ```tsx title="Main.tsx"
+    import { css, mergeStyles } from "@style-this/core";
+    import Counter from "./Counter";
+    import { accent } from "./tokens";
+
+    const container = css`
+      display: flex;
+      flex-direction: column;
+    `;
+
+    const color = css`
+      color: coral;
+      background: ${accent};
+    `;
+
+    const highlight = css`
+      color: crimson;
+    `;
+
+    export default function Main() {
+      return (
+        <div class={container}>
+          <Counter />
+          <span class={mergeStyles(color, highlight)}>world</span>
+        </div>
+      );
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Svelte">
+    ```svelte title="Counter.svelte"
+    <script lang="ts">
+      import { css, extraClass } from "@style-this/core";
+      import { spacing } from "./tokens";
+
+      const counter = css`
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: ${spacing}px;
+        border: 1px solid blue;
+        border-radius: ${spacing / 2}px;
+        ${extraClass("counter")}
+      `;
+
+      const button = css`
+        border: 1px solid blue;
+        padding: 8px;
+        cursor: pointer;
+      `;
+
+      let count = $state(0);
+    </script>
+
+    <div class={counter}>
+      {count}
+      <button
+        class={button}
+        style="background: {count >= 3 ? 'red' : 'green'}"
+        onclick={() => count++}
+        disabled={count >= 3}
+      >
+        count me
+      </button>
+    </div>
+    ```
+  </TabItem>
+</Tabs>
+
+## Running the example projects
+
+```bash
+git clone https://github.com/shiro/style-this
+cd style-this
+pnpm install && pnpm build
+
+cd examples/vite-react
+pnpm dev         # default mode
+pnpm dev:atomic  # atomic mode
+```
+
+Every example has `dev` and `dev:atomic` scripts.
