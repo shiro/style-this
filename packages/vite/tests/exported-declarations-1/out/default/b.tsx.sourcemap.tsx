@@ -5,20 +5,13 @@
 //     "/packages/vite/tests/exported-declarations-1/b.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { css } from \"@style-this/core\";\n\nconst accent = \"blue\",\n  outline = accent;\n\nfunction underline(enabled: boolean) {\n  return enabled ? \"underline\" : decoration;\n}\n\nexport function getLink() {\n  return css`\n    text-decoration: ${underline(false)};\n    border-bottom: ${border};\n  `;\n}\n\nexport class Theme {\n  static accent = css`\n    color: ${accent};\n    outline-color: ${outline};\n  `;\n}\n\n// declared below their uses\nconst decoration = \"none\";\nconst border = `1px solid ${accent}`;\n"
+//     "import { css } from \"@style-this/core\";\n\nexport function getLink() {\n  return css`\n    text-decoration: ${underline(false)};\n    border-bottom: ${border};\n  `;\n}\n\n// declared below their uses\nfunction underline(enabled: boolean) {\n  return enabled ? \"underline\" : decoration;\n}\n\nconst accent = \"blue\",\n  outline = accent;\n\nexport class Theme {\n  static accent = css`\n    color: ${accent};\n    outline-color: ${outline};\n    text-decoration: ${underline(true)};\n  `;\n}\n\nconst decoration = \"none\";\n// `accent` and `borderStyle` move up with it\nconst border = `1px ${borderStyle} ${accent}`;\nconst borderStyle = \"solid\";\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAUS;;;;;AAOS"
+//   "mappings": "AAGS;;;;;AAeS"
 // }
 
 import { css } from "@style-this/core";
-
-const accent = "blue",
-  outline = accent;
-
-function underline(enabled: boolean) {
-  return enabled ? "underline" : decoration;
-}
 
 export function getLink() {
   return css`
@@ -27,13 +20,23 @@ export function getLink() {
   `;
 }
 
+// declared below their uses
+function underline(enabled: boolean) {
+  return enabled ? "underline" : decoration;
+}
+
+const accent = "blue",
+  outline = accent;
+
 export class Theme {
   static accent = css`
     color: ${accent};
     outline-color: ${outline};
+    text-decoration: ${underline(true)};
   `;
 }
 
-// declared below their uses
 const decoration = "none";
-const border = `1px solid ${accent}`;
+// `accent` and `borderStyle` move up with it
+const border = `1px ${borderStyle} ${accent}`;
+const borderStyle = "solid";

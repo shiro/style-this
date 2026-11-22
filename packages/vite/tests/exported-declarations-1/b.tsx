@@ -1,12 +1,5 @@
 import { css } from "@style-this/core";
 
-const accent = "blue",
-  outline = accent;
-
-function underline(enabled: boolean) {
-  return enabled ? "underline" : decoration;
-}
-
 export function getLink() {
   return css`
     text-decoration: ${underline(false)};
@@ -14,13 +7,23 @@ export function getLink() {
   `;
 }
 
+// declared below their uses
+function underline(enabled: boolean) {
+  return enabled ? "underline" : decoration;
+}
+
+const accent = "blue",
+  outline = accent;
+
 export class Theme {
   static accent = css`
     color: ${accent};
     outline-color: ${outline};
+    text-decoration: ${underline(true)};
   `;
 }
 
-// declared below their uses
 const decoration = "none";
-const border = `1px solid ${accent}`;
+// `accent` and `borderStyle` move up with it
+const border = `1px ${borderStyle} ${accent}`;
+const borderStyle = "solid";

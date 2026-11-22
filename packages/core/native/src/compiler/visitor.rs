@@ -221,7 +221,11 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     ///
     /// They can't keep their position, the `css` templates inside functions are evaluated where
     /// the function is, e.g. `function f() { return css\`${size}\`; } const size = 4;`. So each
-    /// one is inserted right after the last statement declaring something it uses, or at the top.
+    /// one is inserted right above the first statement using it, or calling a function using it
+    /// (function declarations are hoisted). The statements below that point it depends on move
+    /// up with it, e.g. `const size = base * 2;` with `base` declared below `f`. The ones only
+    /// used by exports or other pending declarations go to the bottom, the latter pull them up
+    /// once included.
     fn include_pending_declarations(&mut self) {
         let mut pending = self.pending_declarations.pop().unwrap();
         let mut included = vec![];
@@ -240,14 +244,11 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             included.push(declaration);
         }
 
-        let order = dependencies_first(&included);
-        let mut included: Vec<_> = included.into_iter().map(Some).collect();
-        for idx in order {
-            let PendingDeclaration {
-                declaration,
-                right_references,
-            } = included[idx].take().unwrap();
-
+        for PendingDeclaration {
+            declaration,
+            right_references,
+        } in included
+        {
             let len = self.tmp_program_statement_buffer.last().unwrap().len();
             self.include_declaration(declaration, right_references, len);
             if self.error.is_some() {
@@ -255,21 +256,43 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             }
 
             let buffer = self.tmp_program_statement_buffer.last_mut().unwrap();
-            let statements: Vec<_> = buffer.drain(len..).collect();
-            let references: HashSet<_> = statements
-                .iter()
-                .flat_map(utils::statement_get_references)
-                .collect();
+            let mut statements: Vec<_> = buffer.drain(len..).collect();
+            let mut names = program_declared_values(&statements);
+            let references: Vec<_> = buffer.iter().map(utils::statement_get_references).collect();
+            let uses = |idx: usize, names: &HashSet<String>| {
+                references[idx].iter().any(|name| names.contains(name))
+            };
+            // function declarations are hoisted, they use it where they're called
+            loop {
+                let len = names.len();
+                for (idx, statement) in buffer.iter().enumerate() {
+                    if let Statement::FunctionDeclaration(function) = statement
+                        && uses(idx, &names)
+                    {
+                        names.extend(function.id.as_ref().map(|id| id.name.to_string()));
+                    }
+                }
+                if names.len() == len {
+                    break;
+                }
+            }
             // the buffer is bottom-up
-            let pos = buffer
-                .iter()
-                .position(|statement| {
-                    program_declared_values(std::slice::from_ref(statement))
-                        .iter()
-                        .any(|name| references.contains(name))
-                })
-                .unwrap_or(buffer.len());
-            buffer.splice(pos..pos, statements);
+            let Some(user) = (0..buffer.len()).rev().find(|&idx| {
+                !matches!(buffer[idx], Statement::FunctionDeclaration(_)) && uses(idx, &names)
+            }) else {
+                buffer.splice(0..0, statements);
+                continue;
+            };
+
+            let below: Vec<_> = buffer.drain(..user).collect();
+            let dependencies = statement_dependencies(&below, &statements);
+            let (dependencies, below): (Vec<_>, Vec<_>) = below
+                .into_iter()
+                .enumerate()
+                .partition(|(idx, _)| dependencies.contains(idx));
+            statements.extend(dependencies.into_iter().map(|(_, statement)| statement));
+            buffer.splice(1..1, statements);
+            buffer.splice(0..0, below.into_iter().map(|(_, statement)| statement));
         }
     }
 
@@ -1557,40 +1580,26 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     }
 }
 
-/// Indices of the declarations, each one after the ones it references.
-fn dependencies_first(declarations: &[PendingDeclaration]) -> Vec<usize> {
-    fn visit(
-        declarations: &[PendingDeclaration],
-        idx: usize,
-        visited: &mut [bool],
-        order: &mut Vec<usize>,
-    ) {
-        if visited[idx] {
-            return;
-        }
-        visited[idx] = true;
+/// Indices of the statements declaring something the dependents use, directly or through each
+/// other.
+fn statement_dependencies(statements: &[Statement], dependents: &[Statement]) -> HashSet<usize> {
+    let declared: Vec<_> = statements
+        .iter()
+        .map(|statement| program_declared_values(std::slice::from_ref(statement)))
+        .collect();
+    let mut references: HashSet<_> = dependents
+        .iter()
+        .flat_map(utils::statement_get_references)
+        .collect();
+    let mut dependencies = HashSet::new();
 
-        let references = &declarations[idx].right_references;
-        for (dependency, declaration) in declarations.iter().enumerate() {
-            if declaration
-                .declaration
-                .name()
-                .unwrap()
-                .iter()
-                .any(|name| references.contains(name))
-            {
-                visit(declarations, dependency, visited, order);
-            }
-        }
-        order.push(idx);
+    while let Some(idx) = (0..statements.len()).find(|idx| {
+        !dependencies.contains(idx) && declared[*idx].iter().any(|name| references.contains(name))
+    }) {
+        dependencies.insert(idx);
+        references.extend(utils::statement_get_references(&statements[idx]));
     }
-
-    let mut visited = vec![false; declarations.len()];
-    let mut order = vec![];
-    for idx in 0..declarations.len() {
-        visit(declarations, idx, &mut visited, &mut order);
-    }
-    order
+    dependencies
 }
 
 /// Names of the top level values of a program that exist at runtime.
