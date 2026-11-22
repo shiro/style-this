@@ -8,7 +8,7 @@ import { dirname, isAbsolute, join, resolve } from "path";
 import { expect } from "vitest";
 import { test } from "vitest";
 
-const MONOREPO_ROOT_DIR = resolve(join(__dirname, "../../../.."));
+export const MONOREPO_ROOT_DIR = resolve(join(__dirname, "../../../.."));
 
 const normalizeTemporaryProgramKeys = (entries: [string, string][]): [string, string][] => {
   return entries.map(([key, value]) => {

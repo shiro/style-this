@@ -1,11 +1,14 @@
 import { describe, test, expect, vi } from "vitest";
-import { setupPlugin } from "./util/testUtil";
+import { MONOREPO_ROOT_DIR, setupPlugin } from "./util/testUtil";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "fs/promises";
-import { tmpdir } from "os";
-import { join } from "path";
+import { join, relative } from "path";
 
 const VIRTUAL_PREFIX = "\0virtual:style-this:";
 const ATOMIC_ENTRYPOINT_ID = `${VIRTUAL_PREFIX}__style_this_atomic_entrypoint.css`;
+
+// like in real projects, sources live inside the cwd (pinned by `setupPlugin`), virtual module ids are relative to it
+const createTempDir = () => mkdtemp(join(__dirname, ".tmp-hmr-"));
+const virtualId = (file: string, ext: string) => `${VIRTUAL_PREFIX}${relative(MONOREPO_ROOT_DIR, file)}.${ext}`;
 
 type FakeModule = { id: string; url: string; file: string; lastHMRTimestamp: number; importers: Set<FakeModule> };
 
@@ -35,7 +38,7 @@ const createEnvironment = (name: string, consumer: "client" | "server") => {
       const source = createModule(file);
       modules.set(file, source);
       for (const ext of atomic ? ["css", "style-this.js"] : ["css"]) {
-        const id = `${VIRTUAL_PREFIX}${file}.${ext}`;
+        const id = virtualId(file, ext);
         modules.set(id, createModule(id, [source]));
       }
       return source;
@@ -77,7 +80,7 @@ const hotUpdate = (
 
 describe("HMR", () => {
   test("propagates transitive changes to all environments and the atomic entrypoint", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
+    const dir = await createTempDir();
     try {
       const a = join(dir, "a.ts");
       const b = join(dir, "b.tsx");
@@ -115,11 +118,14 @@ export const cStyle = css\`
       (plugin.configureServer as Function)({ environments: { client, ssr } });
 
       // importer first, b's own transform must not drop the `b -> a` import registered by c
-      const cAtomicId = `${VIRTUAL_PREFIX}${c}.style-this.js`;
-      await transformFile(plugin, c);
+      const cAtomicId = virtualId(c, "style-this.js");
+      const { code } = (await transformFile(plugin, c)) as { code: string };
+      // the module graph has the virtual modules under the ids their imports resolve to
+      const virtualImports = code.match(/virtual:style-this:[^"']+/g)!;
+      expect(virtualImports.map((id) => plugin.resolveId(id, c)).sort()).toEqual([virtualId(c, "css"), cAtomicId]);
       expect(await loadCode(plugin, cAtomicId)).toMatch(/cStyle = "cStyle-\S+ \S+"/);
       await transformFile(plugin, b);
-      await loadCode(plugin, `${VIRTUAL_PREFIX}${b}.style-this.js`);
+      await loadCode(plugin, virtualId(b, "style-this.js"));
 
       const initialEntrypoint = await loadCode(plugin, ATOMIC_ENTRYPOINT_ID);
       expect(initialEntrypoint).toContain("color: darkred");
@@ -137,10 +143,10 @@ export const cStyle = css\`
 
       for (const environment of [client, ssr]) {
         const ids = (await hotUpdate(plugin, environment, a, 1))!.map((mod) => mod.id);
-        expect(ids.sort()).toEqual([a, b, c, `${VIRTUAL_PREFIX}${b}.style-this.js`, cAtomicId].sort());
+        expect(ids.sort()).toEqual([a, b, c, virtualId(b, "style-this.js"), cAtomicId].sort());
         // CSS modules are self-accepting, they are only invalidated and reloaded after transform
         expect(environment.moduleGraph.invalidateModule).toHaveBeenCalledWith(
-          environment.moduleGraph.getModuleById(`${VIRTUAL_PREFIX}${c}.css`),
+          environment.moduleGraph.getModuleById(virtualId(c, "css")),
         );
       }
 
@@ -154,7 +160,7 @@ export const cStyle = css\`
       await transformFile(plugin, b);
 
       // the CSS module is sent to the client as an update of its own ...
-      const cssModule = client.moduleGraph.getModuleById(`${VIRTUAL_PREFIX}${c}.css`)!;
+      const cssModule = client.moduleGraph.getModuleById(virtualId(c, "css"))!;
       expect(client.hot.send).toHaveBeenCalledWith({
         type: "update",
         updates: [expect.objectContaining({ type: "js-update", path: cssModule.url, acceptedPath: cssModule.url })],
@@ -188,7 +194,7 @@ export const cStyle = css\`
   }, 30000);
 
   test("invalidates query variants of the atomic entrypoint once new atomic CSS appears", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
+    const dir = await createTempDir();
     try {
       const a = join(dir, "a.tsx");
       const b = join(dir, "b.tsx");
@@ -213,11 +219,11 @@ export const style = css\`
       const plainModule = client.addModule(ATOMIC_ENTRYPOINT_ID);
 
       await transformFile(plugin, a);
-      await loadCode(plugin, `${VIRTUAL_PREFIX}${a}.style-this.js`);
+      await loadCode(plugin, virtualId(a, "style-this.js"));
       expect(await loadCode(plugin, inlineId)).not.toContain("color: blue");
       // a fresh plain variant must not hide the outdated inline one
       await transformFile(plugin, b);
-      await loadCode(plugin, `${VIRTUAL_PREFIX}${b}.style-this.js`);
+      await loadCode(plugin, virtualId(b, "style-this.js"));
       expect(await loadCode(plugin, ATOMIC_ENTRYPOINT_ID)).toContain("color: blue");
 
       await vi.waitFor(() => expect(client.moduleGraph.invalidateModule).toHaveBeenCalledWith(inlineModule));
@@ -233,7 +239,7 @@ export const style = css\`
   }, 30000);
 
   test("unresolvable imports report an error instead of crashing", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
+    const dir = await createTempDir();
     try {
       const file = join(dir, "a.tsx");
       await writeFile(
@@ -250,7 +256,7 @@ export const style = css\`
       for (const atomic of [false, true]) {
         const plugin = await setupPlugin({ "@style-this/core": "" }, { atomic, debug: false });
         await transformFile(plugin, file);
-        await expect(plugin.load(`${VIRTUAL_PREFIX}${file}.css`)).rejects.toThrow("./missing");
+        await expect(plugin.load(virtualId(file, "css"))).rejects.toThrow("./missing");
       }
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -259,7 +265,7 @@ export const style = css\`
 
   for (const atomic of [false, true]) {
     test(`files gaining styles get their CSS evaluated (atomic: ${atomic})`, async () => {
-      const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
+      const dir = await createTempDir();
       try {
         const a = join(dir, "a.tsx");
         const b = join(dir, "b.ts");
@@ -293,8 +299,8 @@ export const style = css\`
         };
         const cssOf = async () =>
           atomic
-            ? `${await load(`${VIRTUAL_PREFIX}${a}.style-this.js`)}\n${await load(ATOMIC_ENTRYPOINT_ID)}`
-            : load(`${VIRTUAL_PREFIX}${a}.css`);
+            ? `${await load(virtualId(a, "style-this.js"))}\n${await load(ATOMIC_ENTRYPOINT_ID)}`
+            : load(virtualId(a, "css"));
 
         let timestamp = 0;
         const edit = async (code: string) => {
@@ -321,7 +327,7 @@ export const style = css\`
   }
 
   test("files with the same name don't share cache entries", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "style-this-hmr-"));
+    const dir = await createTempDir();
     try {
       const x = join(dir, "x", "index.tsx");
       const y = join(dir, "y", "index.tsx");
@@ -341,8 +347,8 @@ export const style = css\`
       await transformFile(plugin, x);
       await transformFile(plugin, y);
 
-      expect(await loadCode(plugin, `${VIRTUAL_PREFIX}${x}.css`)).toContain("color: red");
-      expect(await loadCode(plugin, `${VIRTUAL_PREFIX}${y}.css`)).toContain("color: blue");
+      expect(await loadCode(plugin, virtualId(x, "css"))).toContain("color: red");
+      expect(await loadCode(plugin, virtualId(y, "css"))).toContain("color: blue");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

@@ -2,3 +2,4 @@ dist
 node_modules
 !packages/**/tests/**/node_modules
 *.orig
+.tmp-hmr-*
