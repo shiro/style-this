@@ -92,6 +92,13 @@ export const style = css\`
   --raw-length: \${tokens.length};
 \`;
 `,
+  "optimized.tsx": `${cssImport}
+import { color } from "optimized-dep";
+
+export const style = css\`
+  color: \${color};
+\`;
+`,
   "url.tsx": `${cssImport}
 import url from "./tokens.ts?url";
 
@@ -149,7 +156,11 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
     dir = await mkdtemp(join(tmpdir(), "style-this-json-"));
     for (const [name, code] of Object.entries(files)) await writeFile(path(name), code);
 
-    plugin = await setupPlugin({ "@style-this/core": "" }, { atomic, debug: false });
+    // optimized deps resolve with a `?v=` query in dev
+    plugin = await setupPlugin(
+      { "@style-this/core": "", "optimized-dep": `${path("tokens.ts")}?v=8c4b72b3` },
+      { atomic, debug: false },
+    );
     (plugin.configureServer as Function)({ environments: {} });
   });
 
@@ -203,6 +214,10 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
     const css = await cssOf("raw-and-plain.tsx");
     expect(css).toContain("color: red");
     expect(css).toContain(`--raw-length: ${files["tokens.ts"].length}`);
+  });
+
+  test("version queries of optimized deps are ignored", async () => {
+    expect(await cssOf("optimized.tsx")).toContain("color: red");
   });
 
   test("unsupported import queries are reported", async () => {

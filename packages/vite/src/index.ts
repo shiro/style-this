@@ -301,7 +301,9 @@ const vitePlugin = (options: Options = {}) => {
         if (filepathWithQuery == undefined)
           throw new Error(`vite failed to resolve import '${id}'`);
 
-        let [filepath, query] = filepathWithQuery.split("?", 2);
+        let [filepath, rawQuery] = filepathWithQuery.split("?", 2);
+        // `?v=` of optimized deps in dev only busts the browser cache, it's the same module
+        const query = rawQuery?.split("&").filter((param) => !param.startsWith("v=")).join("&") || undefined;
 
         if (filepath.startsWith(resolvedVirtualModulePrefix)) {
           const virtualPath = fromVirtualId(filepath);
@@ -314,7 +316,7 @@ const vitePlugin = (options: Options = {}) => {
         }
 
         // modules with a query (e.g. `?raw`) are generated from the file by the compiler
-        if (query !== undefined) return [filepathWithQuery, await readFile(filepath, "utf-8")];
+        if (query !== undefined) return [`${filepath}?${query}`, await readFile(filepath, "utf-8")];
 
         if (
           !isInNodeModules(cwd, filepath) &&
