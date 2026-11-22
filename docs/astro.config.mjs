@@ -26,7 +26,7 @@ export default defineConfig({
 			sidebar: [
 				{ label: 'Getting started', items: [{ autogenerate: { directory: 'getting-started' } }] },
 				{ label: 'Guides', items: [{ autogenerate: { directory: 'guides' } }] },
-				{ label: 'Frameworks', items: [{ autogenerate: { directory: 'frameworks' } }] },
+				{ label: 'Frameworks & bundlers', items: [{ autogenerate: { directory: 'frameworks' } }] },
 				{ label: 'Examples', items: [{ autogenerate: { directory: 'examples' } }] },
 				{ label: 'Reference', items: [{ autogenerate: { directory: 'reference' } }] },
 				{ label: 'Troubleshooting', slug: 'troubleshooting' },

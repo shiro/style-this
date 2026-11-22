@@ -42,8 +42,9 @@ Enables [atomic CSS](/guides/atomic-css/) output, wrapped in `@layer utilities`.
 
 - Type: `Record<string, true | (string | typeof DefaultImport)[]>`
 
-Imports to skip during build-time evaluation. `true` ignores the whole module, an array ignores the
-listed import names, `DefaultImport` stands for the default import. See
+Imports to skip during build-time evaluation, keyed by the specifier as written in the source.
+`true` ignores the whole module, an array ignores the listed imported names (aliases don't matter),
+`DefaultImport` stands for the default import. See
 [Ignoring imports](/guides/evaluation/#ignoring-imports).
 
 ### `cssExtension`
@@ -91,7 +92,7 @@ The plugin adjusts your Vite config:
 
 | Id | Content |
 | --- | --- |
-| `virtual:style-this:<file>.<cssExtension>` | per-file stylesheet |
+| `virtual:style-this:<file>.<cssExtension>` | per-file stylesheet, e.g. `Button.tsx.css` or `Card.svelte.css` |
 | `virtual:style-this:<file>.style-this.js` | class name exports (atomic mode) |
 | `@style-this/core/atomic` | atomic stylesheet (layer order and `@layer utilities`) |
 

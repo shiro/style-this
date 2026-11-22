@@ -11,25 +11,29 @@ of components. Your code stays the same, only the output changes.
 
 ## Enabling
 
-```ts title="vite.config.ts"
-styleThis({ atomic: true });
-```
+1. Turn it on in your bundler integration:
 
-Then import the atomic stylesheet **once**, in your app's root module:
+   ```ts title="vite.config.ts"
+   styleThis({ atomic: true });
+   ```
 
-```tsx title="src/App.tsx"
-import "@style-this/core/atomic";
-```
+   ```js title="webpack.config.js"
+   new StyleThisPlugin({ atomic: true });
+   ```
 
-The import marks where the atomic stylesheet is loaded. In builds, the atomic CSS is appended to the
-stylesheet of the chunk containing this import. In default mode the import is a no-op, so keep it
-and toggle the mode from config.
+   ```bash title="Next.js"
+   ATOMIC=1 next build
+   ```
 
-:::note[Next.js]
-With `@style-this/next`, atomic mode is toggled with the `ATOMIC=1` environment variable instead.
-There's no single atomic stylesheet, every file's stylesheet includes the atomic CSS it uses (in the
-same cascade layer). The entrypoint import only fixes the layer order.
-:::
+2. Import the atomic entrypoint **once**, in your app's root module (root layout, `_app`, `App.tsx`,
+   ...):
+
+   ```tsx title="src/App.tsx"
+   import "@style-this/core/atomic";
+   ```
+
+   It marks where the atomic CSS and its [cascade layers](#cascade-layers) are loaded. In default
+   mode the import is a no-op, so keep it and toggle the mode from config.
 
 ## Output
 
@@ -59,7 +63,7 @@ inner === "inner-oty7sd bg-GsBIw p-VSGpc";
 outer === "outer-mvwhqz w-Yb3Gw";
 ```
 
-```css title="atomic stylesheet"
+```css title="atomic CSS"
 @layer theme, base, components, utilities;
 @layer utilities {
   .bg-GsBIw { background: red }
@@ -68,7 +72,7 @@ outer === "outer-mvwhqz w-Yb3Gw";
 }
 ```
 
-```css title="per-file stylesheet"
+```css title="per-file CSS"
 .outer-mvwhqz {
   .inner-oty7sd {
     background: coral;
@@ -82,16 +86,29 @@ outer === "outer-mvwhqz w-Yb3Gw";
 ```
 
 - Atomic classes are named `<property prefix>-<hash>`, e.g. `bg-…` for `background`. The hash
-  starts with an uppercase letter, so `mergeStyles` doesn't mistake hand-written classes like
-  `bg-light` for atomic ones.
+  always starts with an uppercase letter, so they can't be confused with hand-written classes like
+  `bg-light`.
 - Every style keeps its unique class (`inner-oty7sd`), so it can still be
   [referenced in selectors](/guides/css/#referencing-other-styles).
-- **Nested rules and at-rules aren't atomized.** They stay in the per-file stylesheet, scoped to the
-  unique class. Same for [global styles](/guides/css/#global-styles).
+- **Nested rules and at-rules aren't atomized.** They stay in the per-file CSS, scoped to the unique
+  class. Same for [global styles](/guides/css/#global-styles).
+- Dynamic declarations of [styled components](/guides/styled-components/#dynamic-styles-with-styleprops)
+  are atomized too, e.g. `.p-NM_En { padding: var(--var1-4lyfgx) }`.
+
+### Where the atomic CSS is loaded
+
+- **Vite**: all atomic rules are collected into one stylesheet, served by the
+  `@style-this/core/atomic` import. In builds it's appended to the stylesheet of the chunk containing
+  that import.
+- **webpack and Next.js**: there's no step that collects the CSS of all files, so every file's
+  stylesheet includes the atomic rules it uses. The `@style-this/core/atomic` import only declares
+  the layer order.
+
+The cascade works the same either way.
 
 ## Overriding styles
 
-Two styles can now set the same property through different classes, so plain string concatenation
+Two styles can set the same property through different classes, so plain string concatenation
 gives order-dependent results. Use [`mergeStyles`](/guides/merging-styles/), which keeps only the
 last atomic class per property:
 
@@ -103,6 +120,10 @@ import { mergeStyles } from "@style-this/core";
 
 Styled components do this automatically for `className` / `class` and for
 [extended components](/guides/styled-components/#extending-components).
+
+Shorthands and longhands are different properties and aren't de-duplicated against each other.
+Longhands always win: with `padding: 0` and `padding-top: 8px` on one element, the top padding is
+`8px` regardless of order.
 
 ## Cascade layers
 
@@ -124,22 +145,22 @@ against unlayered ones, regardless of specificity or position, so:
   }
   ```
 
-- **Dev and build behave the same.** The cascade doesn't depend on where the atomic stylesheet ends
-  up in the bundle.
+- **Dev and build behave the same.** The cascade doesn't depend on where the atomic CSS ends up in
+  the bundle.
 
 The layer names match Tailwind CSS v4, so both can be used side by side.
 
 ### Custom layer order
 
-Declare your own order before the atomic stylesheet is loaded. The first declaration of a layer
+Declare your own order before the atomic entrypoint is imported. The first declaration of a layer
 fixes its position, so the default statement then has no effect.
 
-```css title="src/layers.css"
+```css title="src/app.css"
 @layer reset, base, components, utilities, overrides;
 ```
 
 ```tsx title="src/App.tsx"
-import "./layers.css";
+import "./app.css";
 import "@style-this/core/atomic";
 ```
 
@@ -147,5 +168,6 @@ Default layers missing from your order (`theme` above) are appended after yours.
 
 ## Source maps and HMR
 
-Atomic rules carry source map markers back to the template they came from. During development the
-atomic stylesheet is hot-updated whenever a module contributes new declarations.
+With the Vite plugin, atomic rules carry source map markers back to the template they came from,
+and the atomic stylesheet is hot-updated whenever a module contributes new declarations, see
+[HMR & source maps](/guides/hmr-and-sourcemaps/).

@@ -5,6 +5,11 @@ sidebar:
   order: 1
 ---
 
+For React with Next.js see [Next.js](/frameworks/next/), with a custom webpack setup see
+[webpack](/frameworks/webpack/).
+
+## Setup
+
 ```bash
 pnpm add @style-this/core @style-this/react
 pnpm add -D @style-this/vite
@@ -25,6 +30,8 @@ export default defineConfig({
 ```
 
 The plugin runs with `enforce: "pre"`, its position relative to `react()` doesn't matter.
+
+## Usage
 
 ```tsx title="src/Counter.tsx"
 import { useState } from "react";
@@ -60,8 +67,17 @@ export default function Counter() {
 }
 ```
 
-For [atomic mode](/guides/atomic-css/), set `atomic: true` and add
-`import "@style-this/core/atomic"` to `src/App.tsx`.
+Styled components forward `ref` to their element, on React 18 and 19.
 
-A complete project lives in
-[`examples/vite-react`](https://github.com/shiro/style-this/tree/master/examples/vite-react).
+## Atomic mode
+
+Set `atomic: true` and import the entrypoint in your root component, see
+[Atomic CSS](/guides/atomic-css/).
+
+```tsx title="src/App.tsx"
+import "@style-this/core/atomic";
+```
+
+## Example
+
+[`examples/vite-react`](https://github.com/shiro/style-this/tree/master/examples/vite-react)

@@ -7,11 +7,11 @@ sidebar:
 
 style-this runs as a bundler plugin. For each matching file it:
 
-1. Finds `css` and `styled` tagged templates.
-2. Builds a small program containing only the code those templates depend on (local constants,
-   imported values, other styles) and **evaluates it at build time**.
-3. Emits the resulting CSS as a virtual stylesheet and imports it from the file.
-4. Replaces each template with its class name.
+1. Finds the `css` and `styled` tagged templates.
+2. Builds a small program containing only the code those templates depend on (constants, imported
+   values, other styles) and **evaluates it at build time** in Node.
+3. Emits the resulting CSS as a stylesheet belonging to the file and imports it from the file.
+4. Replaces each template with its class name, or with a thin component for `styled`.
 
 ## Example
 
@@ -41,22 +41,35 @@ const button = "button-4tu7c1";
 }
 ```
 
-The class name is the variable name plus a stable hash, so it stays readable in devtools. The hash
-doesn't depend on the absolute project path, so output is reproducible across machines.
+The stylesheet import differs per bundler (the Vite plugin uses virtual modules, webpack and Next.js
+use a file with a query), the result is the same.
+
+## Class names
+
+A class name is the name of the variable the style is assigned to, plus a hash: readable in
+devtools and unique per style. The hash doesn't depend on the absolute project path, so output is
+reproducible across machines.
+
+- Styles nested in an object or a function take the name of the nearest variable they're declared
+  in. Styles without any (e.g. `` return css`...` ``) get a generated name.
+- `$` isn't valid in CSS class names and is replaced with `__` (`$btn` → `__btn-…`).
+- Variables starting with `_Global` produce [global styles](/guides/css/#global-styles) without a
+  class.
 
 ## Consequences
 
 - **Values are computed at build time.** Anything interpolated into `css` must be computable
-  without a browser, see [Imports & evaluation](/guides/evaluation/). Per-instance values go through
-  [styled components](/guides/styled-components/), which compile them to CSS custom properties.
+  without a browser and without runtime data, see [Build-time evaluation](/guides/evaluation/).
+  Per-instance values go through [styled components](/guides/styled-components/), which compile them
+  to CSS custom properties.
 - **There's (almost) no runtime.** `css`, `styled` and `extraClass` are removed by the transform,
-  calling them at runtime throws. The only helper that may remain in your bundle is the tiny
-  `mergeStyles` / `joinStyles` used to combine class lists.
+  calling them at runtime throws. What may remain in your bundle are tiny helpers:
+  `mergeStyles` / `joinStyles` to combine class lists and the generated styled components.
 
 ## Output modes
 
-- **Default**: one rule per style, in a per-file stylesheet. This is what the example above shows.
-- **[Atomic](/guides/atomic-css/)**: every top-level declaration becomes its own deduplicated
-  class, collected into a single stylesheet.
+- **Default**: one rule per style, in a stylesheet per file. This is what the example above shows.
+- **[Atomic](/guides/atomic-css/)**: every top-level declaration becomes its own class, shared by
+  all styles using the same declaration.
 
-You can switch between them from config without changing your code.
+Both modes use the same source code, you switch between them in the plugin config.

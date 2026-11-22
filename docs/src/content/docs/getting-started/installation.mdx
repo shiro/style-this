@@ -12,12 +12,12 @@ for every `@style-this/*` package.
 
 | Package | Purpose |
 | --- | --- |
-| `@style-this/core` | `css`, `mergeStyles`, `extraClass` and the compiler. Always required. |
+| `@style-this/core` | `css`, `style`, `extraClass`, `mergeStyles` and the compiler. Always required. |
 | `@style-this/vite` | Vite plugin (Vite, SolidStart, SvelteKit, ...). |
-| `@style-this/next` | Next.js integration (webpack and turbopack). |
+| `@style-this/webpack` | webpack 5 plugin. |
+| `@style-this/next` | Next.js integration (webpack and Turbopack), built on `@style-this/webpack`. |
 | `@style-this/react` | `styled` components for React. |
 | `@style-this/solid` | `styled` components for SolidJS. |
-| `@style-this/webpack` | webpack plugin, also used by `@style-this/next`. |
 
 <Steps>
 
@@ -74,7 +74,7 @@ for every `@style-this/*` package.
      plugins: [react(), styleThis({ filter: /\.tsx$/ })],
    });
    ```
-   `filter` limits the transform to files that contain styles, see
+   `filter` limits the transform to the files that contain styles, see
    [`filter`](/reference/vite/#filter).
    </TabItem>
    <TabItem label="Next.js">
@@ -86,24 +86,31 @@ for every `@style-this/*` package.
 
    export default withStyleThis(nextConfig);
    ```
+   Requires Next.js 16.2 or newer.
    </TabItem>
    <TabItem label="webpack">
    ```js title="webpack.config.js"
+   import MiniCssExtractPlugin from "mini-css-extract-plugin";
    import { StyleThisPlugin } from "@style-this/webpack";
 
    export default {
-     // ...
-     plugins: [new StyleThisPlugin()],
+     module: {
+       rules: [
+         { test: /\.[jt]sx?$/, loader: "esbuild-loader", options: { jsx: "automatic" } },
+         // also handles the generated CSS
+         { test: /\.css$/, use: [MiniCssExtractPlugin.loader, "css-loader"] },
+       ],
+     },
+     plugins: [new StyleThisPlugin(), new MiniCssExtractPlugin()],
    };
    ```
-   The generated CSS is imported as `.css` files, so the config needs a CSS rule, see
-   [`@style-this/webpack`](/reference/next-webpack/#style-thiswebpack).
+   The generated CSS is imported as `.css` files, so the config needs a CSS rule.
    </TabItem>
    </Tabs>
 
 4. Write a style and use the returned class name.
 
-   ```tsx
+   ```tsx title="Title.tsx"
    import { css } from "@style-this/core";
 
    const title = css`
@@ -119,6 +126,7 @@ for every `@style-this/*` package.
 ## Next steps
 
 1. [How it works](/getting-started/how-it-works/): what the transform does to your code.
-2. [Writing styles](/guides/css/): the `css` API, read the guides in order from there.
-3. Framework setup: [React](/frameworks/react/), [SolidJS](/frameworks/solid/),
-   [Svelte](/frameworks/svelte/), [Next.js](/frameworks/next/).
+2. [Writing styles](/guides/css/): the `css` API. The guides build on each other, read them in
+   order from there.
+3. Setup details for your stack: [React](/frameworks/react/), [SolidJS](/frameworks/solid/),
+   [Svelte](/frameworks/svelte/), [Next.js](/frameworks/next/), [webpack](/frameworks/webpack/).

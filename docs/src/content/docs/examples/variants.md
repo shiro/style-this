@@ -71,28 +71,33 @@ const Progress = styled.div<{ value: number; color?: string }>`
 
 ## Contextual overrides
 
-Reference a child style or component from the parent.
+Reference a child style or styled component from the parent. Plain components don't have a class,
+reference the style they use instead.
 
 ```tsx
 import { css } from "@style-this/core";
-import { Button } from "./Button";
+import { styled } from "@style-this/react";
+
+const Item = styled.button`
+  border-radius: 4px;
+`;
 
 const toolbar = css`
   display: flex;
 
-  .${Button} {
+  .${Item} {
     border-radius: 0;
   }
 
-  .${Button}:first-child {
+  .${Item}:first-child {
     border-radius: 4px 0 0 4px;
   }
 `;
 ```
 
 This works in atomic mode as well: nested rules aren't atomized, they stay in the per-file
-stylesheet outside the [`utilities` layer](/guides/atomic-css/#cascade-layers) and always win
-against atomic classes.
+CSS outside the [`utilities` layer](/guides/atomic-css/#cascade-layers) and always win against
+atomic classes.
 
 ## Extending third party components
 

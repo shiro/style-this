@@ -5,12 +5,16 @@ sidebar:
   order: 2
 ---
 
+## Setup
+
 ```bash
 pnpm add @style-this/core @style-this/solid
 pnpm add -D @style-this/vite
 ```
 
-## Vite + Solid
+Register the plugin for your setup:
+
+### Vite + Solid
 
 ```ts title="vite.config.ts"
 import { defineConfig } from "vite";
@@ -22,7 +26,7 @@ export default defineConfig({
 });
 ```
 
-## SolidStart 2
+### SolidStart 2
 
 ```ts title="vite.config.ts"
 import { defineConfig } from "vite";
@@ -40,7 +44,7 @@ export default defineConfig({
 });
 ```
 
-## SolidStart 1 (vinxi)
+### SolidStart 1 (vinxi)
 
 ```ts title="app.config.ts"
 import { defineConfig } from "@solidjs/start/config";
@@ -57,6 +61,9 @@ export default defineConfig({
   },
 });
 ```
+
+The plugin keeps `@style-this/core` out of Vite's SSR externals automatically, so styles and the
+atomic entrypoint resolve on the server too.
 
 ## Usage
 
@@ -92,14 +99,31 @@ export default function Counter() {
 }
 ```
 
-Dynamic expressions are reactive: they re-run whenever the signals or props they read change.
+- Dynamic expressions are reactive: they re-run whenever the signals or props they read change.
+- The `style` prop of styled components accepts an object or a CSS string.
 
-## SSR
+## Atomic mode
 
-The plugin keeps `@style-this/core` out of Vite's SSR externals automatically, so the
-`@style-this/core/atomic` import resolves on the server too. For
-[atomic mode](/guides/atomic-css/), set `atomic: true` and put the import in `src/app.tsx`.
+Set `atomic: true` and import the entrypoint in `src/app.tsx`, see
+[Atomic CSS](/guides/atomic-css/). Global styles imported before it can declare the layer order and
+put themselves into a lower layer, like the examples do:
 
-Examples:
-[`vite-solid`](https://github.com/shiro/style-this/tree/master/examples/vite-solid) (SolidStart 1),
-[`vite-solid-start-2`](https://github.com/shiro/style-this/tree/master/examples/vite-solid-start-2).
+```css title="src/app.css"
+@layer theme, base, components, utilities;
+
+@layer base {
+  body {
+    font-family: sans-serif;
+  }
+}
+```
+
+```tsx title="src/app.tsx"
+import "./app.css";
+import "@style-this/core/atomic";
+```
+
+## Examples
+
+- [`vite-solid`](https://github.com/shiro/style-this/tree/master/examples/vite-solid) (SolidStart 1)
+- [`vite-solid-start-2`](https://github.com/shiro/style-this/tree/master/examples/vite-solid-start-2)

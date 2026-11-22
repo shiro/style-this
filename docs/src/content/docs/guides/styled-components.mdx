@@ -38,12 +38,16 @@ const Button = styled.button`
 </Tabs>
 
 Like `css`, the template is compiled away: what remains is a thin component rendering the element
-with a static class name. Everything from [Writing styles](/guides/css/) works inside the template.
+with a static class name. Everything from [Writing styles](/guides/css/) works inside the template,
+static interpolations are [evaluated at build time](/guides/evaluation/).
+
+The component accepts all props of the element and passes them on, including `ref`. In React the
+component is wrapped in `forwardRef`, so refs work on React 18 as well.
 
 ## Dynamic styles with `styleProps`
 
-Function expressions are evaluated at render time. Declare their inputs as a type argument, callers
-pass them through the `styleProps` prop.
+Function interpolations are evaluated at render time. Declare their inputs as a type argument,
+callers pass them through the `styleProps` prop.
 
 ```tsx
 const Button = styled.button<{ size: number; color: string }>`
@@ -65,14 +69,15 @@ Each function compiles to a CSS custom property that's set through the element's
 
 `styleProps` is required whenever a type argument is given and is never forwarded to the DOM.
 
-:::tip
-Text following the expression stays in the CSS, both of these work:
-
-```ts
-padding: ${({ size }) => size}px;
-padding: ${({ size }) => `${size}px`};
-```
+:::caution[Return complete values]
+The function's result replaces the `var(...)`, so return the value with its unit:
+`` ${({ size }) => `${size}px`} ``. Text after the interpolation (`${({ size }) => size}px`) ends up
+as `var(--var1-…)px`, which CSS doesn't treat as a length.
 :::
+
+The functions are regular runtime code, they can use anything in scope at render time, e.g.
+imported helpers or module-level values. In Solid they're tracked and re-run when the signals or
+props they read change.
 
 ## Reading component props
 
@@ -132,10 +137,15 @@ const override = css`
   background: blue;
 `;
 
-<Button class={override} />;
+// `style` may be an object or a CSS string
+<Button class={override} style="opacity: 0.5" />;
 ```
 </TabItem>
 </Tabs>
+
+Classes are merged with [`mergeStyles`](/guides/merging-styles/), which decides which class wins.
+The custom properties of dynamic styles are combined with the incoming `style`, which wins on
+conflicts.
 
 ## Using components in selectors
 

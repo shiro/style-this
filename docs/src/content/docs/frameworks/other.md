@@ -1,12 +1,13 @@
 ---
 title: Other frameworks
-description: Use style-this with any Vite based setup.
+description: Use style-this with any framework, without styled components.
 sidebar:
-  order: 5
+  order: 6
 ---
 
-`css` produces a plain class name string, so it works with anything that runs on Vite and lets you
-set a class: Preact, Vue JSX, Lit, vanilla TypeScript, ...
+`css` produces a plain class name string, so it works with anything that lets you set a class:
+Preact, Vue JSX, Lit, vanilla TypeScript, ... Use the [Vite plugin](/reference/vite/) or the
+[webpack plugin](/frameworks/webpack/).
 
 ```ts title="vite.config.ts"
 import { defineConfig } from "vite";
@@ -34,8 +35,8 @@ const el = document.createElement("button");
 el.className = mergeStyles(button, primary);
 ```
 
-Only JS/TS files (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`) and `.svelte` files
-are transformed. Files in `node_modules` are never transformed.
+Only JS/TS files are transformed, plus `.svelte` files with the Vite plugin. Files in
+`node_modules` are never transformed.
 
 What you don't get outside React and Solid is `styled`. Use custom properties for dynamic values:
 

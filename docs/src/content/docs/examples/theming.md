@@ -40,6 +40,13 @@ export const card = css`
 
 Editing `theme.ts` hot-updates every style using the changed export.
 
+Tokens exported from a design tool can stay in JSON, they're
+[evaluated like modules](/guides/evaluation/#what-works):
+
+```ts
+import { colors } from "./tokens.json";
+```
+
 ## Runtime theme switching
 
 Values that change at runtime can't be inlined, back them with custom properties defined in a

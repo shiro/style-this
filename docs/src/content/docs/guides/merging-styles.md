@@ -24,13 +24,14 @@ const highlight = css`
   color: crimson;
 `;
 
-<span className={mergeStyles(color, isActive && highlight)} />;
+<span className={mergeStyles(color, isActive && highlight, props.className)} />;
 ```
 
 - Falsy values (`false`, `null`, `undefined`, `""`) are ignored, so conditions can be inlined.
 - Identical classes are de-duplicated.
 - In [atomic mode](/guides/atomic-css/), atomic classes setting the same property are de-duplicated
-  and the last one wins. Above, `color: coral` is dropped when `highlight` is applied.
+  and the last one wins. Above, `color: coral` is dropped when `highlight` is applied. Other classes,
+  including hand-written ones like `bg-light`, are kept as they are.
 
 ### Who wins in default mode
 
@@ -58,7 +59,8 @@ joinStyles("a", false, "b"); // "a b"
 
 ## With styled components
 
-Styled components merge an incoming `className` / `class` with `mergeStyles` automatically:
+Styled components merge an incoming `className` / `class` with `mergeStyles` automatically, after
+their own classes:
 
 ```tsx
 <Button className={override} />
