@@ -16,7 +16,7 @@
 	`;
 
 	const _GlobalMain = css`
-		:global(.Global__Main) {
+		.Global__Main {
 			background: coral;
 		}
 	`;
@@ -29,9 +29,3 @@
 		world
 	</span>
 </div>
-
-<style>
-	:global(.Global__Main) {
-		background: coral;
-	}
-</style>
