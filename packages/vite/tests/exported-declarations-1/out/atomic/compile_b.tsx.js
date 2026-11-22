@@ -1,19 +1,23 @@
-// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "accent", "css", "decoration", "getLink", "underline"}
+// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "accent", "border", "css", "decoration", "getLink", "outline", "underline"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let decoration = "none";
 let accent = "blue";
+let border = `1px solid ${accent}`;
+let outline = accent;
 function underline(enabled) {
 	return enabled ? "underline" : decoration;
 }
 let __styleThis_2 = new String("__styleThis_2-9erkd2");
 __styleThis_2.css = `text-decoration: ${underline(false)};
+    border-bottom: ${border};
   `;
 function getLink() {
 	return __styleThis_2;
 }
 let __styleThis_1 = new String("__styleThis_1-hi3g5a");
 __styleThis_1.css = `color: ${accent};
+    outline-color: ${outline};
   `;
 class Theme {
 	static accent = __styleThis_1;
@@ -21,19 +25,23 @@ class Theme {
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] ?? {}), Theme,getLink};
 
-// /packages/vite/tests/exported-declarations-1/b.tsx: {"__styleThis_1", "__styleThis_2", "accent", "css", "decoration", "underline"}
+// /packages/vite/tests/exported-declarations-1/b.tsx: {"__styleThis_1", "__styleThis_2", "accent", "border", "css", "decoration", "outline", "underline"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let decoration = "none";
 let accent = "blue";
+let border = `1px solid ${accent}`;
+let outline = accent;
 function underline(enabled) {
 	return enabled ? "underline" : decoration;
 }
 let __styleThis_2 = new String("__styleThis_2-9erkd2");
 __styleThis_2.css = `text-decoration: ${underline(false)};
+    border-bottom: ${border};
   `;
 let __styleThis_1 = new String("__styleThis_1-hi3g5a");
 __styleThis_1.css = `color: ${accent};
+    outline-color: ${outline};
   `;
 return {
 "__styleThis_2": __styleThis_2.css,

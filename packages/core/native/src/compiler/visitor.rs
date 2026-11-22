@@ -58,10 +58,20 @@ pub struct VisitorTransformer<'a, 'alloc> {
     random: utils::SeededRandom,
     tmp_program: Program<'alloc>,
     tmp_program_statement_buffer: Vec<Vec<Statement<'alloc>>>,
+    /// per statement list being visited
+    pending_declarations: Vec<Vec<PendingDeclaration<'alloc>>>,
 
     atomic: bool,
 
     pub error: Option<TransformError>,
+}
+
+/// A declaration that wasn't referenced when it was visited. Statements are visited bottom-up, so
+/// a declaration above it can still reference it, e.g. `function f() { return size; }
+/// const size = 4;`.
+struct PendingDeclaration<'alloc> {
+    declaration: VirtualProgramInsert<'alloc>,
+    right_references: Vec<String>,
 }
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
@@ -115,6 +125,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             random: Default::default(),
             tmp_program: utils::build_new_ast(allocator).program,
             tmp_program_statement_buffer: Default::default(),
+            pending_declarations: Default::default(),
 
             atomic,
 
@@ -165,37 +176,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         oxc_ast_visit::walk_mut::walk_function(self, it, flags);
 
-        let Some(id) = &it.id else { return };
-        let name = id.name.as_str();
-
-        if !self.is_variable_referenced(name) {
-            return;
-        }
-
-        let mut function_declaration = it.clone_in(self.allocator);
-
-        if let Some(body) = &mut function_declaration.body {
-            if self.check_dynamic_variable_access(&right_references, body.span().start) {
-                return;
-            }
-
-            for ident in right_references {
-                self.reference_variable(ident);
-            }
-
-            // transform
-            for statement in &mut body.statements {
-                replace_in_statement_using_spans(
-                    self.ast_builder,
-                    statement,
-                    &mut self.replacement_points,
-                );
-            }
-        }
-
-        self.insert_into_virtual_program(
-            VirtualProgramInsert::FunctionDeclaration(function_declaration),
-            Some(pos),
+        self.include_or_defer_declaration(
+            VirtualProgramInsert::FunctionDeclaration(it.clone_in(self.allocator)),
+            right_references,
+            pos,
         );
     }
 
@@ -206,31 +190,192 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         oxc_ast_visit::walk_mut::walk_class(self, it);
 
-        let Some(id) = &it.id else { return };
-        let name = id.name.as_str();
-
-        if !self.is_variable_referenced(name) {
-            return;
-        }
-
-        if self.check_dynamic_variable_access(&right_references, it.body.span.start) {
-            return;
-        }
-
-        for ident in right_references {
-            self.reference_variable(ident);
-        }
-
-        replace_in_class_body_using_spans(
-            self.ast_builder,
-            &mut it.body,
-            &mut self.replacement_points,
-        );
-
-        self.insert_into_virtual_program(
+        self.include_or_defer_declaration(
             VirtualProgramInsert::ClassDeclaration(it.clone_in(self.allocator)),
-            Some(pos),
+            right_references,
+            pos,
         );
+    }
+
+    fn include_or_defer_declaration(
+        &mut self,
+        declaration: VirtualProgramInsert<'alloc>,
+        right_references: Vec<String>,
+        pos: usize,
+    ) {
+        let Some(names) = declaration.name() else {
+            return;
+        };
+
+        if names.iter().any(|name| self.is_variable_referenced(name)) {
+            self.include_declaration(declaration, right_references, pos);
+        } else if let Some(pending) = self.pending_declarations.last_mut() {
+            pending.push(PendingDeclaration {
+                declaration,
+                right_references,
+            });
+        }
+    }
+
+    /// Includes the pending declarations that got referenced, including the ones they reference.
+    ///
+    /// They can't keep their position, the `css` templates inside functions are evaluated where
+    /// the function is, e.g. `function f() { return css\`${size}\`; } const size = 4;`. So each
+    /// one is inserted right after the last statement declaring something it uses, or at the top.
+    fn include_pending_declarations(&mut self) {
+        let mut pending = self.pending_declarations.pop().unwrap();
+        let mut included = vec![];
+        while let Some(idx) = pending.iter().position(|declaration| {
+            declaration
+                .declaration
+                .name()
+                .unwrap()
+                .iter()
+                .any(|name| self.is_variable_referenced(name))
+        }) {
+            let declaration = pending.swap_remove(idx);
+            for ident in &declaration.right_references {
+                self.reference_variable(ident.clone());
+            }
+            included.push(declaration);
+        }
+
+        let order = dependencies_first(&included);
+        let mut included: Vec<_> = included.into_iter().map(Some).collect();
+        for idx in order {
+            let PendingDeclaration {
+                declaration,
+                right_references,
+            } = included[idx].take().unwrap();
+
+            let len = self.tmp_program_statement_buffer.last().unwrap().len();
+            self.include_declaration(declaration, right_references, len);
+            if self.error.is_some() {
+                return;
+            }
+
+            let buffer = self.tmp_program_statement_buffer.last_mut().unwrap();
+            let statements: Vec<_> = buffer.drain(len..).collect();
+            let references: HashSet<_> = statements
+                .iter()
+                .flat_map(utils::statement_get_references)
+                .collect();
+            // the buffer is bottom-up
+            let pos = buffer
+                .iter()
+                .position(|statement| {
+                    program_declared_values(std::slice::from_ref(statement))
+                        .iter()
+                        .any(|name| references.contains(name))
+                })
+                .unwrap_or(buffer.len());
+            buffer.splice(pos..pos, statements);
+        }
+    }
+
+    fn include_declaration(
+        &mut self,
+        declaration: VirtualProgramInsert<'alloc>,
+        right_references: Vec<String>,
+        pos: usize,
+    ) {
+        let declaration = match declaration {
+            VirtualProgramInsert::FunctionDeclaration(mut function) => {
+                if let Some(body) = &mut function.body {
+                    if self.check_dynamic_variable_access(&right_references, body.span().start) {
+                        return;
+                    }
+
+                    for ident in right_references {
+                        self.reference_variable(ident);
+                    }
+
+                    // transform
+                    for statement in &mut body.statements {
+                        replace_in_statement_using_spans(
+                            self.ast_builder,
+                            statement,
+                            &mut self.replacement_points,
+                        );
+                    }
+                }
+
+                VirtualProgramInsert::FunctionDeclaration(function)
+            }
+            VirtualProgramInsert::ClassDeclaration(mut class) => {
+                if self.check_dynamic_variable_access(&right_references, class.body.span.start) {
+                    return;
+                }
+
+                for ident in right_references {
+                    self.reference_variable(ident);
+                }
+
+                replace_in_class_body_using_spans(
+                    self.ast_builder,
+                    &mut class.body,
+                    &mut self.replacement_points,
+                );
+
+                VirtualProgramInsert::ClassDeclaration(class)
+            }
+            VirtualProgramInsert::VariableDeclarator(declarator) => {
+                let VariableDeclarator { span, id, init, .. } = declarator;
+                let Some(mut right) = init else { return };
+                let init_span = right.span();
+
+                if self.check_dynamic_variable_access(&right_references, init_span.start) {
+                    return;
+                }
+
+                for ident in right_references {
+                    self.reference_variable(ident);
+                }
+
+                replace_in_expression_using_spans(
+                    self.ast_builder,
+                    &mut right,
+                    &mut self.replacement_points,
+                );
+
+                replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
+                    self.get_alias(name).map(|v| v.to_string())
+                });
+
+                let mut aliased_idents = id.kind;
+                self.alias_binding_pattern(&mut aliased_idents);
+
+                let variable_declarator = ast::build_variable_declarator_pattern(
+                    self.ast_builder,
+                    span,
+                    self.ast_builder.binding_pattern(
+                        aliased_idents,
+                        None as Option<oxc_allocator::Box<_>>,
+                        false,
+                    ),
+                    right,
+                );
+
+                let ret = self.insert_into_virtual_program(
+                    VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                    Some(pos),
+                );
+
+                // point to the newly hoisted variable on global level
+                if let Some(variable_name) = ret {
+                    self.replacement_points.insert(
+                        init_span,
+                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                            span,
+                            self.ast_builder.atom(&variable_name),
+                        )),
+                    );
+                };
+                return;
+            }
+        };
+
+        self.insert_into_virtual_program(declaration, Some(pos));
     }
 
     /// creates a class name or gets it from cache
@@ -906,9 +1051,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if self.scope_depth == 1 {
             self.reference_export_specifiers(it);
         }
+        self.pending_declarations.push(Default::default());
         for el in it.iter_mut().rev() {
             self.visit_statement(el);
         }
+        self.include_pending_declarations();
         self.scan_pass = scan_pass;
     }
 
@@ -1082,6 +1229,20 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         oxc_ast_visit::walk_mut::walk_expression(self, it);
     }
 
+    fn visit_variable_declarators(
+        &mut self,
+        it: &mut oxc_allocator::Vec<'alloc, VariableDeclarator<'alloc>>,
+    ) {
+        if self.scan_pass {
+            oxc_ast_visit::walk_mut::walk_variable_declarators(self, it);
+            return;
+        }
+        // bottom-up like the statements, e.g. `const a = 1, b = a;`
+        for el in it.iter_mut().rev() {
+            self.visit_variable_declarator(el);
+        }
+    }
+
     fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'alloc>) {
         if self.error.is_some() {
             return;
@@ -1212,70 +1373,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
 
         let Some(init) = &it.init else { return };
-
-        let variable_names = binding_pattern_kind_get_idents(&it.id.kind);
-
-        let referenced_variable_names: Vec<_> = variable_names
-            .iter()
-            .filter(|name| self.is_variable_referenced(name))
-            .collect();
-
-        if referenced_variable_names.is_empty() {
-            return;
-        }
-
-        let span = it.span;
         let right_references = utils::expression_get_references(init);
 
-        if self.check_dynamic_variable_access(&right_references, init.span().start) {
-            return;
-        }
-
-        for ident in right_references {
-            self.reference_variable(ident);
-        }
-
-        let mut right = init.clone_in(self.allocator);
-
-        replace_in_expression_using_spans(
-            self.ast_builder,
-            &mut right,
-            &mut self.replacement_points,
+        self.include_or_defer_declaration(
+            VirtualProgramInsert::VariableDeclarator(it.clone_in(self.allocator)),
+            right_references,
+            pos,
         );
-
-        replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
-            self.get_alias(name).map(|v| v.to_string())
-        });
-
-        let mut aliased_idents = it.id.kind.clone_in(self.allocator);
-        self.alias_binding_pattern(&mut aliased_idents);
-
-        let variable_declarator = ast::build_variable_declarator_pattern(
-            self.ast_builder,
-            span,
-            self.ast_builder.binding_pattern(
-                aliased_idents,
-                None as Option<oxc_allocator::Box<_>>,
-                false,
-            ),
-            right,
-        );
-
-        let ret = self.insert_into_virtual_program(
-            VirtualProgramInsert::VariableDeclarator(variable_declarator),
-            Some(pos),
-        );
-
-        // point to the newly hoisted variable on global level
-        if let Some(variable_name) = ret {
-            self.replacement_points.insert(
-                init.span(),
-                Expression::Identifier(
-                    self.ast_builder
-                        .alloc_identifier_reference(span, self.ast_builder.atom(&variable_name)),
-                ),
-            );
-        };
     }
 
     fn visit_statement(&mut self, it: &mut Statement<'alloc>) {
@@ -1451,6 +1555,42 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             .unwrap()
             .extend(idents);
     }
+}
+
+/// Indices of the declarations, each one after the ones it references.
+fn dependencies_first(declarations: &[PendingDeclaration]) -> Vec<usize> {
+    fn visit(
+        declarations: &[PendingDeclaration],
+        idx: usize,
+        visited: &mut [bool],
+        order: &mut Vec<usize>,
+    ) {
+        if visited[idx] {
+            return;
+        }
+        visited[idx] = true;
+
+        let references = &declarations[idx].right_references;
+        for (dependency, declaration) in declarations.iter().enumerate() {
+            if declaration
+                .declaration
+                .name()
+                .unwrap()
+                .iter()
+                .any(|name| references.contains(name))
+            {
+                visit(declarations, dependency, visited, order);
+            }
+        }
+        order.push(idx);
+    }
+
+    let mut visited = vec![false; declarations.len()];
+    let mut order = vec![];
+    for idx in 0..declarations.len() {
+        visit(declarations, idx, &mut visited, &mut order);
+    }
+    order
 }
 
 /// Names of the top level values of a program that exist at runtime.

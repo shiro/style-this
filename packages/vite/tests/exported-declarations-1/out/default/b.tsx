@@ -1,8 +1,7 @@
 // @ts-nocheck
 import { css } from "@style-this/core";
 import "virtual:style-this:/b.tsx.css";
-const decoration = "none";
-const accent = "blue";
+const accent = "blue", outline = accent;
 function underline(enabled: boolean) {
 	return enabled ? "underline" : decoration;
 }
@@ -12,3 +11,6 @@ export function getLink() {
 export class Theme {
 	static accent = "__styleThis_1-hi3g5a";
 }
+// declared below their uses
+const decoration = "none";
+const border = `1px solid ${accent}`;

@@ -9,8 +9,7 @@ use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::evaluator::{program_imports, slice_program};
 use super::transformer::Transformer;
 use crate::utils::{
-    binding_pattern_kind_get_idents, expression_get_references, statement_get_references,
-    transformed_source_type,
+    binding_pattern_kind_get_idents, statement_get_references, transformed_source_type,
 };
 use js_sys::Array;
 use oxc_allocator::{Allocator, CloneIn};
@@ -187,7 +186,7 @@ fn prune_slice(program: &mut Program, local: &str) -> HashSet<String> {
     let statements: Vec<_> = program
         .body
         .iter()
-        .map(|stmt| (statement_declared_names(stmt), statement_references(stmt)))
+        .map(|stmt| (statement_declared_names(stmt), statement_get_references(stmt)))
         .collect();
 
     let mut references = HashSet::from([local.to_string()]);
@@ -244,19 +243,6 @@ fn statement_declared_names(stmt: &Statement) -> Option<HashSet<String>> {
             Some(HashSet::from([object.name.to_string()]))
         }
         _ => None,
-    }
-}
-
-fn statement_references(stmt: &Statement) -> Vec<String> {
-    match stmt {
-        // the reference collector skips top level declarators
-        Statement::VariableDeclaration(declaration) => declaration
-            .declarations
-            .iter()
-            .filter_map(|declarator| declarator.init.as_ref())
-            .flat_map(expression_get_references)
-            .collect(),
-        _ => statement_get_references(stmt),
     }
 }
 

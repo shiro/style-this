@@ -294,10 +294,9 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
     }
 
     fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
-        let Some(scope) = self.scopes_references.last_mut() else {
-            return;
-        };
-        scope.extend(binding_pattern_kind_get_idents(&it.id.kind));
+        if let Some(scope) = self.scopes_references.last_mut() {
+            scope.extend(binding_pattern_kind_get_idents(&it.id.kind));
+        }
 
         walk_variable_declarator(self, it);
     }
