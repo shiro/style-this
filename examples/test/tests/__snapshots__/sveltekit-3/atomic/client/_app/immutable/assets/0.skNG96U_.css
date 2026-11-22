@@ -1,0 +1,20 @@
+@layer theme,base,components,utilities;
+
+@layer theme, base, components, utilities;
+@layer utilities {
+.b-ZeplZ { border: 1px solid blue }
+.bg-LPp8Q { background: white }
+.c-E_XTG { color: crimson }
+.c-JjnMJ { color: coral }
+.cursor-ALqk3 { cursor: pointer }
+.d-W_vHB { display: flex }
+.gap-Td5yX { gap: 8px }
+.m-GlJsR { margin: 16px }
+.p-DLlYK { padding: 16px }
+.p-TuZme { padding: 8px }
+.flex-d-Fbcuz { flex-direction: column }
+.items-Im4M1 { align-items: center }
+.min-h-ZH67u { min-height: 100vh }
+.r-K5PNW { border-radius: 8px }
+.r-TbAuj { border-radius: 2px }
+}

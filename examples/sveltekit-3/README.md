@@ -11,6 +11,7 @@ pnpm build                 # production build
 pnpm build:atomic          # production build, atomic mode
 ```
 
-Open http://localhost:3000. Styles are defined in `src/lib/`.
+Open http://localhost:3000. Styles are defined in `src/lib/`, the
+`@style-this/core/atomic` entrypoint is imported in `src/routes/+layout.svelte`.
 
 See the [docs](https://style-this.usagi.io) for an explanation of the APIs used here.
