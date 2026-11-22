@@ -604,12 +604,10 @@ const vitePlugin = (options: Options = {}) => {
 
       if (isSvelteFile(filepath)) {
         svelte = svelteSources(code) ?? undefined;
-        if (!svelte) {
-          watchedFiles.delete(filepath);
-          return;
-        }
-        codeToTransform = svelte.program;
-        mapOffset = svelteByteOffsetMapper(svelte);
+        // without a script it's only transformed (as empty) if it was before, which drops its imports
+        if (!svelte && !watchedFiles.has(filepath)) return;
+        codeToTransform = svelte?.program ?? "";
+        mapOffset = svelte && svelteByteOffsetMapper(svelte);
       }
 
       const cssFilepath = `${filepath}.${cssExtension}`;

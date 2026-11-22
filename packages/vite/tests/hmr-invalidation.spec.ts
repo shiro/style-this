@@ -420,6 +420,22 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
     ).toEqual(["b.tsx", "e.tsx"]);
   });
 
+  test("dropped imports don't invalidate the importer anymore", async () => {
+    await edit("c.tsx", (code) => code.replace(`import { color } from "./a";`, `const color = "green";`));
+    await transform("c.tsx");
+    expect(await edit("a.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["a.ts", "b.tsx", "e.tsx", "i.tsx"]);
+
+    // nothing imports `g.ts` anymore, its changes aren't checked
+    await edit("h.tsx", (code) => code.replace(`import width from "./g";`, `const width = "3px";`));
+    await transform("h.tsx");
+    expect(await edit("g.ts", (code) => code.replace(`"1px"`, `"2px"`))).toEqual([]);
+
+    // so its outdated values were dropped
+    expect(await change("h.tsx", files["h.tsx"])).toEqual(["h.tsx"]);
+    await transform("h.tsx");
+    expect(await cssOf("h.tsx")).toContain("outline-width: 2px");
+  });
+
   test("deleting a file invalidates all of its transitive importers", async () => {
     expect(await change("a.ts", undefined)).toEqual(["a.ts", "b.tsx", "c.tsx", "d.tsx", "e.tsx", "i.tsx"]);
   });
@@ -582,8 +598,8 @@ export const Toolbar = css\`
         ["Card.svelte"],
       );
       expect(await transform("Card.svelte")).toBeUndefined();
-      // import registrations are kept so that cached values of dependencies stay invalidated
-      expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["Card.svelte", "theme.ts"]);
+      // its imports are dropped, nothing imports `theme.ts` anymore
+      expect(await edit("theme.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual([]);
 
       await writeFile(path("Card.svelte"), svelteFiles["Card.svelte"]);
       await transform("Card.svelte");

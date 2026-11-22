@@ -237,38 +237,6 @@ impl Transformer {
         self.cache_registry.get_file_atomic_css(filepath)
     }
 
-    /// Get files that import changed exports from the given file
-    /// Returns a JS Array of filepaths that need to be invalidated
-    ///
-    /// `changed_exports` should be a JS Array of export names that changed
-    pub fn get_importers_of_changed_exports(
-        &self,
-        filepath: &str,
-        changed_exports: JsValue,
-    ) -> Array {
-        let changed_exports_arr = Array::from(&changed_exports);
-        let mut changed_set = std::collections::HashSet::new();
-
-        for export_name in changed_exports_arr.iter() {
-            if let Some(name) = export_name.as_string() {
-                changed_set.insert(name);
-            }
-        }
-
-        // Get direct importers
-        let importers = self
-            .cache_registry
-            .dependency_tracker()
-            .borrow()
-            .get_importers_of_changed_exports(filepath, &changed_set);
-
-        let arr = Array::new();
-        for importer in importers {
-            arr.push(&JsValue::from_str(&importer));
-        }
-        arr
-    }
-
     /// Get all files that transitively depend on changed exports from the given file
     ///
     /// `changed_exports` should be a JS Array of export names that changed, empty means any

@@ -185,19 +185,44 @@ impl DependencyTracker {
         result
     }
     
-    /// Clear all import registrations for `importer_file`
-    pub fn clear_file_imports(&self, importer_file: &str) {
-        self.resolved_imports.borrow_mut().remove(importer_file);
-
-        // Remove from reverse index and get what we need to clean from forward index
-        let mut imports = self.file_imports.borrow_mut();
-        let Some(source_map) = imports.remove(importer_file) else {
-            return; // This file had no imports registered
+    /// Drop the registrations of `importer_file` on files it no longer imports, `module_ids` are the
+    /// ids of its current imports.
+    ///
+    /// The registrations on files it still imports are kept, even if unused now: they may come from
+    /// its cached values, which don't register their imports again until they're re-evaluated.
+    ///
+    /// Only files resolved from the dropped ids are dropped, the ones of overwritten resolutions
+    /// (e.g. the id resolves differently in another environment) are kept.
+    ///
+    /// Returns the dropped files nothing imports anymore.
+    pub fn retain_file_imports(&self, importer_file: &str, module_ids: &HashSet<String>) -> Vec<String> {
+        let mut resolved_imports = self.resolved_imports.borrow_mut();
+        let Some(resolved) = resolved_imports.get_mut(importer_file) else {
+            return vec![];
         };
-        
+        let mut sources: HashSet<String> = resolved
+            .extract_if(|module_id, _| !module_ids.contains(module_id))
+            .map(|(_, source_file)| source_file)
+            .collect();
+        // still imported through another id
+        sources.retain(|source_file| !resolved.values().any(|kept| kept == source_file));
+        drop(resolved_imports);
+
+        let mut imports = self.file_imports.borrow_mut();
+        let Some(source_map) = imports.get_mut(importer_file) else {
+            return vec![];
+        };
+        let dropped: Vec<(String, HashSet<String>)> = source_map
+            .extract_if(|source_file, _| sources.contains(source_file))
+            .collect();
+        if source_map.is_empty() {
+            imports.remove(importer_file);
+        }
+
         // Remove from forward index
         let mut importers = self.variable_importers.borrow_mut();
-        for (source_file, variables) in source_map {
+        let mut unimported = vec![];
+        for (source_file, variables) in dropped {
             if let Some(var_map) = importers.get_mut(&source_file) {
                 for var_name in variables {
                     if let Some(importer_set) = var_map.get_mut(&var_name) {
@@ -213,9 +238,11 @@ impl DependencyTracker {
                 // Clean up empty variable maps
                 if var_map.is_empty() {
                     importers.remove(&source_file);
+                    unimported.push(source_file);
                 }
             }
         }
+        unimported
     }
     
     /// Clear all import registrations for a source file
@@ -334,19 +361,28 @@ mod tests {
     }
 
     #[test]
-    fn test_clear_file_imports() {
+    fn test_retain_file_imports() {
         let tracker = DependencyTracker::new();
-        
+
+        tracker.register_resolution("a.tsx", "./b", "b.tsx");
         tracker.register_import("b.tsx", "color", "a.tsx");
+        tracker.register_resolution("a.tsx", "./c", "c.tsx");
+        tracker.register_resolution("a.tsx", "./c.tsx", "c.tsx");
         tracker.register_import("c.tsx", "size", "a.tsx");
-        
-        // Clear a.tsx's imports
-        tracker.clear_file_imports("a.tsx");
-        
-        let mut changed = HashSet::new();
-        changed.insert("color".to_string());
-        
-        let importers = tracker.get_importers_of_changed_exports("b.tsx", &changed);
-        assert!(importers.is_empty());
+        tracker.register_import("c.tsx", "size", "d.tsx");
+        // its resolution was overwritten by `b.tsx`
+        tracker.register_import("b2.tsx", "color", "a.tsx");
+
+        let unimported = tracker.retain_file_imports("a.tsx", &HashSet::from(["./c".to_string()]));
+        assert_eq!(unimported, ["b.tsx"]);
+        assert!(tracker.get_all_importers("b.tsx").is_empty());
+        assert_eq!(tracker.resolve("a.tsx", "./b"), None);
+        assert_eq!(tracker.get_all_importers("b2.tsx"), ["a.tsx".to_string()].into());
+        assert_eq!(tracker.get_all_importers("c.tsx"), ["a.tsx", "d.tsx"].map(String::from).into());
+
+        // `c.tsx` is still imported by `d.tsx`
+        assert!(tracker.retain_file_imports("a.tsx", &HashSet::new()).is_empty());
+        assert_eq!(tracker.get_all_importers("c.tsx"), ["d.tsx"].map(String::from).into());
+        assert_eq!(tracker.get_transitive_dependencies("a.tsx"), ["b2.tsx".to_string()].into());
     }
 }

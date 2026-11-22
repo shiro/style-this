@@ -979,6 +979,25 @@ pub async fn evaluate_program<'alloc>(
         }
     };
 
+    // the evaluations of entrypoints and of their exports for importers register imports under
+    // the same file, the ones of files it no longer imports are outdated either way
+    if entrypoint {
+        let module_ids = program_imports(program, ast_builder)
+            .iter()
+            .map(|import| import.source.value.to_string())
+            .collect();
+        let unimported = transformer
+            .cache_registry
+            .dependency_tracker()
+            .borrow()
+            .retain_file_imports(&program_filepath, &module_ids);
+        // changes of files nothing imports aren't checked, their values would become outdated
+        for file in unimported {
+            transformer.cache_registry.clear_file(&file);
+            transformer.cache_registry.update_module_code(&file, None);
+        }
+    }
+
     // Now check if we should return early (no CSS functions imported)
     // But we've already extracted exports, so dependency tracking will work
     if should_return_early {
