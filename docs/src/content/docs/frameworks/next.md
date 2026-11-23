@@ -86,7 +86,6 @@ Every file's stylesheet includes the atomic CSS it uses, the entrypoint fixes th
 
 ## Limitations
 
-- `middleware.*` files aren't transformed under Turbopack.
 - `withStyleThis` takes no style-this specific options, `ignoredImports` and `debug` aren't
   available.
 - No CSS source maps, see [HMR & source maps](/guides/hmr-and-sourcemaps/#source-maps).

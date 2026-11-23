@@ -35,8 +35,6 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
         // same as the `node_modules` exclusion of the webpack rule
         { not: "foreign" },
         { not: { path: regexNoopAtomicProgram } },
-        // TODO: can be removed once https://github.com/vercel/next.js/issues/79592 is fixed
-        { not: { path: new RegExp(`middleware\\.(${transformExtensions.join("|")})$`) } },
       ],
     },
     loaders: [

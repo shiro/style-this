@@ -12,7 +12,6 @@ The file wasn't transformed. Check that:
 - the plugin is registered, and with Vite its [`filter`](/reference/vite/#filter) matches the file
 - the file has a supported extension (JS/TS, or `.svelte` with Vite) and isn't inside
   `node_modules`
-- with Next.js on Turbopack, the file isn't `middleware.*`
 
 The same applies to `styled.*` and `extraClass` errors.
 
