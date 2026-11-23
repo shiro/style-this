@@ -25,7 +25,7 @@ header to read the docs of an older release.
 ### Features
 
 - Add `StyleThisPlugin` to `@style-this/webpack`, a working webpack 5 plugin with `atomic` and
-  `useRequire` options. It replaces the default loader and `NextCSSLoader` exports
+  `useRequire` options
 - Support atomic mode in Next.js (`ATOMIC=1`), every file's stylesheet includes the atomic CSS it
   uses
 - Transform `.ts`, `.jsx`, `.js` and `.mjs` files under Turbopack, not only `.tsx`
@@ -43,17 +43,14 @@ header to read the docs of an older release.
 
 ### Fixes
 
-- Fix the Next.js integration, which failed to resolve the generated CSS imports. Requires Next.js
-  16.2, `next` is now a peer dependency
+- Fix the Next.js integration, which failed to resolve the generated CSS imports
 - Update the CSS of importers when a dependency changes in Next.js and webpack
 - Rewrite `css` inside exported functions and classes, and include declarations used above their
   position
 - Start atomic class hashes with an uppercase letter, so `mergeStyles` no longer de-duplicates
   hand-written classes like `bg-light` and `bg-white`
-- Keep `extraClass` classes out of selectors interpolating a style
 - Keep CSS escapes like `\2014` intact
 - Replace `$` in generated class names
-- Match `ignoredImports` by imported name, fixing aliased and default imports
 - Keep data URLs and escaped strings intact when splitting atomic declarations
 - Prefix the locals of generated styled components, so style functions can reference variables
   like `props`
@@ -65,7 +62,13 @@ header to read the docs of an older release.
 ### Breaking changes
 
 - Remove the `wrapSelectorsWithGlobal` compiler option
-- Remove the default loader and `NextCSSLoader` exports of `@style-this/webpack`
+- Remove the default loader and `NextCSSLoader` exports of `@style-this/webpack`, use
+  `new StyleThisPlugin()` instead
+- `@style-this/next` requires `next >=16.2`, now a peer dependency
+- `ignoredImports` matches the imported name instead of the local one, so aliased and default
+  imports are now ignored too
+- Interpolating a style into a selector (`.${style} {}`) no longer includes its `extraClass`
+  classes, add them to the selector if needed
 
 ## 0.5.0
 

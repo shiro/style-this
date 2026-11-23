@@ -18,8 +18,12 @@
 
 - Lockstep release of all packages.
   - Support atomic mode in the Next plugin, and fix the Next and webpack plugins (shared loaders, sourcemaps, error reporting, Turbopack rule for all script extensions, CSS invalidation of changed dependencies, location-independent webpack module ids)
-  - Make `next` a peer dependency of `@style-this/next`, and point the next and webpack package types at the built `.d.mts`
-  - Remove the `wrapSelectorsWithGlobal` transformer option
+  - Point the next and webpack package types at the built `.d.mts`
+  - **Breaking:** remove the `wrapSelectorsWithGlobal` transformer option
+  - **Breaking:** remove the default loader and `NextCSSLoader` exports of `@style-this/webpack`, use `new StyleThisPlugin()` instead
+  - **Breaking:** `@style-this/next` requires `next >=16.2`, now a peer dependency
+  - **Breaking:** `ignoredImports` matches the imported name instead of the local one, so aliased and default imports are now ignored too
+  - **Breaking:** interpolating a style into a selector (`.${style} {}`) no longer includes its `extraClass` classes, add them to the selector if needed
   - Add a `resolveVirtualImport` transformer option
   - Svelte: transform both scripts and keep their attributes, transform files under their own path, map sourcemaps to the `.svelte` file and normalize filepaths for HMR
   - Forward refs in generated React styled components, and merge string style props in Solid styled components
