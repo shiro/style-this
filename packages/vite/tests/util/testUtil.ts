@@ -95,7 +95,7 @@ const evaluateProgramWithMode = async (
   let transformResult = await plugin.transform(code, entryFilepath);
 
   if (transformResult) {
-    transformResult.code = transformResult.code.replace(testDir, "");
+    transformResult.code = transformResult.code.replaceAll(testDir, "");
   }
 
   await expect(transformResult?.code).toMatchFileSnapshot(
@@ -108,49 +108,35 @@ const evaluateProgramWithMode = async (
 
   const cssImport = `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`;
   const cssId = plugin.resolveId(cssImport, entryFilepath);
-  expect(cssId, `resolve id for '${cssImport}'`).toBeDefined();
+  if (!cssId) throw new Error(`Failed to resolve id for '${cssImport}'`);
 
   const cssRaw = await plugin.load(cssId);
-
-  // Handle both string and object responses (with source maps)
-  let cssCode: string;
-  let cssMap: string | undefined;
-  let sourceContent: string | undefined;
-
-  if (typeof cssRaw === 'string') {
-    cssCode = cssRaw;
-  } else if (cssRaw && typeof cssRaw === 'object') {
-    cssCode = cssRaw.code || '';
-    if (cssRaw.map) {
-      cssMap = JSON.stringify(cssRaw.map, null, 2).replaceAll(MONOREPO_ROOT_DIR, "");
-      // Extract source content from sourcemap
-      try {
-        const mapObj = cssRaw.map;
-        if (mapObj.sourcesContent && mapObj.sourcesContent.length > 0) {
-          sourceContent = mapObj.sourcesContent[0];
-        }
-      } catch (e) {
-        // Continue without source content
-      }
-    }
-  } else {
-    cssCode = String(cssRaw || '');
-  }
+  if (!cssRaw || typeof cssRaw !== "object") throw new Error(`Expected CSS module object for '${cssImport}'`);
+  const { code: cssCode, map } = cssRaw;
 
   await expect(cssCode).toMatchFileSnapshot(
     `${outDir}/${entry}.${plugin.cssExtension}`,
   );
 
-  if (cssMap && sourceContent) {
+  // files without any CSS have no source map, every other CSS module must have one
+  if (cssCode === "") {
+    expect(map, `source map of empty CSS module '${cssImport}'`).toBeUndefined();
+  } else {
+    expect(map, `source map of '${cssImport}'`).toBeTruthy();
+    const sourceContent = map!.sourcesContent?.[0];
+    expect(sourceContent, `source map content of '${cssImport}'`).toBeTypeOf("string");
+
     // Embed sourcemap as JSON comments at the top of the source file
-    const sourceMapLines = cssMap.split('\n').map(line => `// ${line}`);
-    const sourceMapComment = sourceMapLines.join('\n');
-    const sourceWithSourceMap = `${sourceMapComment}\n\n${sourceContent}`;
+    const sourceMapComment = JSON.stringify(map, null, 2)
+      .replaceAll(MONOREPO_ROOT_DIR, "")
+      .split('\n')
+      .map(line => `// ${line}`)
+      .join('\n');
 
     // Save as .sourcemap.{ext} file (using entry's extension)
     const sourceMapFilename = `${entry}.sourcemap.${entry.split('.').pop()}`;
 
-    await expect(sourceWithSourceMap).toMatchFileSnapshot(
+    await expect(`${sourceMapComment}\n\n${sourceContent}`).toMatchFileSnapshot(
       `${outDir}/${sourceMapFilename}`,
     );
   }
@@ -163,84 +149,6 @@ const evaluateProgramWithMode = async (
 
   await expect(temporaryPrograms).toMatchFileSnapshot(
     `${outDir}/compile_${entry}.js`,
-  );
-};
-
-export const evaluateProgram = async (
-  testDir: string,
-  entry: string,
-  plugin: Awaited<ReturnType<typeof setupPlugin>>,
-) => {
-  const entryFilepath = `${testDir}/${entry}`;
-  const code = await readFile(entryFilepath, "utf-8");
-  let transformResult = await plugin.transform(code, entryFilepath);
-
-  if (transformResult) {
-    transformResult.code = transformResult.code.replace(testDir, "");
-  }
-
-  await expect(transformResult?.code).toMatchFileSnapshot(
-    `${testDir}/out/${entry}`,
-  );
-
-  const id = plugin.resolveId(
-    `virtual:style-this:${entryFilepath}.${plugin.cssExtension}`,
-    entryFilepath,
-  )!;
-  expect(id).toBeDefined();
-
-  const cssRaw = await plugin.load(id);
-
-  // Handle both string and object responses (with source maps)
-  let cssCode: string;
-  let cssMap: string | undefined;
-  let sourceContent: string | undefined;
-
-  if (typeof cssRaw === 'string') {
-    cssCode = cssRaw;
-  } else if (cssRaw && typeof cssRaw === 'object') {
-    cssCode = cssRaw.code || '';
-    if (cssRaw.map) {
-      cssMap = JSON.stringify(cssRaw.map, null, 2).replaceAll(MONOREPO_ROOT_DIR, "");
-      // Extract source content from sourcemap
-      try {
-        const mapObj = cssRaw.map;
-        if (mapObj.sourcesContent && mapObj.sourcesContent.length > 0) {
-          sourceContent = mapObj.sourcesContent[0];
-        }
-      } catch (e) {
-        // Continue without source content
-      }
-    }
-  } else {
-    cssCode = String(cssRaw || '');
-  }
-
-  await expect(cssCode).toMatchFileSnapshot(
-    `${testDir}/out/${entry}.${plugin.cssExtension}`,
-  );
-
-  if (cssMap && sourceContent) {
-    // Embed sourcemap as JSON comments at the top of the source file
-    const sourceMapLines = cssMap.split('\n').map(line => `// ${line}`);
-    const sourceMapComment = sourceMapLines.join('\n');
-    const sourceWithSourceMap = `${sourceMapComment}\n\n${sourceContent}`;
-
-    // Save as .sourcemap.{ext} file (using entry's extension)
-    const sourceMapFilename = `${entry}.sourcemap.${entry.split('.').pop()}`;
-    await expect(sourceWithSourceMap).toMatchFileSnapshot(
-      `${testDir}/out/${sourceMapFilename}`,
-    );
-  }
-
-  const temporaryPrograms = normalizeTemporaryProgramKeys(Object.entries(plugin.__getDebugVirtualModules()))
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `// ${key}\n${value}`)
-    .join("\n\n")
-    .replaceAll(MONOREPO_ROOT_DIR, "");
-
-  await expect(temporaryPrograms).toMatchFileSnapshot(
-    `${testDir}/out/compile_${entry}.js`,
   );
 };
 
