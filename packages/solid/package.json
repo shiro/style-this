@@ -27,7 +27,10 @@
     "test:watch": "echo 'No tests yet' && exit 0",
     "prepublishOnly": "node -e \"if (!process.env.CI) { console.error('Publishing is only allowed from CI'); process.exit(1) }\""
   },
-  "dependencies": {
+  "peerDependencies": {
+    "solid-js": "^1.0.0"
+  },
+  "devDependencies": {
     "solid-js": "1.9.10"
   }
 }

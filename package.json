@@ -26,11 +26,8 @@
     "playwright": "^1.49.1",
     "tsdown": "0.16.1",
     "tsx": "^4.19.2",
+    "typescript": "6.0.3",
     "typescript-eslint": "8.61.1",
     "vitest": "4.1.9"
-  },
-  "dependencies": {
-    "@rollup/plugin-wasm": "6.2.2",
-    "typescript": "6.0.3"
   }
 }

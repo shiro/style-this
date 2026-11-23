@@ -1,5 +1,4 @@
 import { defineConfig } from "tsdown";
-import { wasm } from "@rollup/plugin-wasm";
 
 export default defineConfig({
   dts: {
@@ -8,5 +7,4 @@ export default defineConfig({
   target: "esnext",
   format: "esm",
   entry: ["src/index.ts"],
-  plugins: [wasm({ maxFileSize: 10000000 })],
 });

@@ -76,7 +76,7 @@ export interface ExtraFields {
   getTransitiveImporters(filepath: string, changedExports: string[]): string[];
 }
 
-const vitePlugin = (options: Options = {}) => {
+const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
   let { cssExtension = "css", filter = [], debug = false, atomic = false, useRequire, cacheRegistry = new CacheRegistry() } = options;
 
   if (!Array.isArray(filter)) filter = [filter];
@@ -655,7 +655,7 @@ const vitePlugin = (options: Options = {}) => {
         handleTransformError(filepath, code, err);
       }
     },
-  } satisfies Plugin & ExtraFields;
+  };
 };
 
 export default vitePlugin;

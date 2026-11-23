@@ -1,5 +1,4 @@
 import { defineConfig } from "tsdown";
-import { wasm } from "@rollup/plugin-wasm";
 
 export default defineConfig([
   {
@@ -15,6 +14,5 @@ export default defineConfig([
       "src/loaders/cssLoader.ts",
       "src/loaders/atomicProgramLoader.ts",
     ],
-    plugins: [wasm({ maxFileSize: 10000000 })],
   },
 ]);
