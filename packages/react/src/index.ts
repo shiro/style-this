@@ -9,6 +9,10 @@ type TemplateExpression<StyleProps> =
   | number
   | ((styleProps: StyleProps) => string | number);
 
+type PropsOf<BaseComponent> = BaseComponent extends ComponentType<infer P>
+  ? P
+  : JSX.IntrinsicElements[BaseComponent & keyof JSX.IntrinsicElements];
+
 type StyledTemplateFn<
   BaseComponent extends ComponentType<any> | keyof JSX.IntrinsicElements,
 > = <
@@ -21,13 +25,13 @@ type StyledTemplateFn<
   ...expr: Array<
     TemplateExpression<
       StyleProps &
-        (BaseComponent extends ComponentType<infer P> ? P : JSX.IntrinsicElements[BaseComponent & keyof JSX.IntrinsicElements]) & {
-          props: BaseComponent extends ComponentType<infer P> ? Omit<P, "styleProps"> : JSX.IntrinsicElements[BaseComponent & keyof JSX.IntrinsicElements];
+        (PropsOf<BaseComponent> extends { styleProps: infer BaseStyleProps } ? BaseStyleProps : {}) & {
+          props: Omit<PropsOf<BaseComponent>, "styleProps">;
         }
     >
   >
 ) => ComponentType<
-  (BaseComponent extends ComponentType<infer P> ? P : JSX.IntrinsicElements[BaseComponent & keyof JSX.IntrinsicElements]) &
+  PropsOf<BaseComponent> &
     (StyleProps extends Record<string, never> ? {} : { styleProps: StyleProps })
 > &
   (StyleProps extends Record<string, never> ? CssExtension : {});

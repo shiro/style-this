@@ -5,6 +5,7 @@ export default defineConfig({
     projects: [
       "packages/core",
       "packages/next",
+      "packages/react",
       "packages/solid",
       "packages/vite",
       "packages/webpack",
