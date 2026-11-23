@@ -2,11 +2,15 @@
 import { css } from "@style-this/core";
 import "virtual:style-this:/b.tsx.css";
 export function getLink() {
-	return "__styleThis_2-9erkd2";
+	return "__styleThis_3-7styr4";
 }
 // declared below their uses
 function underline(enabled: boolean) {
 	return enabled ? "underline" : decoration;
+}
+// its CSS moves up with it
+function focus() {
+	return "__styleThis_2-9erkd2";
 }
 const accent = "blue", outline = accent;
 export class Theme {

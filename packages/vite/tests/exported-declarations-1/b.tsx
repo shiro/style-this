@@ -4,12 +4,18 @@ export function getLink() {
   return css`
     text-decoration: ${underline(false)};
     border-bottom: ${border};
+    ${focus().css}
   `;
 }
 
 // declared below their uses
 function underline(enabled: boolean) {
   return enabled ? "underline" : decoration;
+}
+
+// its CSS moves up with it
+function focus() {
+  return css`outline: none;`;
 }
 
 const accent = "blue",

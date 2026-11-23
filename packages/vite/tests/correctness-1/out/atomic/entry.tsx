@@ -12,31 +12,47 @@ const Button = ({ variant }) => {
 	function gap() {
 		return 4;
 	}
-	return [mutate() ?? color, _styleThisClasses.__styleThis_13];
+	return [mutate() ?? color, _styleThisClasses.__styleThis_17];
 };
 const mutate = (v) => v;
 const a1 = () => {
 	const a2 = () => {
 		const a3 = () => {
-			return _styleThisClasses.__styleThis_11;
+			return _styleThisClasses.__styleThis_15;
 		};
 		return a3();
 	};
 	const wi = a2();
-	const m = _styleThisClasses.__styleThis_var_m_7;
+	const m = _styleThisClasses.__styleThis_var_m_11;
 	return wi;
 };
 const b = _styleThisClasses.b;
 const comp = () => {
 ("foob");
 	const b = () => {
-		const c = () => _styleThisClasses.__styleThis_6;
-		const s1 = _styleThisClasses.__styleThis_var_s1_4;
+		const c = () => _styleThisClasses.__styleThis_10;
+		const s1 = _styleThisClasses.__styleThis_var_s1_8;
 	};
 	mutate(b);
-	return _styleThisClasses.__styleThis_3;
+	return _styleThisClasses.__styleThis_7;
 };
 const { color } = { color: "blue" };
 const st = undefined;
 const s2 = _styleThisClasses.s2;
+// read themselves, the locals hoisted out of them go below them
+class Size {
+	static base = 2;
+	static gap() {
+		const gap = Size.base * 2;
+		return _styleThisClasses.__styleThis_4;
+	}
+}
+const spacing = {
+	base: 3,
+	margin() {
+		const margin = spacing.base * 2;
+		return _styleThisClasses.__styleThis_2;
+	}
+};
+const sized = _styleThisClasses.sized;
 const unrelated = _styleThisClasses.unrelated;

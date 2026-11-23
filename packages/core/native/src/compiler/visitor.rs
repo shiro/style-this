@@ -72,6 +72,8 @@ pub struct VisitorTransformer<'a, 'alloc> {
 struct PendingDeclaration<'alloc> {
     declaration: VirtualProgramInsert<'alloc>,
     right_references: Vec<String>,
+    /// statements hoisted out of it, they move with it
+    inner: Vec<Statement<'alloc>>,
 }
 
 impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
@@ -213,6 +215,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             pending.push(PendingDeclaration {
                 declaration,
                 right_references,
+                inner: self
+                    .tmp_program_statement_buffer
+                    .last_mut()
+                    .unwrap()
+                    .drain(pos..)
+                    .collect(),
             });
         }
     }
@@ -222,10 +230,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     /// They can't keep their position, the `css` templates inside functions are evaluated where
     /// the function is, e.g. `function f() { return css\`${size}\`; } const size = 4;`. So each
     /// one is inserted right above the first statement using it, or calling a function using it
-    /// (function declarations are hoisted). The statements below that point it depends on move
-    /// up with it, e.g. `const size = base * 2;` with `base` declared below `f`. The ones only
-    /// used by exports or other pending declarations go to the bottom, the latter pull them up
-    /// once included.
+    /// (function declarations are hoisted). The statements hoisted out of it and the ones below
+    /// that point it depends on move up with it, e.g. `const size = base * 2;` with `base`
+    /// declared below `f`. The ones only used by exports or other pending declarations go to the
+    /// bottom, the latter pull them up once included.
     fn include_pending_declarations(&mut self) {
         let mut pending = self.pending_declarations.pop().unwrap();
         let mut included = vec![];
@@ -244,12 +252,21 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             included.push(declaration);
         }
 
+        // e.g. the CSS of unused functions, the bottom is after anything they could use
+        let buffer = self.tmp_program_statement_buffer.last_mut().unwrap();
+        for declaration in pending {
+            buffer.splice(0..0, declaration.inner);
+        }
+
         for PendingDeclaration {
             declaration,
             right_references,
+            inner,
         } in included
         {
-            let len = self.tmp_program_statement_buffer.last().unwrap().len();
+            let buffer = self.tmp_program_statement_buffer.last_mut().unwrap();
+            let len = buffer.len();
+            buffer.extend(inner);
             self.include_declaration(declaration, right_references, len);
             if self.error.is_some() {
                 return;
@@ -296,7 +313,44 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         }
     }
 
+    /// The statements hoisted out of the declaration while walking it are above `pos`, the ones
+    /// using the declaration go below it instead, e.g. `class A { static f() { const y = A.x;
+    /// return css\`${y}\`; } }`.
     fn include_declaration(
+        &mut self,
+        declaration: VirtualProgramInsert<'alloc>,
+        right_references: Vec<String>,
+        pos: usize,
+    ) {
+        let inner: Vec<_> = self
+            .tmp_program_statement_buffer
+            .last_mut()
+            .unwrap()
+            .drain(pos..)
+            .collect();
+
+        self.insert_declaration(declaration, right_references, pos);
+
+        let buffer = self.tmp_program_statement_buffer.last_mut().unwrap();
+        let mut names = program_declared_values(&buffer[pos..]);
+        let references: Vec<_> = inner.iter().map(utils::statement_get_references).collect();
+        let mut dependent = vec![false; inner.len()];
+        while let Some(idx) = (0..inner.len()).find(|&idx| {
+            !dependent[idx] && references[idx].iter().any(|name| names.contains(name))
+        }) {
+            dependent[idx] = true;
+            names.extend(program_declared_values(std::slice::from_ref(&inner[idx])));
+        }
+
+        let (dependents, independents): (Vec<_>, Vec<_>) = inner
+            .into_iter()
+            .zip(dependent)
+            .partition(|(_, dependent)| *dependent);
+        buffer.splice(pos..pos, dependents.into_iter().map(|(statement, _)| statement));
+        buffer.extend(independents.into_iter().map(|(statement, _)| statement));
+    }
+
+    fn insert_declaration(
         &mut self,
         declaration: VirtualProgramInsert<'alloc>,
         right_references: Vec<String>,

@@ -5,10 +5,10 @@
 //     "/packages/vite/tests/correctness-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { css, style } from \"@style-this/core\";\nimport mib, * as a from \"./a\";\n\n// locals shadowing the top level names used below\nconst Button = ({ variant }) => {\n  const color = variant === \"primary\" ? \"blue\" : \"gray\";\n  function mutate() {\n    return variant;\n  }\n  function gap() {\n    return 4;\n  }\n  return [mutate() ?? color, css`gap: ${gap()}px;`];\n};\n\nconst mutate = (v) => v;\n\nconst a1 = () => {\n  const a2 = () => {\n    const a3 = () => {\n      return css`background: black;`;\n    };\n    return a3();\n  };\n  const wi = a2();\n  const m = css`\n    ${wi}\n  `;\n  return wi;\n};\n\nconst b = css`\n  ${a1()}\n`;\n\nconst comp = () => {\n  (\"foob\");\n\n  const b = () => {\n    const c = () => css`\n      background: blue;\n    `;\n\n    const s1 = css`\n      ${c().css}\n    `;\n  };\n\n  mutate(b);\n\n  return css`\n    @media (max-width: 500px) {\n      background: blue;\n    }\n  `;\n};\n\nconst { color } = { color: \"blue\" };\n\nconst st = style`\n  color: ${color};\n  ${mib.foo().css}\n`;\n\nconst s2 = css`\n  ${st}\n  ${comp().css}\n`;\n\nconst unrelated = css`\n  background: none;\n  ${a.foo.css}\n`;\n"
+//     "import { css, style } from \"@style-this/core\";\nimport mib, * as a from \"./a\";\n\n// locals shadowing the top level names used below\nconst Button = ({ variant }) => {\n  const color = variant === \"primary\" ? \"blue\" : \"gray\";\n  function mutate() {\n    return variant;\n  }\n  function gap() {\n    return 4;\n  }\n  return [mutate() ?? color, css`gap: ${gap()}px;`];\n};\n\nconst mutate = (v) => v;\n\nconst a1 = () => {\n  const a2 = () => {\n    const a3 = () => {\n      return css`background: black;`;\n    };\n    return a3();\n  };\n  const wi = a2();\n  const m = css`\n    ${wi}\n  `;\n  return wi;\n};\n\nconst b = css`\n  ${a1()}\n`;\n\nconst comp = () => {\n  (\"foob\");\n\n  const b = () => {\n    const c = () => css`\n      background: blue;\n    `;\n\n    const s1 = css`\n      ${c().css}\n    `;\n  };\n\n  mutate(b);\n\n  return css`\n    @media (max-width: 500px) {\n      background: blue;\n    }\n  `;\n};\n\nconst { color } = { color: \"blue\" };\n\nconst st = style`\n  color: ${color};\n  ${mib.foo().css}\n`;\n\nconst s2 = css`\n  ${st}\n  ${comp().css}\n`;\n\n// read themselves, the locals hoisted out of them go below them\nclass Size {\n  static base = 2;\n  static gap() {\n    const gap = Size.base * 2;\n    return css`gap: ${gap}px;`;\n  }\n}\n\nconst spacing = {\n  base: 3,\n  margin() {\n    const margin = spacing.base * 2;\n    return css`margin: ${margin}px;`;\n  },\n};\n\nconst sized = css`\n  ${Size.gap().css}\n  ${spacing.margin().css}\n`;\n\nconst unrelated = css`\n  background: none;\n  ${a.foo.css}\n`;\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAY6B;;;AAQhB;;;AAKD;;;;AAMF;;;AAQU;;;;AAIL;;;;;AAON;;;;;;AAcE;;;;;;;;;AAKO"
+//   "mappings": "AAY6B;;;AAQhB;;;AAKD;;;;AAMF;;;AAQU;;;;AAIL;;;;;AAON;;;;;;AAcE;;;;;;;;;AAUA;;;AAQA;;;AAIG;;;;AAKI"
 // }
 
 import { css, style } from "@style-this/core";
@@ -78,6 +78,28 @@ const st = style`
 const s2 = css`
   ${st}
   ${comp().css}
+`;
+
+// read themselves, the locals hoisted out of them go below them
+class Size {
+  static base = 2;
+  static gap() {
+    const gap = Size.base * 2;
+    return css`gap: ${gap}px;`;
+  }
+}
+
+const spacing = {
+  base: 3,
+  margin() {
+    const margin = spacing.base * 2;
+    return css`margin: ${margin}px;`;
+  },
+};
+
+const sized = css`
+  ${Size.gap().css}
+  ${spacing.margin().css}
 `;
 
 const unrelated = css`

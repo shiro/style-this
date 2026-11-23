@@ -67,6 +67,28 @@ const s2 = css`
   ${comp().css}
 `;
 
+// read themselves, the locals hoisted out of them go below them
+class Size {
+  static base = 2;
+  static gap() {
+    const gap = Size.base * 2;
+    return css`gap: ${gap}px;`;
+  }
+}
+
+const spacing = {
+  base: 3,
+  margin() {
+    const margin = spacing.base * 2;
+    return css`margin: ${margin}px;`;
+  },
+};
+
+const sized = css`
+  ${Size.gap().css}
+  ${spacing.margin().css}
+`;
+
 const unrelated = css`
   background: none;
   ${a.foo.css}

@@ -1,16 +1,22 @@
-// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "accent", "border", "borderStyle", "css", "decoration", "getLink", "outline", "underline"}
+// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "__styleThis_3", "accent", "border", "borderStyle", "css", "decoration", "focus", "getLink", "outline", "underline"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let __styleThis_2 = new String("__styleThis_2-9erkd2");
+let __styleThis_3 = new String("__styleThis_3-7styr4");
 let accent = "blue";
 let borderStyle = "solid";
 let border = `1px ${borderStyle} ${accent}`;
 let decoration = "none";
-__styleThis_2.css = `text-decoration: ${underline(false)};
+let __styleThis_2 = new String("__styleThis_2-9erkd2");
+__styleThis_2.css = `outline: none;`;
+function focus() {
+	return __styleThis_2;
+}
+__styleThis_3.css = `text-decoration: ${underline(false)};
     border-bottom: ${border};
+    ${focus().css}
   `;
 function getLink() {
-	return __styleThis_2;
+	return __styleThis_3;
 }
 function underline(enabled) {
 	return enabled ? "underline" : decoration;
@@ -37,8 +43,8 @@ let nav = new String("nav-4xyb4t");
 nav.css = `.${getLink()}, .${Theme.accent} {
     font-weight: bold;
   }`;
-let __styleThis_var_button_4 = new String("button-lajgtq");
-__styleThis_var_button_4.css = `color: ${color};
+let __styleThis_1 = new String("__styleThis_1-t6jshu");
+__styleThis_1.css = `display: flex;
   `;
 let __styleThis_3 = new String("__styleThis_3-avo1ib");
 __styleThis_3.css = `margin: 8px;
@@ -46,8 +52,8 @@ __styleThis_3.css = `margin: 8px;
 let __styleThis_2 = new String("__styleThis_2-nwt6zk");
 __styleThis_2.css = `padding: 4px;
   `;
-let __styleThis_1 = new String("__styleThis_1-t6jshu");
-__styleThis_1.css = `display: flex;
+let __styleThis_var_button_4 = new String("button-lajgtq");
+__styleThis_var_button_4.css = `color: ${color};
   `;
 return {
 "nav": nav.css,

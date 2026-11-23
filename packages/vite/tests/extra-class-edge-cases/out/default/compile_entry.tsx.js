@@ -17,14 +17,6 @@ test4.css = `background: green;
   
   margin: 5px;
   `;
-let __styleThis_var_ParentStyled_4 = new String("ParentStyled-difgta");
-__styleThis_var_ParentStyled_4.css = `background: yellow;
-  
-  padding: 20px;`;
-let __styleThis_var_ChildStyled_2 = new String("ChildStyled-hyrg5m");
-__styleThis_var_ChildStyled_2.css = `color: purple;
-  
-  border: 1px solid black;`;
 let test5 = new String("test5-9ibg5y");
 test5.css = `display: flex;
   
@@ -37,6 +29,14 @@ test6.css = `background: orange;
 let test7 = new String("test7-ijc9m3");
 test7.css = `background: pink;
   `;
+let __styleThis_var_ChildStyled_2 = new String("ChildStyled-hyrg5m");
+__styleThis_var_ChildStyled_2.css = `color: purple;
+  
+  border: 1px solid black;`;
+let __styleThis_var_ParentStyled_4 = new String("ParentStyled-difgta");
+__styleThis_var_ParentStyled_4.css = `background: yellow;
+  
+  padding: 20px;`;
 return [
 `.test1-6z85mr {
 ${test1.css}
