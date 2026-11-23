@@ -1162,7 +1162,9 @@ pub async fn evaluate_program<'alloc>(
         }
     }
 
-    if transformer.debug {
+    if transformer.debug
+        && let Some(on_debug_virtual_module) = &transformer.on_debug_virtual_module
+    {
         let importer_part = if let Some(importer_filepath) = importer_filepath {
             format!(" ({importer_filepath})")
         } else {
@@ -1172,23 +1174,12 @@ pub async fn evaluate_program<'alloc>(
         sorted_idents.sort();
         let key = format!("{program_filepath}{importer_part}: {{{}}}", sorted_idents.join(", "));
 
-        // Call the debug callback with the module name and code
-        let args = js_sys::Array::new();
-        args.push(&JsValue::from_str(&key));
-        args.push(&JsValue::from_str(&eval_program_js));
-
-        js_sys::Reflect::apply(
-            &js_sys::Reflect::get(
-                &js_sys::global(),
-                &JsValue::from_str(&transformer.on_debug_virtual_module_ref),
-            )
-            .unwrap()
-            .dyn_into::<js_sys::Function>()
-            .unwrap(),
+        // a debug hook, its errors mustn't fail the transform
+        let _ = on_debug_virtual_module.call2(
             &JsValue::UNDEFINED,
-            &args,
-        )
-        .unwrap();
+            &JsValue::from_str(&key),
+            &JsValue::from_str(&eval_program_js),
+        );
     }
 
     let value_cache_ref = &transformer.value_cache_ref;

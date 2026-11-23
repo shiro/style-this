@@ -42,6 +42,11 @@ pub enum TransformError {
         row: usize,
         column: usize,
     },
+    #[error("invalid option '{option}', expected {expected}")]
+    InvalidOption {
+        option: &'static str,
+        expected: &'static str,
+    },
 }
 
 impl From<TransformError> for JsValue {
@@ -97,7 +102,8 @@ impl From<&TransformError> for JsValue {
                 )
                 .unwrap();
             }
-            TransformError::UnsupportedImportQuery { .. } => {}
+            TransformError::UnsupportedImportQuery { .. }
+            | TransformError::InvalidOption { .. } => {}
         };
 
         err.into()

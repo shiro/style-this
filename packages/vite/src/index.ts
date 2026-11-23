@@ -114,9 +114,6 @@ const vitePlugin = (options: Options = {}) => {
     debugVirtualModules.set(key, code);
   };
 
-  // Default noop callback for non-debug mode
-  const noopCallback = () => { };
-
   /** Files that contain styled templates. */
   const watchedFiles = new Set<string>();
   type Resolve = (id: string, importer: string) => Promise<string | undefined>;
@@ -341,7 +338,7 @@ const vitePlugin = (options: Options = {}) => {
         useRequire,
         debug,
         atomic,
-        onDebugVirtualModule: debug ? onDebugVirtualModule : noopCallback,
+        onDebugVirtualModule,
       });
 
       if (atomic) {

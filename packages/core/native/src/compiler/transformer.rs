@@ -22,7 +22,7 @@ pub struct Transformer {
     pub(crate) use_require: bool,
     pub(crate) debug: bool,
     pub(crate) atomic: bool,
-    pub(crate) on_debug_virtual_module_ref: String,
+    pub(crate) on_debug_virtual_module: Option<js_sys::Function>,
     pub(crate) resolve_virtual_import: Option<js_sys::Function>,
 }
 
@@ -37,17 +37,18 @@ pub(crate) enum VirtualImport {
 impl Transformer {
     #[wasm_bindgen(constructor)]
     #[allow(clippy::new_without_default)]
-    pub fn new(opts: JsValue) -> Self {
+    pub fn new(opts: JsValue) -> Result<Self, TransformError> {
         let global = js_sys::global();
 
-        let cwd = js_sys::Reflect::get(&opts, &JsValue::from_str("cwd"))
-            .unwrap()
-            .as_string()
-            .unwrap();
+        let get =
+            |key: &str| js_sys::Reflect::get(&opts, &JsValue::from_str(key)).unwrap_or_default();
+        let invalid = |option, expected| TransformError::InvalidOption { option, expected };
 
-        let ignored_imports = js_sys::Reflect::get(&opts, &JsValue::from_str("ignoredImports"))
-            .ok()
-            .and_then(|v| v.dyn_into::<js_sys::Object>().ok());
+        let cwd = get("cwd")
+            .as_string()
+            .ok_or_else(|| invalid("cwd", "a string"))?;
+
+        let ignored_imports = get("ignoredImports").dyn_into::<js_sys::Object>().ok();
 
         let ignored_imports: HashMap<String, Vec<String>> = ignored_imports
             .as_ref()
@@ -66,19 +67,16 @@ impl Transformer {
             })
             .unwrap_or_default();
 
-        let load_file = js_sys::Reflect::get(&opts, &JsValue::from_str("loadFile"))
-            .unwrap()
+        let load_file = get("loadFile")
             .dyn_into::<js_sys::Function>()
-            .unwrap();
+            .map_err(|_| invalid("loadFile", "a function"))?;
 
-        let css_extension = js_sys::Reflect::get(&opts, &JsValue::from_str("cssExtension"))
-            .unwrap()
+        let css_extension = get("cssExtension")
             .as_string()
-            .unwrap();
+            .ok_or_else(|| invalid("cssExtension", "a string"))?;
 
         // Get CacheRegistry from options (passed from Vite)
-        let cache_registry_value = js_sys::Reflect::get(&opts, &JsValue::from_str("cacheRegistry"))
-            .unwrap_or(JsValue::null());
+        let cache_registry_value = get("cacheRegistry");
 
         let (
             cache_registry,
@@ -153,60 +151,32 @@ impl Transformer {
             )
         };
 
-        let use_require = js_sys::Reflect::get(&opts, &JsValue::from_str("useRequire"))
-            .unwrap()
-            .as_bool()
-            .unwrap_or_default();
+        let use_require = get("useRequire").as_bool().unwrap_or_default();
+        let debug = get("debug").as_bool().unwrap_or_default();
+        let atomic = get("atomic").as_bool().unwrap_or_default();
 
-        let debug = js_sys::Reflect::get(&opts, &JsValue::from_str("debug"))
-            .unwrap()
-            .as_bool()
-            .unwrap_or_default();
-
-        let atomic = js_sys::Reflect::get(&opts, &JsValue::from_str("atomic"))
-            .unwrap()
-            .as_bool()
-            .unwrap_or_default();
-
-        let create_require = js_sys::Reflect::get(&opts, &JsValue::from_str("createRequire"))
-            .ok()
-            .and_then(|v| v.dyn_into::<js_sys::Function>().ok());
+        let create_require = get("createRequire").dyn_into::<js_sys::Function>().ok();
 
         let require_ref = create_require.map(|create_require_fn| {
             let require_suffix = crate::utils::generate_random_id(8);
             let require_ref = format!("{PREFIX}_require_{require_suffix}");
 
-            js_sys::Reflect::set(
+            let _ = js_sys::Reflect::set(
                 &global,
                 &JsValue::from_str(&require_ref),
                 &create_require_fn,
-            )
-            .unwrap();
+            );
             require_ref
         });
 
-        let on_debug_virtual_module =
-            js_sys::Reflect::get(&opts, &JsValue::from_str("onDebugVirtualModule"))
-                .ok()
-                .and_then(|v| v.dyn_into::<js_sys::Function>().ok())
-                .unwrap_or_else(|| js_sys::Function::new_no_args(""));
+        let on_debug_virtual_module = get("onDebugVirtualModule")
+            .dyn_into::<js_sys::Function>()
+            .ok();
+        let resolve_virtual_import = get("resolveVirtualImport")
+            .dyn_into::<js_sys::Function>()
+            .ok();
 
-        let resolve_virtual_import =
-            js_sys::Reflect::get(&opts, &JsValue::from_str("resolveVirtualImport"))
-                .ok()
-                .and_then(|v| v.dyn_into::<js_sys::Function>().ok());
-
-        let callback_suffix = crate::utils::generate_random_id(8);
-        let on_debug_virtual_module_ref = format!("{PREFIX}_debug_callback_{callback_suffix}");
-
-        js_sys::Reflect::set(
-            &global,
-            &JsValue::from_str(&on_debug_virtual_module_ref),
-            &on_debug_virtual_module,
-        )
-        .unwrap();
-
-        Self {
+        Ok(Self {
             cwd,
             ignored_imports,
 
@@ -221,9 +191,9 @@ impl Transformer {
             use_require,
             debug,
             atomic,
-            on_debug_virtual_module_ref,
+            on_debug_virtual_module,
             resolve_virtual_import,
-        }
+        })
     }
 
     /// Get all collected atomic CSS
