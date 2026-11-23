@@ -7,7 +7,7 @@ const a = css`
 
 const b = css`
   color: blue;
-  ${extraClass("baz")}
+  ${extraClass('baz bg-[url("x.png")]')}
 `;
 
 const c = css`

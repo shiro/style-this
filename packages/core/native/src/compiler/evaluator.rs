@@ -1320,7 +1320,7 @@ pub async fn evaluate_program<'alloc>(
                 all_classes.extend(css_var.extra_classes.iter().cloned());
 
                 let class_list = all_classes.join(" ");
-                format!("export const {var} = \"{class_list}\"")
+                format!("export const {var} = {class_list:?}")
             })
             .collect::<Vec<_>>()
             .join(";\n");
