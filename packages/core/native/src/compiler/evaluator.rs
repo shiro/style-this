@@ -1074,7 +1074,7 @@ pub async fn evaluate_program<'alloc>(
     if skip_css_eval {
         return Ok(());
     }
-    let mut value_cache = value_cache_guard.lock().await;
+    let value_cache = value_cache_guard.lock().await;
 
     transpile_ts_to_js(allocator, &mut eval_program);
 
@@ -1089,14 +1089,10 @@ pub async fn evaluate_program<'alloc>(
         .build(&eval_program)
         .code;
 
-    // evaluated exports are only stored at the end of the program, if evaluation fails they need
-    // to be evaluated again by the next importer
-    let evaluated_exports: Vec<String> = exported_idents.keys().cloned().collect();
-
     // we append all exported idents we evaluated to the cache
-    if !exported_idents.is_empty() {
-        value_cache.extend(exported_idents.keys().cloned());
+    let cached_exports = CachedExports::new(value_cache, exported_idents.keys().cloned().collect());
 
+    if !exported_idents.is_empty() {
         // the program's own exports take precedence over the ones of `export * from`
         let star_reexports = exported_idents
             .remove(STAR_IMPORT)
@@ -1222,11 +1218,9 @@ pub async fn evaluate_program<'alloc>(
         .await
         {
             Ok(v) => v,
-            Err(err) => {
-                value_cache.retain(|ident| !evaluated_exports.contains(ident));
-                return report_error(entries.as_ref(), err);
-            }
+            Err(err) => return report_error(entries.as_ref(), err),
         };
+        cached_exports.commit();
 
         // Extract CSS blocks from evaluated object
         let obj = evaluated.dyn_into::<js_sys::Object>().unwrap();
@@ -1340,11 +1334,9 @@ pub async fn evaluate_program<'alloc>(
     .await
     {
         Ok(v) => v,
-        Err(err) => {
-            value_cache.retain(|ident| !evaluated_exports.contains(ident));
-            return report_error(entries.as_ref(), err);
-        }
+        Err(err) => return report_error(entries.as_ref(), err),
     };
+    cached_exports.commit();
 
     if let Some(entries) = &entries {
         if has_css {
@@ -1389,6 +1381,32 @@ async fn evaluate(
             );
             evaluation_failed(cause)
         })
+}
+
+/// Exports added to the value cache before evaluating them, they're only stored at the end of the
+/// program. Unless committed after a successful evaluation they're removed again on drop, also when
+/// the evaluation is dropped mid-flight (e.g. `try_join_all` of a failing sibling dependency), so
+/// the next importer evaluates them again instead of reading the missing values from the store.
+struct CachedExports<'a> {
+    value_cache: futures::lock::MutexGuard<'a, HashSet<String>>,
+    exports: Vec<String>,
+}
+
+impl<'a> CachedExports<'a> {
+    fn new(mut value_cache: futures::lock::MutexGuard<'a, HashSet<String>>, exports: Vec<String>) -> Self {
+        value_cache.extend(exports.iter().cloned());
+        Self { value_cache, exports }
+    }
+
+    fn commit(mut self) {
+        self.exports.clear();
+    }
+}
+
+impl Drop for CachedExports<'_> {
+    fn drop(&mut self) {
+        self.value_cache.retain(|ident| !self.exports.contains(ident));
+    }
 }
 
 /// Virtual module entries of an entrypoint, captured when its evaluation starts. Edits during the

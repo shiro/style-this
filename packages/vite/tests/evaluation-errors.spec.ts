@@ -38,5 +38,20 @@ describe("evaluation errors", () => {
       const css = await loadCss(plugin, `${testDir}/working.tsx`);
       expect(typeof css === "object" && css?.code).toContain(".button-");
     });
+
+    test(`module dropped by a failing sibling is reported (${atomic ? "atomic" : "default"})`, async () => {
+      const testDir = `${__dirname}/evaluation-error-in-import`;
+      const resolver = await getResolver();
+      const plugin = await setupPlugin(resolver, { atomic, debug: false });
+
+      await expect(loadCss(plugin, `${testDir}/entry-slow.tsx`)).rejects.toMatchObject({
+        message: "failed to compute color",
+      });
+
+      // the dropped evaluation of `slow-dep` didn't cache its exports, so they're evaluated again
+      await expect(loadCss(plugin, `${testDir}/entry-slow-2.tsx`)).rejects.toMatchObject({
+        message: "failed to compute size",
+      });
+    });
   }
 });
