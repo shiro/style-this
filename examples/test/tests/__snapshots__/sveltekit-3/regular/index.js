@@ -1,7 +1,7 @@
 import http from 'node:http';
 import fs__default from 'node:fs';
 import process from 'node:process';
-import { p as polka, h as handler, f as format_listening_address } from './server/chunks/handler-C4IYegTB.js';
+import { p as polka, h as handler, f as format_listening_address } from './server/chunks/handler-DpF6qQOH.js';
 import { env, timeout_env } from './env.js';
 import { rm } from 'node:fs/promises';
 import './shims.js';
@@ -19,7 +19,7 @@ import './server/chunks/chunks/internal.js-w6zW5ZLH.js';
 import './server/chunks/chunks/server.js-C3XFd1wL.js';
 import './server/chunks/chunks/internal2.js-BZSnTRCj.js';
 import './server/chunks/chunks/exports.js-CmaNWZrb.js';
-import './server/chunks/manifest.js-CnYDB-Nb.js';
+import './server/chunks/manifest.js-Dh714gPH.js';
 import 'node:url';
 
 const path = env('SOCKET_PATH', false);

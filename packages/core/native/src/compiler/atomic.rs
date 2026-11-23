@@ -60,7 +60,7 @@ fn property_rank(property: &str) -> usize {
     let dashes = property.trim_start_matches('-').matches('-').count();
     match property.as_str() {
         "top" | "right" | "bottom" | "left" => 1,
-        "flex-flow" | "place-items" | "place-content" | "place-self" | "grid-area" => 0,
+        "flex-flow" | "place-items" | "place-content" | "place-self" | "grid-area" | "vertical-align" => 0,
         _ => dashes,
     }
 }
@@ -539,19 +539,90 @@ mod tests {
                     assert!(longhands.contains(nested), "'{shorthand}' is missing '{nested}' of '{longhand}'");
                 }
             }
+            // shorthands it fully overrides (`border-image` of `border`) are dropped too
+            for (nested, nested_longhands) in ATOMIC_SHORTHANDS.iter() {
+                if nested != shorthand && nested_longhands.iter().all(|longhand| longhands.contains(longhand)) {
+                    assert!(longhands.contains(nested), "'{shorthand}' is missing '{nested}'");
+                }
+            }
         }
+    }
+
+    /// Longhands reset by shorthands that lightningcss doesn't know about, per the specs (if a
+    /// browser implements them).
+    const SPEC_LONGHANDS: &[(&str, &str)] = &[
+        (
+            "font",
+            "font-width font-variant-ligatures font-variant-alternates font-variant-numeric \
+             font-variant-east-asian font-variant-position font-variant-emoji font-kerning \
+             font-size-adjust font-feature-settings font-variation-settings font-optical-sizing \
+             font-language-override",
+        ),
+        (
+            "font-variant",
+            "font-variant-ligatures font-variant-caps font-variant-alternates font-variant-numeric \
+             font-variant-east-asian font-variant-position font-variant-emoji",
+        ),
+        (
+            "border",
+            "border-image-source border-image-slice border-image-width border-image-outset border-image-repeat",
+        ),
+        ("columns", "column-width column-count column-height column-wrap"),
+        ("white-space", "white-space-collapse text-wrap-mode white-space-trim"),
+        ("text-wrap", "text-wrap-mode text-wrap-style"),
+        ("vertical-align", "alignment-baseline baseline-shift baseline-source"),
+        ("transition", "transition-behavior"),
+        ("animation", "animation-range-start animation-range-end"),
+        ("animation-range", "animation-range-start animation-range-end"),
+    ];
+
+    fn reset_longhands(shorthand: &str) -> Vec<String> {
+        use lightningcss::properties::PropertyId;
+
+        let known = PropertyId::from(shorthand).longhands().into_iter().flatten();
+        let spec = SPEC_LONGHANDS.iter().filter(|(name, _)| *name == shorthand);
+        known
+            .map(|longhand| longhand.name().to_string())
+            .chain(spec.flat_map(|(_, longhands)| longhands.split_whitespace().map(String::from)))
+            .collect()
     }
 
     /// Longhands of atomized shorthands must be atomized too. Unlayered (per-file) ones would win
     /// against later shorthands, and `mergeStyles` couldn't drop them.
     #[test]
     fn shorthand_table_covers_longhands() {
-        use lightningcss::properties::PropertyId;
-
         for property in ATOMIC_PREFIXES.keys() {
             let listed = ATOMIC_SHORTHANDS.get(property).cloned().unwrap_or_default();
-            for longhand in PropertyId::from(*property).longhands().into_iter().flatten() {
-                assert!(listed.contains(&longhand.name()), "'{property}' is missing '{}'", longhand.name());
+            for longhand in reset_longhands(property) {
+                assert!(listed.contains(&longhand.as_str()), "'{property}' is missing '{longhand}'");
+            }
+        }
+    }
+
+    /// Shorthands of atomized longhands must be atomized too, unlayered ones would win against
+    /// later longhands.
+    #[test]
+    fn shorthands_of_atomized_longhands_are_atomized() {
+        for longhand in ATOMIC_PREFIXES.keys() {
+            // shorthands are named by a subset of their longhands' segments
+            // (`border-inline-width` of `border-inline-start-width`)
+            let segments: Vec<&str> = longhand.split('-').collect();
+            let named = (0..1 << (segments.len() - 1)).map(|mask: u32| {
+                let mut name = segments[0].to_string();
+                for (i, segment) in segments[1..].iter().enumerate() {
+                    if mask >> i & 1 == 1 {
+                        name = format!("{name}-{segment}");
+                    }
+                }
+                name
+            });
+            let spec = SPEC_LONGHANDS.iter().map(|(shorthand, _)| shorthand.to_string());
+            for shorthand in named.chain(spec) {
+                // no browser supports `caret`
+                if shorthand == "caret" || !reset_longhands(&shorthand).contains(&longhand.to_string()) {
+                    continue;
+                }
+                assert!(atomic_prefix(&shorthand).is_some(), "'{shorthand}' of '{longhand}' has no prefix");
             }
         }
     }
