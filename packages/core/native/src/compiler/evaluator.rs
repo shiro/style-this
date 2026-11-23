@@ -1220,35 +1220,18 @@ pub async fn evaluate_program<'alloc>(
             transformer.require_ref.as_deref(),
         );
 
-        // Execute Stage 1 eval and get the promise
-        let evaluated_promise: JsValue =
-            match js_sys::eval(&eval_program_js).map_err(|cause| TransformError::EvaluationFailed {
-                filepath: program_filepath.clone(),
-                program: if transformer.debug {
-                    Some(eval_program_js.to_string())
-                } else {
-                    None
-                },
-                cause,
-            }) {
-                Ok(v) => v,
-                Err(err) => {
-                    value_cache.retain(|ident| !evaluated_exports.contains(ident));
-                    return report_error(entries.as_ref(), err);
-                }
-            };
-
-        // Await the promise to get the CSS blocks
-        let promise = js_sys::Promise::from(evaluated_promise);
-        let future = wasm_bindgen_futures::JsFuture::from(promise);
-        let evaluated = match future.await {
+        let evaluated = match evaluate(
+            allocator,
+            transformer.debug,
+            &program_filepath,
+            program_code,
+            &eval_program,
+            &eval_program_js,
+        )
+        .await
+        {
             Ok(v) => v,
-            Err(cause) => {
-                let err = TransformError::EvaluationFailed {
-                    filepath: program_filepath.clone(),
-                    program: None,
-                    cause,
-                };
+            Err(err) => {
                 value_cache.retain(|ident| !evaluated_exports.contains(ident));
                 return report_error(entries.as_ref(), err);
             }
@@ -1356,46 +1339,16 @@ pub async fn evaluate_program<'alloc>(
         transformer.require_ref.as_deref(),
     );
 
-    let evaluated =
-        match js_sys::eval(&eval_program_js).map_err(|cause| TransformError::EvaluationFailed {
-            filepath: program_filepath.clone(),
-            program: if transformer.debug {
-                Some(eval_program_js.to_string())
-            } else {
-                None
-            },
-            cause,
-        }) {
-            Ok(v) => v,
-            Err(err) => {
-                value_cache.retain(|ident| !evaluated_exports.contains(ident));
-                return report_error(entries.as_ref(), err);
-            }
-        };
-
-    let promise = js_sys::Promise::from(evaluated);
-    let future = wasm_bindgen_futures::JsFuture::from(promise);
-    let evaluated = match future
-        .await
-        .inspect_err(|err| {
-            error_mapping::resolve_err(
-                allocator,
-                err,
-                &program_filepath,
-                program_code,
-                &eval_program,
-                &eval_program_js,
-            );
-        })
-        .map_err(|cause| TransformError::EvaluationFailed {
-            filepath: program_filepath.clone(),
-            program: if transformer.debug {
-                Some(eval_program_js.to_string())
-            } else {
-                None
-            },
-            cause,
-        }) {
+    let evaluated = match evaluate(
+        allocator,
+        transformer.debug,
+        &program_filepath,
+        program_code,
+        &eval_program,
+        &eval_program_js,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(err) => {
             value_cache.retain(|ident| !evaluated_exports.contains(ident));
@@ -1415,6 +1368,37 @@ pub async fn evaluate_program<'alloc>(
     }
 
     Ok(())
+}
+
+/// Evaluates the wrapped program, mapping the error locations of the evaluated code to the source.
+async fn evaluate(
+    allocator: &oxc_allocator::Allocator,
+    debug: bool,
+    program_filepath: &str,
+    program_code: &str,
+    eval_program: &Program<'_>,
+    eval_program_js: &str,
+) -> Result<JsValue, TransformError> {
+    let evaluation_failed = |cause: JsValue| TransformError::EvaluationFailed {
+        filepath: program_filepath.to_string(),
+        program: debug.then(|| eval_program_js.to_string()),
+        cause,
+    };
+
+    let promise = js_sys::eval(eval_program_js).map_err(evaluation_failed)?;
+    wasm_bindgen_futures::JsFuture::from(js_sys::Promise::from(promise))
+        .await
+        .map_err(|cause| {
+            error_mapping::resolve_err(
+                allocator,
+                &cause,
+                program_filepath,
+                program_code,
+                eval_program,
+                eval_program_js,
+            );
+            evaluation_failed(cause)
+        })
 }
 
 /// Virtual module entries of an entrypoint, captured when its evaluation starts. Edits during the

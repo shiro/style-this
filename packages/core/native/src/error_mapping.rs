@@ -28,8 +28,6 @@ pub fn resolve_err(
         return;
     };
 
-    let regex = js_sys::RegExp::new(r"/style-this/.*/core/dist/compiler\.cjs:", "");
-
     let stack_lines = js_sys::Reflect::get(err, &JsValue::from_str("stack"))
         .ok()
         .and_then(|stack| stack.as_string())
@@ -42,15 +40,11 @@ pub fn resolve_err(
         .unwrap_or_default()
         .into_iter()
         .map(|mut line| {
-            if !regex.test(&line) {
+            let Some((row, col)) = eval_frame_position(&line) else {
                 return line;
-            }
+            };
 
-            let mut it = line.trim().trim_end_matches(')').split(':').rev();
             let _: Option<_> = try {
-                let col: usize = it.next()?.parse().ok()?;
-                let row: usize = it.next()?.parse().ok()?;
-
                 let error_offset = get_offset_from_pos(eval_program, row, col);
 
                 let Some(mut node_idx) = get_node_idx_from_offset(&eval_ast, error_offset) else {
@@ -80,6 +74,24 @@ pub fn resolve_err(
         &JsValue::from_str("stack"),
         &JsValue::from_str(&stack_lines.join("\n")),
     );
+}
+
+/// The position in the eval program of a stack frame of code the compiler evaluated, e.g.
+/// `at fn (eval at <anonymous> (/app/node_modules/@style-this/core/dist/compiler.cjs:600:16), <anonymous>:24:11)`.
+fn eval_frame_position(frame: &str) -> Option<(usize, usize)> {
+    let frame = frame.trim_end();
+    // frames without a function name aren't wrapped in parentheses
+    let frame = frame.strip_suffix(')').unwrap_or(frame);
+    let (eval_site, position) = frame.rsplit_once("), <anonymous>:")?;
+
+    // the eval site's location is `<path>:<row>:<col>`
+    let eval_site_path = eval_site.rsplitn(3, ':').nth(2)?;
+    if !eval_site.contains("eval at ") || !eval_site_path.ends_with("compiler.cjs") {
+        return None;
+    }
+
+    let (row, col) = position.split_once(':')?;
+    Some((row.parse().ok()?, col.parse().ok()?))
 }
 
 pub fn get_pos_from_offset(source: &str, offset: usize) -> (usize, usize) {
@@ -201,4 +213,48 @@ fn get_nth_node(ast: &Program, node_idx: usize) -> Option<(Span, Option<String>)
     };
     visitor.visit_program(ast);
     visitor.target_node_span
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn eval_frame_position_of_installed_compilers() {
+        for compiler in [
+            "/app/node_modules/@style-this/core/dist/compiler.cjs",
+            "/app/node_modules/.pnpm/@style-this+core@0.6.1/node_modules/@style-this/core/dist/compiler.cjs",
+            r"C:\app\node_modules\@style-this\core\dist\compiler.cjs",
+        ] {
+            let eval_site = format!("eval at <anonymous> ({compiler}:600:16), <anonymous>:24:11");
+            assert_eq!(
+                eval_frame_position(&format!("    at getColor ({eval_site})")),
+                Some((24, 11))
+            );
+            assert_eq!(
+                eval_frame_position(&format!("    at {eval_site}")),
+                Some((24, 11))
+            );
+        }
+    }
+
+    #[test]
+    fn eval_frame_position_ignores_other_frames() {
+        assert_eq!(
+            eval_frame_position("    at getColor (/app/src/dep.tsx:4:9)"),
+            None
+        );
+        assert_eq!(
+            eval_frame_position(
+                "    at /app/node_modules/@style-this/core/dist/compiler.cjs:600:16"
+            ),
+            None
+        );
+        assert_eq!(
+            eval_frame_position(
+                "    at fn (eval at run (/app/node_modules/lib/index.js:1:1), <anonymous>:3:5)"
+            ),
+            None
+        );
+    }
 }

@@ -15,8 +15,10 @@ describe("evaluation errors", () => {
       const resolver = await getResolver();
       const plugin = await setupPlugin(resolver, { atomic, debug: false });
 
+      // the location of the evaluated code is mapped to the source
       await expect(loadCss(plugin, `${testDir}/dep.tsx`)).rejects.toMatchObject({
         message: "failed to compute color",
+        loc: { file: `${testDir}/dep.tsx`, line: 4, column: 9 },
       });
 
       // importers evaluate the failing module again instead of reading its missing exports
