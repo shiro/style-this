@@ -555,13 +555,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         it: VirtualProgramInsert<'alloc>,
         pos: Option<usize>,
     ) -> Option<String> {
-        let mut variable_names = it.name()?;
+        let variable_names = it.name()?;
         let span = it.span();
 
-        // if cached, grab from cache
-        variable_names.retain(|variable_name| {
-            let cached = self.value_cache.contains(variable_name);
-            if cached {
+        // if cached, grab from cache. A destructuring pattern with any uncached name is copied
+        // whole, which declares the cached names as well
+        if variable_names
+            .iter()
+            .all(|variable_name| self.value_cache.contains(variable_name))
+        {
+            for variable_name in &variable_names {
                 let variable_declaration = ast::build_variable_declaration_ident(
                     self.ast_builder,
                     span,
@@ -573,12 +576,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     .last_mut()
                     .unwrap()
                     .push(variable_declaration);
-                return false;
             }
-            true
-        });
-
-        if variable_names.is_empty() {
             return None;
         }
 
