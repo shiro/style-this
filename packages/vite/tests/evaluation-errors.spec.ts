@@ -21,9 +21,12 @@ describe("evaluation errors", () => {
         loc: { file: `${testDir}/dep.tsx`, line: 4, column: 9 },
       });
 
-      // importers evaluate the failing module again instead of reading its missing exports
+      // importers evaluate the failing module again instead of reading its missing exports, the code
+      // frame is of the failing module
       await expect(loadCss(plugin, `${testDir}/entry.tsx`)).rejects.toMatchObject({
         message: "failed to compute color",
+        loc: { file: `${testDir}/dep.tsx`, line: 4 },
+        frame: expect.stringContaining('> 4 |   throw new Error("failed to compute color");'),
       });
 
       // other importers of the failing module get the error too

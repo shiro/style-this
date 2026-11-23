@@ -474,7 +474,7 @@ const vitePlugin = (options: Options = {}) => {
           const resolved = await timeoutPromise(entry, TIMEOUT_DURATION);
 
           if (resolved instanceof Error)
-            handleTransformError(id, entry.code, resolved);
+            handleTransformError(sourceFilepath, entry.code, resolved);
 
           // Ensure resolved is a string
           if (typeof resolved !== "string") {

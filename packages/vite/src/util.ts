@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+
 export type Filter = RegExp | ((filepath: string) => boolean);
 
 /**
@@ -51,6 +53,14 @@ export const filterMatches = (filter: Filter[], filepath: string) => {
   );
 };
 
+const readFileOrUndefined = (filepath: string) => {
+  try {
+    return readFileSync(filepath, "utf-8");
+  } catch {
+    return undefined;
+  }
+};
+
 export const handleTransformError = (
   id: string,
   code: string,
@@ -74,9 +84,11 @@ export const handleTransformError = (
     : undefined;
 
   let frame: string | undefined;
+  // the error can be located in a dependency of `id`
+  const frameCode = filepath === id ? code : readFileOrUndefined(filepath);
 
-  if (loc) {
-    const lines = code.split("\n");
+  if (loc && frameCode !== undefined) {
+    const lines = frameCode.split("\n");
     const startLineNr = Math.max(0, loc.line - 3);
     const endLineNr = Math.min(lines.length, loc.line + 2);
     const padding = endLineNr.toString().length;
