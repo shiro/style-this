@@ -85,7 +85,7 @@ pub fn export_default_declaration_to_expression<'alloc>(
         ExportDefaultDeclarationKind::TemplateLiteral(it) => Expression::TemplateLiteral(it),
         ExportDefaultDeclarationKind::Identifier(it) => Expression::Identifier(it),
         ExportDefaultDeclarationKind::MetaProperty(it) => Expression::MetaProperty(it),
-        ExportDefaultDeclarationKind::Super(_) => todo!(),
+        ExportDefaultDeclarationKind::Super(it) => Expression::Super(it),
         ExportDefaultDeclarationKind::ArrayExpression(it) => Expression::ArrayExpression(it),
         ExportDefaultDeclarationKind::ArrowFunctionExpression(it) => {
             Expression::ArrowFunctionExpression(it)

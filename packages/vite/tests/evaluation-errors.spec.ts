@@ -53,5 +53,30 @@ describe("evaluation errors", () => {
         message: "failed to compute size",
       });
     });
+
+    test(`invalid default export is reported (${atomic ? "atomic" : "default"})`, async () => {
+      const testDir = `${__dirname}/evaluation-error-in-import`;
+      const resolver = await getResolver();
+      const plugin = await setupPlugin(resolver, { atomic, debug: false });
+
+      // used to panic, which hung the evaluation. Without a location, the source file is reported instead of the
+      // virtual id
+      await expect(loadCss(plugin, `${testDir}/entry-default-super.tsx`)).rejects.toMatchObject({
+        message: "'super' keyword unexpected here",
+        id: `${testDir}/entry-default-super.tsx`,
+      });
+    });
+
+    test(`default exported interface imported as a value is reported (${atomic ? "atomic" : "default"})`, async () => {
+      const testDir = `${__dirname}/evaluation-error-in-import`;
+      const resolver = await getResolver();
+      const plugin = await setupPlugin(resolver, { atomic, debug: false });
+
+      // used to panic, like a missing export it fails to read the value instead
+      await expect(loadCss(plugin, `${testDir}/entry-default-interface.tsx`)).rejects.toMatchObject({
+        message: expect.stringMatching(/^Cannot read properties of undefined/),
+        id: `${testDir}/entry-default-interface.tsx`,
+      });
+    });
   }
 });

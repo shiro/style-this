@@ -278,32 +278,29 @@ impl Transformer {
         id: &str,
         importer: &str,
     ) -> Result<(String, String), TransformError> {
-        let promise = self
+        let error = |cause| TransformError::ReadFileError {
+            filepath: id.to_string(),
+            cause,
+        };
+        let ret = self
             .load_file
             .call2(
                 &JsValue::UNDEFINED,
                 &JsValue::from_str(id),
                 &JsValue::from_str(importer),
             )
-            .unwrap();
-        let future = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::from(promise));
-        let ret = future
+            .map_err(error)?;
+        let ret = wasm_bindgen_futures::JsFuture::from(js_sys::Promise::resolve(&ret))
             .await
-            .map_err(|cause| TransformError::ReadFileError {
-                filepath: id.to_string(),
-                cause,
-            })?;
+            .map_err(error)?;
 
-        let arr = Array::from(&ret);
-        let mut arr = arr
-            .into_iter()
-            .map(|v| v.as_string().unwrap())
-            .collect::<Vec<String>>();
-
-        let filepath = arr.remove(0);
-        let code = arr.remove(0);
-
-        Ok((filepath, code))
+        let file = ret
+            .dyn_into::<Array>()
+            .ok()
+            .and_then(|arr| Some((arr.get(0).as_string()?, arr.get(1).as_string()?)));
+        file.ok_or_else(|| {
+            error(js_sys::Error::new("loadFile must resolve to [filepath, code]").into())
+        })
     }
 
     /// Import specifier of a virtual module imported by `filepath`, `resolveVirtualImport` replaces

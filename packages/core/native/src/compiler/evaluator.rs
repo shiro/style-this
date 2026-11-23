@@ -1223,7 +1223,8 @@ pub async fn evaluate_program<'alloc>(
         cached_exports.commit();
 
         // Extract CSS blocks from evaluated object
-        let obj = evaluated.dyn_into::<js_sys::Object>().unwrap();
+        // the program can only return the object literal appended above
+        let obj = evaluated.unchecked_into::<js_sys::Object>();
         let keys = js_sys::Object::keys(&obj);
         let mut css_blocks: HashMap<String, String> = HashMap::new();
 

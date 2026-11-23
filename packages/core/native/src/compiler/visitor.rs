@@ -1525,6 +1525,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if self.scan_pass {
             return;
         }
+        // types aren't values, there's nothing to export
+        if let ExportDefaultDeclarationKind::TSInterfaceDeclaration(_) = it.declaration {
+            return;
+        }
 
         let global_sentinel = DEFAULT_EXPORT;
         let referenced = self

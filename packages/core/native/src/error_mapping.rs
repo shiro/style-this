@@ -47,14 +47,12 @@ pub fn resolve_err(
             let _: Option<_> = try {
                 let error_offset = get_offset_from_pos(eval_program, row, col);
 
-                let Some(mut node_idx) = get_node_idx_from_offset(&eval_ast, error_offset) else {
-                    return None?;
-                };
+                let node_idx = get_node_idx_from_offset(&eval_ast, error_offset)?;
 
-                // take the program preable offset into account
-                node_idx -= program_start_node_idx;
-                // we also undercounted the "Program" node and a "use strict" string literal node
-                node_idx += 2;
+                // take the program preamble offset into account, frames in it aren't mapped
+                let node_idx = node_idx.checked_sub(program_start_node_idx)?
+                    // we also undercounted the "Program" node and a "use strict" string literal node
+                    + 2;
 
                 let Some((span, name)) = get_nth_node(source_ast, node_idx) else {
                     return None?;
