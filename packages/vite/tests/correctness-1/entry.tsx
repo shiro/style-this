@@ -89,10 +89,16 @@ const sized = css`
   ${spacing.margin().css}
 `;
 
-// `accent` is included on its own and as part of `theme`, both need its CSS
+function accent() {
+  return css`color: blue;`;
+}
+
+// the nested `accent` is included on its own and as part of `theme`, both need its CSS, the
+// hoisted one is renamed so it doesn't clash with the top level `accent` and uses `enabled`
 function theme() {
+  const enabled = true;
   function accent() {
-    return css`color: red;`;
+    return enabled ? css`color: red;` : undefined;
   }
   const link = css`${accent().css}`;
   return accent();
@@ -100,6 +106,7 @@ function theme() {
 
 const themed = css`
   ${theme().css}
+  ${accent().css}
 `;
 
 const unrelated = css`

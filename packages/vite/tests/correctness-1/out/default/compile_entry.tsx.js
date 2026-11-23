@@ -17,143 +17,154 @@ __styleThis_2.css = `color: hotpink;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
-// /packages/vite/tests/correctness-1/entry.tsx: {"Size", "__styleThis_12", "__styleThis_17", "__styleThis_19", "__styleThis_2", "__styleThis_4", "__styleThis_6", "__styleThis_9", "a", "a1", "accent", "b", "color", "comp", "css", "mib", "mutate", "s2", "sized", "spacing", "st", "style", "theme", "themed", "unrelated"}
+// /packages/vite/tests/correctness-1/entry.tsx: {"Size", "__styleThis_12", "__styleThis_15", "__styleThis_20", "__styleThis_24", "__styleThis_4", "__styleThis_5", "__styleThis_7", "__styleThis_9", "a", "a1", "accent", "b", "color", "comp", "css", "mib", "mutate", "s2", "sized", "spacing", "st", "style", "theme", "themed", "undefined", "unrelated"}
 "use strict";
 const a = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"];
 const mib = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
 let { css } = require("/packages/core/dist/index.mjs");
 let mutate = (v) => v;
-let __styleThis_17 = new String("__styleThis_17-ghy34l");
-__styleThis_17.css = `background: black;`;
-let __styleThis_var_a2_15 = () => {
+let __styleThis_20 = new String("__styleThis_20-rcdyrk");
+__styleThis_20.css = `background: black;`;
+let __styleThis_var_a2_18 = () => {
 	const a3 = () => {
-		return __styleThis_17;
+		return __styleThis_20;
 	};
 	return a3();
 };
-let __styleThis_var_wi_14 = __styleThis_var_a2_15();
-let __styleThis_var_m_13 = new String("m-7o5eb8");
-__styleThis_var_m_13.css = `${__styleThis_var_wi_14}
+let __styleThis_var_wi_17 = __styleThis_var_a2_18();
+let __styleThis_var_m_16 = new String("m-ghy34l");
+__styleThis_var_m_16.css = `${__styleThis_var_wi_17}
   `;
 let a1 = () => {
-	const a2 = __styleThis_var_a2_15;
-	const wi = __styleThis_var_wi_14;
-	const m = __styleThis_var_m_13;
+	const a2 = __styleThis_var_a2_18;
+	const wi = __styleThis_var_wi_17;
+	const m = __styleThis_var_m_16;
 	return wi;
 };
-let b = new String("b-no9e3s");
+let b = new String("b-7o5eb8");
 b.css = `${a1()}`;
-let __styleThis_9 = new String("__styleThis_9-zwper0");
-__styleThis_9.css = `@media (max-width: 500px) {
+let __styleThis_12 = new String("__styleThis_12-stinkp");
+__styleThis_12.css = `@media (max-width: 500px) {
       background: blue;
     }
   `;
-let __styleThis_12 = new String("__styleThis_12-ibwxer");
-__styleThis_12.css = `background: blue;
+let __styleThis_15 = new String("__styleThis_15-no9e3s");
+__styleThis_15.css = `background: blue;
     `;
-let __styleThis_var_c_11 = () => __styleThis_12;
-let __styleThis_var_s1_10 = new String("s1-stinkp");
-__styleThis_var_s1_10.css = `${__styleThis_var_c_11().css}
+let __styleThis_var_c_14 = () => __styleThis_15;
+let __styleThis_var_s1_13 = new String("s1-ibwxer");
+__styleThis_var_s1_13.css = `${__styleThis_var_c_14().css}
     `;
 let comp = () => {
 ("foob");
 	const b = () => {
-		const c = __styleThis_var_c_11;
-		const s1 = __styleThis_var_s1_10;
+		const c = __styleThis_var_c_14;
+		const s1 = __styleThis_var_s1_13;
 	};
 	mutate(b);
-	return __styleThis_9;
+	return __styleThis_12;
 };
-let __styleThis_expression_7 = { color: "blue" };
-let { color } = __styleThis_expression_7;
+let __styleThis_expression_10 = { color: "blue" };
+let { color } = __styleThis_expression_10;
 let st = `color: ${color};
   ${mib.foo().css}`;
-let s2 = new String("s2-abwhir");
+let s2 = new String("s2-zwper0");
 s2.css = `${st}
   ${comp().css}`;
-let __styleThis_6 = new String("__styleThis_6-9ib41m");
+let __styleThis_9 = new String("__styleThis_9-abwhir");
 class Size {
 	static base = 2;
 	static gap() {
-		const gap = __styleThis_var_gap_5;
-		return __styleThis_6;
+		const gap = __styleThis_var_gap_8;
+		return __styleThis_9;
 	}
 }
-let __styleThis_var_gap_5 = Size.base * 2;
-__styleThis_6.css = `gap: ${__styleThis_var_gap_5}px;`;
-let __styleThis_4 = new String("__styleThis_4-aj4l6b");
+let __styleThis_var_gap_8 = Size.base * 2;
+__styleThis_9.css = `gap: ${__styleThis_var_gap_8}px;`;
+let __styleThis_7 = new String("__styleThis_7-9ib41m");
 let spacing = {
 	base: 3,
 	margin() {
-		const margin = __styleThis_var_margin_3;
-		return __styleThis_4;
+		const margin = __styleThis_var_margin_6;
+		return __styleThis_7;
 	}
 };
-let __styleThis_var_margin_3 = spacing.base * 2;
-__styleThis_4.css = `margin: ${__styleThis_var_margin_3}px;`;
-let sized = new String("sized-irk5mb");
+let __styleThis_var_margin_6 = spacing.base * 2;
+__styleThis_7.css = `margin: ${__styleThis_var_margin_6}px;`;
+let sized = new String("sized-aj4l6b");
 sized.css = `${Size.gap().css}
   ${spacing.margin().css}`;
-let __styleThis_2 = new String("__styleThis_2-gta3sx");
-__styleThis_2.css = `color: red;`;
+let __styleThis_5 = new String("__styleThis_5-irk5mb");
+__styleThis_5.css = `color: blue;`;
 function accent() {
-	return __styleThis_2;
+	return __styleThis_5;
+}
+let __styleThis_var_enabled_3 = true;
+let __styleThis_4 = new String("__styleThis_4-gta3sx");
+__styleThis_4.css = `color: red;`;
+function __styleThis_var_accent_2() {
+	return __styleThis_var_enabled_3 ? __styleThis_4 : undefined;
 }
 let __styleThis_var_link_1 = new String("link-q74xyr");
-__styleThis_var_link_1.css = `${accent().css}`;
+__styleThis_var_link_1.css = `${__styleThis_var_accent_2().css}`;
 function theme() {
+	const enabled = __styleThis_var_enabled_3;
 	function accent() {
-		return __styleThis_2;
+		return enabled ? __styleThis_4 : undefined;
 	}
 	const link = __styleThis_var_link_1;
 	return accent();
 }
 let themed = new String("themed-3ctqjk");
-themed.css = `${theme().css}`;
+themed.css = `${theme().css}
+  ${accent().css}`;
 let unrelated = new String("unrelated-5y7cxe");
 unrelated.css = `background: none;
   ${a.foo.css}`;
-function gap() {
+function __styleThis_var_gap_21() {
 	return 4;
 }
-let __styleThis_19 = new String("__styleThis_19-rcdyrk");
-__styleThis_19.css = `gap: ${gap()}px;`;
+let __styleThis_24 = new String("__styleThis_24-olmb8t");
+__styleThis_24.css = `gap: ${__styleThis_var_gap_21()}px;`;
 return [
-`.__styleThis_19-rcdyrk {
-${__styleThis_19.css}
+`.__styleThis_24-olmb8t {
+${__styleThis_24.css}
 }`,
-`.__styleThis_17-ghy34l {
-${__styleThis_17.css}
+`.__styleThis_20-rcdyrk {
+${__styleThis_20.css}
 }`,
-`.m-7o5eb8 {
-${__styleThis_var_m_13.css}
+`.m-ghy34l {
+${__styleThis_var_m_16.css}
 }`,
-`.b-no9e3s {
+`.b-7o5eb8 {
 ${b.css}
 }`,
-`.__styleThis_12-ibwxer {
+`.__styleThis_15-no9e3s {
+${__styleThis_15.css}
+}`,
+`.s1-ibwxer {
+${__styleThis_var_s1_13.css}
+}`,
+`.__styleThis_12-stinkp {
 ${__styleThis_12.css}
 }`,
-`.s1-stinkp {
-${__styleThis_var_s1_10.css}
-}`,
-`.__styleThis_9-zwper0 {
-${__styleThis_9.css}
-}`,
-`.s2-abwhir {
+`.s2-zwper0 {
 ${s2.css}
 }`,
-`.__styleThis_6-9ib41m {
-${__styleThis_6.css}
+`.__styleThis_9-abwhir {
+${__styleThis_9.css}
 }`,
-`.__styleThis_4-aj4l6b {
-${__styleThis_4.css}
+`.__styleThis_7-9ib41m {
+${__styleThis_7.css}
 }`,
-`.sized-irk5mb {
+`.sized-aj4l6b {
 ${sized.css}
 }`,
-`.__styleThis_2-gta3sx {
-${__styleThis_2.css}
+`.__styleThis_5-irk5mb {
+${__styleThis_5.css}
+}`,
+`.__styleThis_4-gta3sx {
+${__styleThis_4.css}
 }`,
 `.link-q74xyr {
 ${__styleThis_var_link_1.css}

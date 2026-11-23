@@ -597,8 +597,8 @@ struct IdentifierReplacer<'a, 'alloc, F>
 where
     F: Fn(&str) -> Option<String>,
 {
-    ast_builder: Option<&'a AstBuilder<'alloc>>,
-    get_replacement: Option<&'a F>,
+    ast_builder: &'a AstBuilder<'alloc>,
+    get_replacement: &'a F,
 }
 
 pub fn replace_in_expression_using_identifiers<'alloc, F>(
@@ -608,21 +608,39 @@ pub fn replace_in_expression_using_identifiers<'alloc, F>(
 ) where
     F: Fn(&str) -> Option<String>,
 {
-    let mut t = IdentifierReplacer {
-        ast_builder: None,
-        get_replacement: None,
-    };
-
-    t.ast_builder = Some(ast_builder);
-    t.get_replacement = Some(get_replacement);
-
-    t.visit_expression(expression);
-
-    #[allow(unused_assignments)]
-    {
-        t.ast_builder = None;
-        t.get_replacement = None;
+    IdentifierReplacer {
+        ast_builder,
+        get_replacement,
     }
+    .visit_expression(expression);
+}
+
+pub fn replace_in_function_using_identifiers<'alloc, F>(
+    ast_builder: &AstBuilder<'alloc>,
+    function: &mut oxc_ast::ast::Function<'alloc>,
+    get_replacement: &F,
+) where
+    F: Fn(&str) -> Option<String>,
+{
+    IdentifierReplacer {
+        ast_builder,
+        get_replacement,
+    }
+    .visit_function(function, ScopeFlags::Function);
+}
+
+pub fn replace_in_class_using_identifiers<'alloc, F>(
+    ast_builder: &AstBuilder<'alloc>,
+    class: &mut oxc_ast::ast::Class<'alloc>,
+    get_replacement: &F,
+) where
+    F: Fn(&str) -> Option<String>,
+{
+    IdentifierReplacer {
+        ast_builder,
+        get_replacement,
+    }
+    .visit_class(class);
 }
 
 impl<'a, 'alloc, F> VisitMut<'alloc> for IdentifierReplacer<'a, 'alloc, F>
@@ -630,14 +648,14 @@ where
     F: Fn(&str) -> Option<String>,
 {
     fn visit_identifier_reference(&mut self, it: &mut oxc_ast::ast::IdentifierReference<'alloc>) {
-        if let Some(replacement) = self.get_replacement.as_ref().unwrap()(&it.name) {
-            it.name = self.ast_builder.unwrap().atom(&replacement);
+        if let Some(replacement) = (self.get_replacement)(&it.name) {
+            it.name = self.ast_builder.atom(&replacement);
         }
     }
 
     fn visit_binding_identifier(&mut self, it: &mut oxc_ast::ast::BindingIdentifier<'alloc>) {
-        if let Some(replacement) = self.get_replacement.as_ref().unwrap()(&it.name) {
-            it.name = self.ast_builder.unwrap().atom(&replacement);
+        if let Some(replacement) = (self.get_replacement)(&it.name) {
+            it.name = self.ast_builder.atom(&replacement);
         }
     }
 }

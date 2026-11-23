@@ -12,29 +12,29 @@ const Button = ({ variant }) => {
 	function gap() {
 		return 4;
 	}
-	return [mutate() ?? color, _styleThisClasses.__styleThis_19];
+	return [mutate() ?? color, _styleThisClasses.__styleThis_24];
 };
 const mutate = (v) => v;
 const a1 = () => {
 	const a2 = () => {
 		const a3 = () => {
-			return _styleThisClasses.__styleThis_17;
+			return _styleThisClasses.__styleThis_20;
 		};
 		return a3();
 	};
 	const wi = a2();
-	const m = _styleThisClasses.__styleThis_var_m_13;
+	const m = _styleThisClasses.__styleThis_var_m_16;
 	return wi;
 };
 const b = _styleThisClasses.b;
 const comp = () => {
 ("foob");
 	const b = () => {
-		const c = () => _styleThisClasses.__styleThis_12;
-		const s1 = _styleThisClasses.__styleThis_var_s1_10;
+		const c = () => _styleThisClasses.__styleThis_15;
+		const s1 = _styleThisClasses.__styleThis_var_s1_13;
 	};
 	mutate(b);
-	return _styleThisClasses.__styleThis_9;
+	return _styleThisClasses.__styleThis_12;
 };
 const { color } = { color: "blue" };
 const st = undefined;
@@ -44,21 +44,26 @@ class Size {
 	static base = 2;
 	static gap() {
 		const gap = Size.base * 2;
-		return _styleThisClasses.__styleThis_6;
+		return _styleThisClasses.__styleThis_9;
 	}
 }
 const spacing = {
 	base: 3,
 	margin() {
 		const margin = spacing.base * 2;
-		return _styleThisClasses.__styleThis_4;
+		return _styleThisClasses.__styleThis_7;
 	}
 };
 const sized = _styleThisClasses.sized;
-// `accent` is included on its own and as part of `theme`, both need its CSS
+function accent() {
+	return _styleThisClasses.__styleThis_5;
+}
+// the nested `accent` is included on its own and as part of `theme`, both need its CSS, the
+// hoisted one is renamed so it doesn't clash with the top level `accent` and uses `enabled`
 function theme() {
+	const enabled = true;
 	function accent() {
-		return _styleThisClasses.__styleThis_2;
+		return enabled ? _styleThisClasses.__styleThis_4 : undefined;
 	}
 	const link = _styleThisClasses.__styleThis_var_link_1;
 	return accent();

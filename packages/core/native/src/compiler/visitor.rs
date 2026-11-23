@@ -9,7 +9,8 @@ use crate::error_mapping::get_pos_from_offset;
 use crate::styled_component_transformer::ClassDisplayNames;
 use crate::utils::{
     self, binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
-    replace_in_expression_using_identifiers, replace_in_expression_using_spans,
+    replace_in_class_using_identifiers, replace_in_expression_using_identifiers,
+    replace_in_expression_using_spans, replace_in_function_using_identifiers,
     replace_in_statement_using_spans,
 };
 use oxc_allocator::{Allocator, CloneIn};
@@ -377,6 +378,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     }
                 }
 
+                replace_in_function_using_identifiers(self.ast_builder, &mut function, &|name| {
+                    self.get_alias(name).map(|v| v.to_string())
+                });
+
                 VirtualProgramInsert::FunctionDeclaration(function)
             }
             VirtualProgramInsert::ClassDeclaration(mut class) => {
@@ -393,6 +398,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     &mut class.body,
                     &self.replacement_points,
                 );
+
+                replace_in_class_using_identifiers(self.ast_builder, &mut class, &|name| {
+                    self.get_alias(name).map(|v| v.to_string())
+                });
 
                 VirtualProgramInsert::ClassDeclaration(class)
             }
@@ -1471,12 +1480,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 Statement::ClassDeclaration(class) => class.id.as_ref(),
                 _ => None,
             };
-            // not aliased, they keep their name in the virtual program
             if let Some(id) = id {
-                self.aliases
-                    .last_mut()
-                    .unwrap()
-                    .insert(id.name.to_string(), None);
+                let name = id.name.to_string();
+                let alias = (self.scope_depth != 1)
+                    .then(|| format!("{PREFIX}_var_{name}_{}", self.unique_number()));
+                self.aliases.last_mut().unwrap().insert(name, alias);
             }
         } else {
             // these walk the declaration themselves
