@@ -42,8 +42,9 @@ export const transformRuleConditions = {
  * from them), so these would otherwise depend on the project's location.
  */
 export const noopFileImport = (noopFile: string, filepath: string) => {
-  let noopFilepath = path.relative(path.dirname(filepath), noopFile);
-  if (!noopFilepath.startsWith(".")) noopFilepath = `./${noopFilepath}`;
+  // absolute if they're on different drives on Windows
+  let noopFilepath = path.relative(path.dirname(filepath), noopFile).replaceAll(path.sep, "/");
+  if (!path.isAbsolute(noopFilepath) && !noopFilepath.startsWith("../")) noopFilepath = `./${noopFilepath}`;
   const query = path.relative(path.dirname(noopFile), filepath).replaceAll(path.sep, "/");
   return `${noopFilepath}?filepath=${encodeURIComponent(query)}`;
 };

@@ -11,4 +11,10 @@ describe("noopFileImport", () => {
       "../node_modules/@style-this/webpack/style-this.css?filepath=..%2F..%2F..%2Fsrc%2FApp.tsx",
     );
   });
+
+  it("prefixes requests into dot-directories with `./`", () => {
+    const request = noopFileImport("/a/.yarn/@style-this/webpack/style-this.css", "/a/App.tsx");
+
+    expect(request).toBe("./.yarn/@style-this/webpack/style-this.css?filepath=..%2F..%2F..%2FApp.tsx");
+  });
 });
