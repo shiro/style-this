@@ -1,10 +1,12 @@
 // @ts-nocheck
 import { css } from "@style-this/core";
-import { getLink, Theme, weight } from "./b";
+import Palette, { getLink, Theme, weight } from "./b";
+import rounded from "./c";
 import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
 import "virtual:style-this:/entry.tsx.css";
 const color = "red";
 const nav = _styleThisClasses.nav;
+const page = _styleThisClasses.page;
 export function Button() {
 	const button = _styleThisClasses.__styleThis_var_button_1;
 	return button;

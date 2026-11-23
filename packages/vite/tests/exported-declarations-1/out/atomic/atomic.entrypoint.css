@@ -1,5 +1,6 @@
 @layer theme, base, components, utilities;
 @layer utilities {
+.c-DYDh7 { color: teal }
 .c-EoseN { color: blue }
 .c-TwPQN { color: red }
 .d-W_vHB { display: flex }

@@ -200,6 +200,21 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         );
     }
 
+    /// Visits the default export as a variable declaration of the default export sentinel.
+    fn visit_default_export_expression(&mut self, span: Span, expression: Expression<'alloc>) {
+        let variable_declarator =
+            ast::build_variable_declarator(self.ast_builder, span, DEFAULT_EXPORT, expression);
+
+        let mut statement =
+            Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                span,
+                VariableDeclarationKind::Let,
+                self.ast_builder.vec1(variable_declarator),
+                false,
+            ));
+        self.visit_statement(&mut statement);
+    }
+
     fn include_or_defer_declaration(
         &mut self,
         declaration: VirtualProgramInsert<'alloc>,
@@ -1512,19 +1527,48 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
 
         let global_sentinel = DEFAULT_EXPORT;
-
-        if !self
+        let referenced = self
             .referenced_idents
             .first()
             .unwrap()
-            .contains(global_sentinel)
-        {
+            .contains(global_sentinel);
+
+        if referenced {
+            self.exported_idents
+                .insert(global_sentinel.to_string(), global_sentinel.to_string());
+        }
+
+        // named declarations keep their name for same-file and self references, the default
+        // export is a variable pointing to it, declared below it
+        match &mut it.declaration {
+            ExportDefaultDeclarationKind::FunctionDeclaration(function)
+                if function.id.is_some() =>
+            {
+                // overload signatures would declare it once more
+                if referenced && function.body.is_some() {
+                    let name = &function.id.as_ref().unwrap().name;
+                    let expression = ast::build_identifier(self.ast_builder, function.span, name);
+                    self.visit_default_export_expression(function.span, expression);
+                }
+                self.visit_function_declaration(function, ScopeFlags::Function);
+                return;
+            }
+            ExportDefaultDeclarationKind::ClassDeclaration(class) if class.id.is_some() => {
+                if referenced {
+                    let name = &class.id.as_ref().unwrap().name;
+                    let expression = ast::build_identifier(self.ast_builder, class.span, name);
+                    self.visit_default_export_expression(class.span, expression);
+                }
+                self.visit_class_declaration(class);
+                return;
+            }
+            _ => {}
+        }
+
+        if !referenced {
             oxc_ast_visit::walk_mut::walk_export_default_declaration(self, it);
             return;
         }
-
-        self.exported_idents
-            .insert(global_sentinel.to_string(), global_sentinel.to_string());
 
         match &it.declaration {
             ExportDefaultDeclarationKind::FunctionDeclaration(function) => {
@@ -1555,24 +1599,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 let span = rest.span();
                 let expression =
                     utils::export_default_declaration_to_expression(self.allocator, rest);
-
-                // pretend the default export is actually a variable declaration
-                // for our meta variable
-                let variable_declarator = ast::build_variable_declarator(
-                    self.ast_builder,
-                    span,
-                    global_sentinel,
-                    expression,
-                );
-
-                let mut statement =
-                    Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
-                        span,
-                        VariableDeclarationKind::Let,
-                        self.ast_builder.vec1(variable_declarator),
-                        false,
-                    ));
-                self.visit_statement(&mut statement);
+                self.visit_default_export_expression(span, expression);
             }
         }
     }

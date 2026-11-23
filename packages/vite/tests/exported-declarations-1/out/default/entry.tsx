@@ -1,9 +1,11 @@
 // @ts-nocheck
 import { css } from "@style-this/core";
-import { getLink, Theme, weight } from "./b";
+import Palette, { getLink, Theme, weight } from "./b";
+import rounded from "./c";
 import "virtual:style-this:/entry.tsx.css";
 const color = "red";
-const nav = "nav-4xyb4t";
+const nav = "nav-4h6fk9";
+const page = "page-4xyb4t";
 export function Button() {
 	const button = "button-lajgtq";
 	return button;

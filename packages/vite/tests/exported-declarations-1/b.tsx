@@ -36,3 +36,11 @@ const borderStyle = "solid";
 // destructured into a temporary when the importer evaluates it, which doesn't change the class
 // names above
 export const { weight } = { weight: "bold" };
+
+// references itself under its local name
+export default class Palette {
+  static primary = "teal";
+  static accent = css`
+    color: ${Palette.primary};
+  `;
+}

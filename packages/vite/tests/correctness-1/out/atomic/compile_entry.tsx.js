@@ -1,4 +1,4 @@
-// /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"__global__export__", "__styleThis_1", "__styleThis_2", "css", "foo"}
+// /packages/vite/tests/correctness-1/a.tsx (/packages/vite/tests/correctness-1/entry.tsx): {"M", "__global__export__", "__styleThis_1", "__styleThis_2", "css", "foo"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let foo = new String("foo-l6j05a");
@@ -6,11 +6,12 @@ foo.css = `color: white;`;
 let __styleThis_1 = new String("__styleThis_1-gp6rwx");
 __styleThis_1.css = `color: green;
     `;
-class __global__export__ {
+class M {
 	static foo() {
 		return __styleThis_1;
 	}
 }
+let __global__export__ = M;
 let __styleThis_2 = new String("__styleThis_2-wduf4d");
 __styleThis_2.css = `color: hotpink;
   `;

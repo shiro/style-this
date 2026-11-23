@@ -1,11 +1,18 @@
 import { css } from "@style-this/core";
-import { getLink, Theme, weight } from "./b";
+import Palette, { getLink, Theme, weight } from "./b";
+import rounded from "./c";
 
 const color = "red";
 
 const nav = css`
   .${getLink()}, .${Theme.accent} {
     font-weight: ${weight};
+  }
+`;
+
+const page = css`
+  .${Page()} > .${Palette.accent}, .${rounded()} {
+    gap: 4px;
   }
 `;
 
