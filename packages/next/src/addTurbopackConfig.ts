@@ -7,7 +7,6 @@ import type {
 import { WithLinariaConfig } from "./types";
 import {
   regexFilepathQuery,
-  regexNoopAtomicProgram,
   transformExtensions,
 } from "@style-this/webpack/core";
 import { noopAtomicCssFilename } from "./loaders/consts";
@@ -32,9 +31,9 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
   const transformRule: TurbopackRuleConfigItem = {
     condition: {
       all: [
-        // same as the `node_modules` exclusion of the webpack rule
+        // same as `transformRuleConditions` of the webpack rule
         { not: "foreign" },
-        { not: { path: regexNoopAtomicProgram } },
+        { not: { query: /./ } },
       ],
     },
     loaders: [

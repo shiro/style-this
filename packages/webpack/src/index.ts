@@ -6,7 +6,7 @@ import {
   regexFilepathQuery,
   regexNoopAtomicProgram,
   regexNoopCss,
-  regexTransformExtension,
+  transformRuleConditions,
   type LoaderOptions,
 } from "./loaders/consts";
 
@@ -45,10 +45,9 @@ export class StyleThisPlugin {
         options,
       },
       {
-        test: regexTransformExtension,
+        ...transformRuleConditions,
         loader: path.resolve(__dirname, "./loaders/transformLoader.mjs"),
         options,
-        exclude: [/node_modules/, regexNoopAtomicProgram],
       },
     );
   }

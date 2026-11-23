@@ -1,5 +1,6 @@
+import path from "path";
 import { describe, it, expect, vi } from "vitest";
-import type { Configuration } from "webpack";
+import webpack, { type Configuration } from "webpack";
 import { withStyleThis } from "../src/index";
 import { loaderConfig } from "../src/loaders/consts";
 
@@ -40,6 +41,21 @@ describe("withStyleThis", () => {
     const transformRule = withStyleThis({}).turbopack?.rules?.[transformGlob];
 
     expect(rules?.[transformGlob]).toEqual([...expected, transformRule]);
+  });
+
+  it.each([
+    ["/app/page.tsx?__next_edge_ssr_entry__", ["webpackTransformLoader.mjs"]],
+    ["/app/page.tsx?raw", []],
+  ])("applies the webpack loaders of %s", (request, expected) => {
+    const webpackConfig: Configuration = { module: { rules: [] }, plugins: [] };
+    withStyleThis({}).webpack!(webpackConfig, {} as any);
+    const { ruleSet } = webpack(webpackConfig).newCompilationParams().normalModuleFactory;
+    const [resource, resourceQuery] = request.split(/(?=\?)/);
+
+    const effects = ruleSet.exec({ resource, resourceQuery, dependency: "esm", issuer: "", issuerLayer: "" });
+    expect(effects.flatMap((effect) => (effect.type === "use" ? [path.basename(effect.value.loader)] : []))).toEqual(
+      expected,
+    );
   });
 });
 

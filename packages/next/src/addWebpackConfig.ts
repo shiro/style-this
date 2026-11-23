@@ -7,7 +7,7 @@ import type * as Webpack from "webpack";
 import {
   regexFilepathQuery,
   regexNoopAtomicProgram,
-  regexTransformExtension,
+  transformRuleConditions,
 } from "@style-this/webpack/core";
 import { noopAtomicCssFile, regexNoopCss } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
@@ -80,10 +80,11 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
       });
 
       config.module.rules.push({
-        test: regexTransformExtension,
+        ...transformRuleConditions,
+        // Next's own queries, e.g. the pages of the edge runtime are imported with `?__next_edge_ssr_entry__`
+        resourceQuery: [transformRuleConditions.resourceQuery, /^\?__next_\w+__$/],
         loader: path.resolve(__dirname, "./loaders/webpackTransformLoader.mjs"),
         options: {},
-        exclude: [/node_modules/, regexNoopAtomicProgram],
       });
     }
 

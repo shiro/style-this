@@ -9,6 +9,6 @@ export {
   noopFileImport,
   regexFilepathQuery,
   regexNoopAtomicProgram,
-  regexTransformExtension,
   transformExtensions,
+  transformRuleConditions,
 } from "./loaders/consts";

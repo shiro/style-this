@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import path from "path";
+import type { RuleSetRule } from "webpack";
 import type { VirtualImportKind } from "@style-this/core/compiler";
 import type { LoaderConfig } from "./transform";
 
@@ -22,11 +23,18 @@ export const noopAtomicCssFile = (atomic: boolean) =>
 
 /** Extensions of the files the transform loader runs on. */
 export const transformExtensions = ["tsx", "ts", "jsx", "js", "mjs"];
-export const regexTransformExtension = new RegExp(`\\.(${transformExtensions.join("|")})$`);
 
 export const regexNoopCss = /[\\/]style-this\.css$/;
 export const regexNoopAtomicProgram = /[\\/]style-this\.atomic-program\.js$/;
 export const regexFilepathQuery = /[?&]filepath=/;
+
+/** The files the transform loader runs on. Like in vite, imports with a query (e.g. `?raw`) are skipped. */
+export const transformRuleConditions = {
+  test: new RegExp(`\\.(${transformExtensions.join("|")})$`),
+  // also skips the `?filepath=` imports of the noop atomic program file
+  resourceQuery: { not: [/./] },
+  exclude: /[\\/]node_modules[\\/]/,
+} satisfies RuleSetRule;
 
 /**
  * Import of `noopFile` from `filepath`, its loader serves the virtual module of `filepath`. The query holds
