@@ -9,7 +9,7 @@ import {
   regexNoopAtomicProgram,
   transformRuleConditions,
 } from "@style-this/webpack/core";
-import { noopAtomicCssFile, regexNoopCss } from "./loaders/consts";
+import { noopAtomicCssFile, regexNoopCss, type LoaderOptions } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -51,7 +51,9 @@ function modifyCssLoaderConfig(rules: Webpack.RuleSetRule[]) {
 
 export type LinariaConfig = NextConfig;
 
-export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
+export function addWebpackConfig({ ...nextConfig }: LinariaConfig, atomic: boolean) {
+  const loaderOptions: LoaderOptions = { bundler: "webpack", atomic };
+
   const webpack = (
     config: Webpack.Configuration,
     options: NextServer.WebpackConfigContext,
@@ -62,29 +64,29 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig) {
       config.resolve ??= {};
       config.resolve.alias = {
         ...(config.resolve.alias as Record<string, string>),
-        "@style-this/core/atomic$": noopAtomicCssFile,
+        "@style-this/core/atomic$": noopAtomicCssFile(atomic),
       };
 
       config.module.rules.push({
         test: regexNoopCss,
         resourceQuery: regexFilepathQuery,
         loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"),
-        options: {},
+        options: loaderOptions,
       });
 
       config.module.rules.push({
         test: regexNoopAtomicProgram,
         resourceQuery: regexFilepathQuery,
         loader: path.resolve(__dirname, "./loaders/atomicProgramLoader.mjs"),
-        options: {},
+        options: loaderOptions,
       });
 
       config.module.rules.push({
         ...transformRuleConditions,
         // Next's own queries, e.g. the pages of the edge runtime are imported with `?__next_edge_ssr_entry__`
         resourceQuery: [transformRuleConditions.resourceQuery, /^\?__next_\w+__$/],
-        loader: path.resolve(__dirname, "./loaders/webpackTransformLoader.mjs"),
-        options: {},
+        loader: path.resolve(__dirname, "./loaders/transformLoader.mjs"),
+        options: loaderOptions,
       });
     }
 

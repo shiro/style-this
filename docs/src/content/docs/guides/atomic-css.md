@@ -22,8 +22,8 @@ changes.
    new StyleThisPlugin({ atomic: true });
    ```
 
-   ```bash title="Next.js"
-   ATOMIC=1 next build
+   ```js title="next.config.mjs"
+   withStyleThis(nextConfig, { atomic: true });
    ```
 
 2. Import the atomic entrypoint **once**, in your app's root module (root layout, `_app`, `App.tsx`,

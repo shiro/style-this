@@ -9,7 +9,7 @@ import {
   regexFilepathQuery,
   transformExtensions,
 } from "@style-this/webpack/core";
-import { noopAtomicCssFilename } from "./loaders/consts";
+import { noopAtomicCssFilename, type LoaderOptions } from "./loaders/consts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,7 +25,8 @@ const appendRule = (
 ): TurbopackRuleConfigCollection =>
   userRule ? [...(Array.isArray(userRule) ? userRule : [userRule]), rule] : rule;
 
-export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig {
+export function addTurbopackConfig(config: WithLinariaConfig, atomic: boolean): WithLinariaConfig {
+  const options: LoaderOptions = { bundler: "turbopack", atomic };
   const userRules = config.turbopack?.rules;
 
   const transformRule: TurbopackRuleConfigItem = {
@@ -37,7 +38,7 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
       ],
     },
     loaders: [
-      { loader: path.resolve(__dirname, "./loaders/turbopackTransformLoader.mjs"), options: {} },
+      { loader: path.resolve(__dirname, "./loaders/transformLoader.mjs"), options },
     ],
   };
 
@@ -47,7 +48,7 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
     // plain CSS, CSS modules would rename the classes and the pages router accepts it outside `_app`
     type: "css" as const,
     loaders: [
-      { loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"), options: { bundler: "turbopack" } },
+      { loader: path.resolve(__dirname, "./loaders/cssLoader.mjs"), options },
     ],
   };
 
@@ -57,7 +58,7 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
       ...config.turbopack,
       resolveAlias: {
         ...config.turbopack?.resolveAlias,
-        "@style-this/core/atomic": `@style-this/next/${noopAtomicCssFilename}`,
+        "@style-this/core/atomic": `@style-this/next/${noopAtomicCssFilename(atomic)}`,
       },
       rules: {
         ...userRules,
@@ -70,7 +71,7 @@ export function addTurbopackConfig(config: WithLinariaConfig): WithLinariaConfig
           loaders: [
             {
               loader: path.resolve(__dirname, "./loaders/atomicProgramLoader.mjs"),
-              options: { bundler: "turbopack" },
+              options,
             },
           ],
         },

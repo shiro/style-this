@@ -42,7 +42,7 @@ needed for regular use.
 ```ts
 import { withStyleThis } from "@style-this/next";
 
-withStyleThis(config: NextConfig): NextConfig
+withStyleThis(config: NextConfig, options?: StyleThisNextOptions): NextConfig
 ```
 
 Setup guide: [Next.js](/frameworks/next/). Wraps a Next.js config with the loaders of
@@ -56,8 +56,8 @@ Setup guide: [Next.js](/frameworks/next/). Wraps a Next.js config with the loade
 
 The passed config isn't mutated.
 
-| Environment variable | Effect |
-| --- | --- |
-| `ATOMIC=1` | enables [atomic mode](/guides/atomic-css/) |
+| Option | Default | Description |
+| --- | --- | --- |
+| `atomic` | `false` | enables [atomic mode](/guides/atomic-css/) |
 
 Peer dependencies: `next >=16.2`, `webpack ^5`.

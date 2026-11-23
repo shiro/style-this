@@ -43,8 +43,28 @@ describe("withStyleThis", () => {
     expect(rules?.[transformGlob]).toEqual([...expected, transformRule]);
   });
 
+  it.each([false, true])("passes `atomic: %s` to every loader", (atomic) => {
+    const config = withStyleThis({}, { atomic });
+    const aliasFile = atomic ? "style-this.atomic-layers.css" : "style-this.atomic.css";
+
+    const turbopackRules = Object.values(config.turbopack?.rules ?? {}) as { loaders: { options: object }[] }[];
+    expect(turbopackRules.flatMap((rule) => rule.loaders.map((loader) => loader.options))).toEqual(
+      Array(4).fill({ bundler: "turbopack", atomic }),
+    );
+    expect(config.turbopack?.resolveAlias?.["@style-this/core/atomic"]).toBe(`@style-this/next/${aliasFile}`);
+
+    const webpackConfig: Configuration = { module: { rules: [] }, plugins: [] };
+    config.webpack!(webpackConfig, {} as any);
+    expect(webpackConfig.module!.rules!.map((rule: any) => rule.options)).toEqual(
+      Array(3).fill({ bundler: "webpack", atomic }),
+    );
+    expect(path.basename((webpackConfig.resolve!.alias as Record<string, string>)["@style-this/core/atomic$"])).toBe(
+      aliasFile,
+    );
+  });
+
   it.each([
-    ["/app/page.tsx?__next_edge_ssr_entry__", ["webpackTransformLoader.mjs"]],
+    ["/app/page.tsx?__next_edge_ssr_entry__", ["transformLoader.mjs"]],
     ["/app/page.tsx?raw", []],
   ])("applies the webpack loaders of %s", (request, expected) => {
     const webpackConfig: Configuration = { module: { rules: [] }, plugins: [] };
@@ -61,10 +81,19 @@ describe("withStyleThis", () => {
 
 describe("loaderConfig", () => {
   it("imports the CSS of the pages router's `_app` as global CSS", () => {
-    const { resolveVirtualImport } = loaderConfig({ bundler: "turbopack" });
+    const { resolveVirtualImport } = loaderConfig({ bundler: "turbopack", atomic: false });
 
     expect(resolveVirtualImport("css", "/app/src/pages/_app.tsx")).toMatch(/style-this\.global\.css\?filepath=/);
     expect(resolveVirtualImport("css", "/app/src/pages/_app.mjs")).toMatch(/style-this\.global\.css\?filepath=/);
     expect(resolveVirtualImport("css", "/app/src/pages/index.tsx")).toMatch(/style-this\.module\.css\?filepath=/);
+  });
+
+  it("creates a transformer per bundler and mode", () => {
+    expect(loaderConfig({ bundler: "turbopack", atomic: true })).toMatchObject({ atomic: true, useRequire: true });
+    expect(loaderConfig({ bundler: "webpack", atomic: false })).toMatchObject({ atomic: false, useRequire: false });
+    const keys = (["webpack", "turbopack"] as const).flatMap((bundler) =>
+      [false, true].map((atomic) => loaderConfig({ bundler, atomic }).key),
+    );
+    expect(new Set(keys).size).toBe(4);
   });
 });

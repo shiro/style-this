@@ -61,17 +61,10 @@ router components outside `_app`.
 
 ## Atomic mode
 
-Atomic mode is enabled with the `ATOMIC` environment variable:
+Atomic mode is enabled with the `atomic` option:
 
-```json title="package.json"
-{
-  "scripts": {
-    "dev": "next dev",
-    "dev:atomic": "ATOMIC=1 next dev",
-    "build": "next build",
-    "build:atomic": "ATOMIC=1 next build"
-  }
-}
+```js title="next.config.mjs"
+export default withStyleThis(nextConfig, { atomic: true });
 ```
 
 Import the atomic entrypoint in the root layout, and in `pages/_app` if you use the pages router:
@@ -86,7 +79,7 @@ Every file's stylesheet includes the atomic CSS it uses, the entrypoint fixes th
 
 ## Limitations
 
-- `withStyleThis` takes no style-this specific options, `ignoredImports` and `debug` aren't
+- `withStyleThis` only takes the `atomic` option, `ignoredImports` and `debug` aren't
   available.
 - No CSS source maps, see [HMR & source maps](/guides/hmr-and-sourcemaps/#source-maps).
 

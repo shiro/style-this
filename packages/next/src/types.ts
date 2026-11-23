@@ -15,3 +15,11 @@ export type WithLinariaConfig = NextConfig & {
    */
   // linaria?: LinariaTransformLoaderOptions;
 };
+
+export type StyleThisNextOptions = {
+  /**
+   * Enables atomic mode.
+   * @default false
+   */
+  atomic?: boolean;
+};

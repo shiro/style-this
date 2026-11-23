@@ -13,15 +13,13 @@ export const noopCssFiles = {
   global: path.join(packageRoot, "style-this.global.css"),
 };
 
-/** Toggled with `ATOMIC=1`, loaders run in processes that inherit the environment. */
-export const atomic = process.env.ATOMIC === "1";
-
 /**
  * `@style-this/core/atomic` resolves to one of these. The atomic CSS is served with the CSS of each
  * file, so the entrypoint only fixes the layer order in atomic mode.
  */
-export const noopAtomicCssFilename = atomic ? "style-this.atomic-layers.css" : "style-this.atomic.css";
-export const noopAtomicCssFile = path.join(packageRoot, noopAtomicCssFilename);
+export const noopAtomicCssFilename = (atomic: boolean) =>
+  atomic ? "style-this.atomic-layers.css" : "style-this.atomic.css";
+export const noopAtomicCssFile = (atomic: boolean) => path.join(packageRoot, noopAtomicCssFilename(atomic));
 
 /** The atomic class modules of transformed files point at this, the loader serves the module of `?filepath=`. */
 export const noopAtomicProgramFile = path.join(packageRoot, "style-this.atomic-program.js");
@@ -37,12 +35,13 @@ const resolveVirtualImport = (kind: VirtualImportKind, filepath: string) =>
 
 type Bundler = "webpack" | "turbopack";
 
-const loaderConfigs: Record<Bundler, LoaderConfig> = {
-  webpack: { key: "webpack", atomic, resolveVirtualImport },
-  turbopack: { key: "turbopack", atomic, resolveVirtualImport, useRequire: true },
-};
+/** Turbopack passes loader options as JSON, so they must be serializable. */
+export type LoaderOptions = { bundler: Bundler; atomic: boolean };
 
-type LoaderOptions = { bundler?: Bundler };
-
-/** The virtual module loaders are shared by both bundlers, they're told which one with the `bundler` option. */
-export const loaderConfig = ({ bundler = "webpack" }: LoaderOptions) => loaderConfigs[bundler];
+/** The loaders are shared by both bundlers, they're told which one with the `bundler` option. */
+export const loaderConfig = ({ bundler, atomic }: LoaderOptions): LoaderConfig => ({
+  key: `${bundler}:${atomic}`,
+  atomic,
+  resolveVirtualImport,
+  useRequire: bundler === "turbopack",
+});
