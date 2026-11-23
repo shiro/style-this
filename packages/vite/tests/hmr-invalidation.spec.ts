@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
-import { setupPlugin } from "./util/testUtil";
+import { cssOfFile, setupPlugin } from "./util/testUtil";
 import { mkdtemp, readFile, rm, writeFile, unlink } from "fs/promises";
 import { tmpdir } from "os";
 import { basename, join } from "path";
@@ -195,13 +195,7 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
   const transform = async (name: string) =>
     plugin.transform(await readFile(path(name), "utf-8"), path(name));
 
-  /** CSS that applies to the file, in atomic mode that includes all atomic CSS. */
-  const cssOf = async (name: string) => {
-    const moduleCss = await loadCode(plugin, `${VIRTUAL_PREFIX}${path(name)}.css`);
-    if (!atomic) return moduleCss;
-    await loadCode(plugin, `${VIRTUAL_PREFIX}${path(name)}.style-this.js`);
-    return moduleCss + (await loadCode(plugin, ATOMIC_ENTRYPOINT_ID));
-  };
+  const cssOf = (name: string) => cssOfFile((id) => loadCode(plugin, id), path(name), { atomic });
 
   const hotUpdate = async (
     name: string,
@@ -450,10 +444,8 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
     // cached CSS and values that didn't change
     expect(await cssOf("d.tsx")).toContain("width: 8px");
     expect(await cssOf("f.tsx")).toContain("border-style: solid");
-    if (!atomic) {
-      expect(await cssOf("c.tsx")).not.toContain("red");
-      expect(await cssOf("e.tsx")).not.toContain("darkred");
-    }
+    expect(await cssOf("c.tsx")).not.toContain("color: red");
+    expect(await cssOf("e.tsx")).not.toContain("darkred");
 
     // re-evaluating a file that depends on unchanged cached values
     await edit("f.tsx", (code) => code.replace("border-style", "border-top-style"));

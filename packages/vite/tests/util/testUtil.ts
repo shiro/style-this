@@ -320,6 +320,31 @@ export const resetRandom = (() => {
 
 export const tsx = (raw: TemplateStringsArray) => raw.join("");
 
+/**
+ * CSS that applies to a file. In atomic mode that's its module CSS plus only the atomic entrypoint rules of the
+ * classes its atomic module (`<file>.style-this.js`) currently references, other files' (and stale) atomic rules
+ * are excluded.
+ */
+export const cssOfFile = async (
+  load: (id: string) => Promise<string>,
+  file: string,
+  options: { atomic: boolean },
+) => {
+  const prefix = "\0virtual:style-this:";
+  const moduleCss = await load(`${prefix}${file}.css`);
+  if (!options.atomic) return moduleCss;
+
+  const atomicModule = await load(`${prefix}${file}.style-this.js`);
+  const classes = new Set(
+    [...atomicModule.matchAll(/=\s*"([^"]*)"/g)].flatMap(([, value]) => value.split(/\s+/).filter(Boolean)),
+  );
+  const entrypoint = await load(`${prefix}__style_this_atomic_entrypoint.css`);
+  const rules = [...entrypoint.matchAll(/^\s*\.([\w-]+)[^{]*\{[^}]*\}/gm)]
+    .filter(([, name]) => classes.has(name))
+    .map(([rule]) => rule.trim());
+  return [moduleCss, ...rules].join("\n");
+};
+
 export const setupPlugin = async (
   resolver: Record<string, string | Promise<string>>,
   options?: Record<string, unknown>,

@@ -1,11 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from "vitest";
-import { setupPlugin } from "./util/testUtil";
+import { cssOfFile, setupPlugin } from "./util/testUtil";
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { basename, join } from "path";
-
-const VIRTUAL_PREFIX = "\0virtual:style-this:";
-const ATOMIC_ENTRYPOINT_ID = `${VIRTUAL_PREFIX}__style_this_atomic_entrypoint.css`;
 
 type Plugin = Awaited<ReturnType<typeof setupPlugin>>;
 
@@ -129,13 +126,9 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
   const transform = async (name: string) =>
     plugin.transform(await readFile(path(name), "utf-8"), path(name));
 
-  /** CSS that applies to the file, in atomic mode that includes all atomic CSS. */
   const cssOf = async (name: string) => {
     await transform(name);
-    const moduleCss = await loadCode(plugin, `${VIRTUAL_PREFIX}${path(name)}.css`);
-    if (!atomic) return moduleCss;
-    await loadCode(plugin, `${VIRTUAL_PREFIX}${path(name)}.style-this.js`);
-    return moduleCss + (await loadCode(plugin, ATOMIC_ENTRYPOINT_ID));
+    return cssOfFile((id) => loadCode(plugin, id), path(name), { atomic });
   };
 
   /** Writes a file and runs the HMR update, returns the affected source files. */

@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { MONOREPO_ROOT_DIR, setupPlugin } from "./util/testUtil";
+import { cssOfFile, MONOREPO_ROOT_DIR, setupPlugin } from "./util/testUtil";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "fs/promises";
 import { join, relative } from "path";
 
@@ -297,10 +297,7 @@ export const style = css\`
           ]).finally(() => clearTimeout(timeout));
           return result;
         };
-        const cssOf = async () =>
-          atomic
-            ? `${await load(virtualId(a, "style-this.js"))}\n${await load(ATOMIC_ENTRYPOINT_ID)}`
-            : load(virtualId(a, "css"));
+        const cssOf = () => cssOfFile(load, relative(MONOREPO_ROOT_DIR, a), { atomic });
 
         let timestamp = 0;
         const edit = async (code: string) => {

@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { setupPlugin } from "./util/testUtil";
+import { cssOfFile, setupPlugin } from "./util/testUtil";
 
 type Plugin = Awaited<ReturnType<typeof setupPlugin>>;
 
-const VIRTUAL_PREFIX = "\0virtual:style-this:";
 const cssImport = `import { css } from "@style-this/core";`;
 
 /** Deadlocks never settle, fail instead of waiting for the test timeout */
@@ -70,13 +69,7 @@ describe.each([false, true])("circular imports (atomic: %s)", (atomic) => {
     return typeof result === "string" ? result : (result?.code ?? "");
   };
 
-  /** CSS that applies to the file, in atomic mode that includes all atomic CSS. */
-  const cssOf = async (name: string) => {
-    const moduleCss = await load(`${VIRTUAL_PREFIX}${path(name)}.${plugin.cssExtension}`);
-    if (!atomic) return moduleCss;
-    await load(`${VIRTUAL_PREFIX}${path(name)}.style-this.js`);
-    return moduleCss + (await load(`${VIRTUAL_PREFIX}__style_this_atomic_entrypoint.css`));
-  };
+  const cssOf = (name: string) => cssOfFile(load, path(name), { atomic });
 
   const circularError = (from: string, to: string) =>
     `circular import of '${path(to)}' from '${path(from)}', its values can't be used before it's evaluated`;
