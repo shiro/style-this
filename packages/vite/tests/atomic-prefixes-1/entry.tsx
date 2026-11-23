@@ -36,6 +36,18 @@ const important = css`
   }
 `;
 
+// consecutive declarations of a property are fallbacks, they're kept in order in a single class.
+// Declarations without a value are dropped, except for custom properties.
+const fallbacks = css`
+  color: blue;
+  display: -webkit-box;
+  display: flex;
+  width: 100%;
+  width: -webkit-fill-available;
+  color: ${""};
+  --empty: ;
+`;
+
 export const merged = mergeStyles(duplicates, shorthands, sameDeclaration);
 
-export { duplicates, shorthands, sameDeclaration, important };
+export { duplicates, shorthands, sameDeclaration, important, fallbacks };

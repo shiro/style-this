@@ -1,4 +1,4 @@
-.duplicates-ijw9ev {
+.duplicates-hyrgl2 {
 --accent: red;
   padding: 16px;
   color: red;
@@ -7,7 +7,7 @@
   -webkit-line-clamp: 2;
   --accent: blue;
 }
-.shorthands-bcdq7s {
+.shorthands-ijw9ev {
 margin: 8px;
   margin-top: 4px;
   background: none;
@@ -15,12 +15,21 @@ margin: 8px;
   border: 0;
   border-top: 1px solid red;
 }
-.sameDeclaration-rc1qzs {
+.sameDeclaration-bcdq7s {
 margin: 8px;
 }
-.important-v4pm30 {
+.important-rc1qzs {
 color: red !important;
   &.active {
     color: blue !important;
   }
+}
+.fallbacks-v4pm30 {
+color: blue;
+  display: -webkit-box;
+  display: flex;
+  width: 100%;
+  width: -webkit-fill-available;
+  color: ;
+  --empty: ;
 }

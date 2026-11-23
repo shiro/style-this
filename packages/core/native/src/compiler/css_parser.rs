@@ -30,6 +30,7 @@ pub fn parse_css(css: &str) -> ParseCssResult {
 
     for segment in split_top_level_segments(&stripped) {
         match segment {
+            TopLevelSegment::Declaration(decl_text) if has_empty_value(decl_text) => {}
             TopLevelSegment::Declaration(decl_text) if is_atomizable_declaration(decl_text) => {
                 let normalized = decl_text.trim().trim_end_matches(';').to_string();
                 atomizable.retain(|existing| existing != &normalized);
@@ -206,6 +207,17 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     segments
 }
 
+/// Whether a declaration has no value, e.g. `color: ;` or an interpolation that rendered `''`.
+/// It's invalid and ignored by browsers, but would override earlier declarations when atomized.
+/// Custom properties may be empty (`--x: ;`).
+fn has_empty_value(decl_text: &str) -> bool {
+    decl_text
+        .trim()
+        .trim_end_matches(';')
+        .split_once(':')
+        .is_some_and(|(property, value)| value.trim().is_empty() && !property.trim().starts_with("--"))
+}
+
 /// Check if a declaration is a single valid declaration without `!important`, of a property with
 /// an atomic prefix. The `;` is optional, since the last declaration of a template may omit it.
 /// Layers reverse the cascade of `!important` declarations, layered (atomic) ones would beat the
@@ -359,6 +371,13 @@ mod tests {
             result.non_atomizable.as_deref(),
             Some("&:hover {\n  color: blue;\n}")
         );
+    }
+
+    #[test]
+    fn declarations_without_value_are_dropped() {
+        let result = parse_css("color: red;\ncolor: ;\nmargin: /* none */;\n--x: ;\ncolor:");
+        assert_eq!(result.atomizable, vec!["color: red".to_string()]);
+        assert_eq!(result.non_atomizable.as_deref(), Some("--x: ;"));
     }
 
     #[test]

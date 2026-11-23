@@ -12,5 +12,8 @@ const shorthands = _styleThisClasses.shorthands;
 const sameDeclaration = _styleThisClasses.sameDeclaration;
 // `!important` declarations aren't atomized, a layered one would beat the nested override
 const important = _styleThisClasses.important;
+// consecutive declarations of a property are fallbacks, they're kept in order in a single class.
+// Declarations without a value are dropped, except for custom properties.
+const fallbacks = _styleThisClasses.fallbacks;
 export const merged = mergeStyles(duplicates, shorthands, sameDeclaration);
-export { duplicates, shorthands, sameDeclaration, important };
+export { duplicates, shorthands, sameDeclaration, important, fallbacks };
