@@ -35,6 +35,13 @@ pub enum TransformError {
         row: usize,
         column: usize,
     },
+    #[error("'{tag}' templates can't be destructured")]
+    DestructuredTemplateError {
+        tag: String,
+        filepath: String,
+        row: usize,
+        column: usize,
+    },
 }
 
 impl From<TransformError> for JsValue {
@@ -69,6 +76,12 @@ impl From<&TransformError> for JsValue {
                 column,
             }
             | TransformError::AccessDynamicVariableError {
+                filepath,
+                row,
+                column,
+                ..
+            }
+            | TransformError::DestructuredTemplateError {
                 filepath,
                 row,
                 column,

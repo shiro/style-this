@@ -15,6 +15,8 @@ const styled = (body: string) => `${cssImport}\n\nexport const style = css\`\n  
 const syntaxError = `${cssImport}\n\nexport const style = css\`\n  color: blue;\n\`;\n\ninvalid(...\n`;
 // function parameters can't be evaluated at build time
 const dynamicVariableAccess = `${cssImport}\n\nexport const style = (color: string) => css\`\n  color: \${color};\n\`;\n`;
+// used to panic, which hung the transform
+const destructuredTemplate = `${cssImport}\n\nexport const [style] = css\`\n  color: blue;\n\`;\n`;
 
 const createEnvironment = () => {
   const modules = new Map<string, { id: string; url: string; file: string; lastHMRTimestamp: number; importers: Set<unknown> }>();
@@ -107,6 +109,7 @@ describe.each([false, true])("transform errors (atomic: %s)", (atomic) => {
   test.each([
     ["syntax errors", syntaxError, "failed to parse program"],
     ["dynamic variable access", dynamicVariableAccess, "tried to access dynamic variable 'color'"],
+    ["destructured templates", destructuredTemplate, "'css' templates can't be destructured"],
   ])("%s don't block the virtual modules", async (_, code, message) => {
     await writeFile(path("broken.tsx"), code);
     await expect(transform("broken.tsx")).rejects.toMatchObject({ message: expect.stringContaining(message) });

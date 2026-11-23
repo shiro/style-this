@@ -1343,7 +1343,14 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 || Some(tag) == self.style_function_name.as_deref())
         {
             let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
-                panic!("css variable declaration was not a regular variable declaration")
+                let (row, column) = get_pos_from_offset(self.program_code, it.span.start as usize);
+                self.error = Some(TransformError::DestructuredTemplateError {
+                    tag: tag.to_string(),
+                    filepath: self.program_filepath.to_string(),
+                    row,
+                    column,
+                });
+                return;
             };
 
             oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
