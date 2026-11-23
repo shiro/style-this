@@ -1,19 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { isInNodeModules } from "../src/util";
 
-// simulate Windows: `process.cwd()` uses `\`, resolved ids may use either separator
-vi.mock("path", async (importOriginal) => {
-  const { win32 } = await importOriginal<typeof import("path")>();
-  return { ...win32, default: win32 };
-});
-
-describe("isInNodeModules on Windows", () => {
+describe("isInNodeModules", () => {
   it.each([
     ["C:\\app\\node_modules\\lib\\index.js", true],
-    ["C:/app/node_modules/lib/index.js", true],
+    // e.g. the workspace root's in monorepos
+    ["/repo/node_modules/.pnpm/lib@1.0.0/node_modules/lib/index.js", true],
     ["C:\\app\\src\\node_modules.ts", false],
-    ["C:\\other\\node_modules\\lib\\index.js", false],
   ])("%s", (filepath, expected) => {
-    expect(isInNodeModules("C:\\app", filepath)).toBe(expected);
+    expect(isInNodeModules(filepath)).toBe(expected);
   });
 });

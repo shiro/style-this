@@ -1,10 +1,10 @@
-import { relative, sep } from "path";
-
 export type Filter = RegExp | ((filepath: string) => boolean);
 
-/** Whether `filepath` is inside `cwd`'s `node_modules`, `/` and `\` separators are both accepted on Windows. */
-export const isInNodeModules = (cwd: string, filepath: string) =>
-  relative(cwd, filepath).split(sep, 1)[0] === "node_modules";
+/**
+ * Whether `filepath` is inside any `node_modules`, e.g. the workspace root's in monorepos. `/` and `\`
+ * separators are both accepted on Windows.
+ */
+export const isInNodeModules = (filepath: string) => /[\\/]node_modules[\\/]/.test(filepath);
 
 const TIMEOUT = Symbol("TIMEOUT");
 

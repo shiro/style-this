@@ -15,21 +15,24 @@ export const chainSourceMap = (sourcemap: string, inputSourceMap: InputSourceMap
     ? remapping([sourcemap, inputSourceMap as SourceMapInput], () => null)
     : JSON.parse(sourcemap);
 
-/** Whether `filepath` is inside `cwd`'s `node_modules`, `/` and `\` separators are both accepted on Windows. */
-export const isInNodeModules = (cwd: string, filepath: string) =>
-  path.relative(cwd, filepath).split(path.sep, 1)[0] === "node_modules";
+/**
+ * Whether `filepath` is inside any `node_modules`, e.g. the workspace root's in monorepos. `/` and `\`
+ * separators are both accepted on Windows.
+ */
+export const isInNodeModules = (filepath: string) => /[\\/]node_modules[\\/]/.test(filepath);
 
 export const makeLoadFile = (ctx: LoaderCtx) => {
   const resolveSync = ctx.getResolve({ dependencyType: "esm" });
   const cwd = process.cwd();
 
+  const importerDir = (importer: string) =>
+    path.isAbsolute(importer) ? path.dirname(importer) : path.join(cwd, path.dirname(importer));
+
   const resolve = (
     token: string,
     importer: string,
   ): Promise<string | undefined> => {
-    const context = path.isAbsolute(importer)
-      ? path.dirname(importer)
-      : path.join(process.cwd(), path.dirname(importer));
+    const context = importerDir(importer);
     return new Promise((ok) => {
       resolveSync(context, token, (err, result) => {
         if (err) {
@@ -59,7 +62,7 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
     let filepath = resolved ?? importSourceId;
 
     if (
-      !isInNodeModules(cwd, filepath) &&
+      !isInNodeModules(filepath) &&
       !importSourceId.startsWith("@style-this/")
     ) {
       try {
@@ -71,7 +74,9 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
     // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
     // bundled one (that might not yet exist on disk)
     // also do not load the contents, the transformer should require(...) it as-is
-    filepath = require.resolve(importSourceId);
+    // like Node from the importer, monorepo packages can have their own dependencies, then from the project
+    // for files outside of it
+    filepath = require.resolve(importSourceId, { paths: [importerDir(importer), cwd] });
     return [filepath, ""];
   };
 

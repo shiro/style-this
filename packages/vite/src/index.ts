@@ -1,6 +1,6 @@
 import { DevEnvironment, EnvironmentModuleNode, Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
-import { isAbsolute, relative, resolve as resolvePath } from "path";
+import { dirname, isAbsolute, relative, resolve as resolvePath } from "path";
 import {
   Transformer,
   initializeStyleThis,
@@ -319,7 +319,7 @@ const vitePlugin = (options: Options = {}) => {
         if (query !== undefined) return [`${filepath}?${query}`, await readFile(filepath, "utf-8")];
 
         if (
-          !isInNodeModules(cwd, filepath) &&
+          !isInNodeModules(filepath) &&
           !id.startsWith("@style-this/")
         ) {
           try {
@@ -328,7 +328,9 @@ const vitePlugin = (options: Options = {}) => {
           } catch (err) { }
         }
 
-        filepath = require.resolve(id);
+        // like Node from the importer, monorepo packages can have their own dependencies, then from the project
+        // for files outside of it
+        filepath = require.resolve(id, { paths: [dirname(importer), cwd] });
 
         return [filepath, ""];
       };
