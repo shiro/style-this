@@ -112,6 +112,24 @@ fn strip_comments(css: &str) -> String {
                 escaped = false;
                 continue;
             }
+            // an unquoted url is a single token, `/*` in it is part of the url, e.g. `url(//a/*.png)`
+            '(' if !escaped && ends_with_url_function_name(&output) => {
+                output.push(ch);
+                while let Some(ch) = chars.next_if(|ch| ch.is_whitespace()) {
+                    output.push(ch);
+                }
+                if !matches!(chars.peek(), Some('\'' | '"')) {
+                    let mut url_escaped = false;
+                    for ch in chars.by_ref() {
+                        output.push(ch);
+                        if ch == ')' && !url_escaped {
+                            break;
+                        }
+                        url_escaped = ch == '\\' && !url_escaped;
+                    }
+                }
+                continue;
+            }
             _ => {}
         }
 
@@ -120,6 +138,16 @@ fn strip_comments(css: &str) -> String {
     }
 
     output
+}
+
+fn ends_with_url_function_name(css: &str) -> bool {
+    let Some(name_start) = css.len().checked_sub(3).filter(|&idx| css.is_char_boundary(idx)) else {
+        return false;
+    };
+    css[name_start..].eq_ignore_ascii_case("url")
+        && !css[..name_start].ends_with(|ch: char| {
+            ch.is_ascii_alphanumeric() || !ch.is_ascii() || matches!(ch, '-' | '_' | '\\')
+        })
 }
 
 /// Split CSS into top-level segments (declarations and blocks), `;` and braces inside parentheses
@@ -383,6 +411,8 @@ mod tests {
                 color: blue;
             }
             content: '/* not a comment */';
+            background: url(//cdn/a/*.png);
+            cursor: URL( a\\)/*.png ), auto;
         "};
         let result = parse_css(input);
 
@@ -391,6 +421,8 @@ mod tests {
             vec![
                 "color: red".to_string(),
                 "content: '/* not a comment */'".to_string(),
+                "background: url(//cdn/a/*.png)".to_string(),
+                r"cursor: URL( a\)/*.png ), auto".to_string(),
             ]
         );
         let non_atomizable = result.non_atomizable.unwrap();
