@@ -170,10 +170,9 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
         segments.push(TopLevelSegment::Declaration(rest));
     }
 
-    segments.retain(|segment| match segment {
-        TopLevelSegment::Declaration(text) | TopLevelSegment::Block(text) => {
-            !text.trim().is_empty()
-        }
+    // empty declarations, e.g. from `;;` or `};`
+    segments.retain(|segment| {
+        !matches!(segment, TopLevelSegment::Declaration(text) if text.trim().trim_end_matches(';').is_empty())
     });
 
     segments
@@ -318,6 +317,16 @@ mod tests {
 
         let result = parse_css("&:hover {\n  color: blue;\n}\nmargin-top: 1px /* ; */");
         assert_eq!(result.atomizable, vec!["margin-top: 1px".to_string()]);
+        assert_eq!(
+            result.non_atomizable.as_deref(),
+            Some("&:hover {\n  color: blue;\n}")
+        );
+    }
+
+    #[test]
+    fn empty_declarations_are_dropped() {
+        let result = parse_css("color: red;;\n  ;\n&:hover {\n  color: blue;\n};");
+        assert_eq!(result.atomizable, vec!["color: red".to_string()]);
         assert_eq!(
             result.non_atomizable.as_deref(),
             Some("&:hover {\n  color: blue;\n}")
