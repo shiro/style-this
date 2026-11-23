@@ -525,6 +525,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .any(|aliases| aliases.contains_key(name))
     }
 
+    /// The names requested from a namespace import, unless a local variable shadows it.
+    fn namespace_import_mut(&mut self, name: &str) -> Option<&mut HashSet<String>> {
+        if self.variable_exists(name) {
+            return None;
+        }
+        self.namespace_imports
+            .get_mut(name)
+            .map(|(_, remote_referenced_idents)| remote_referenced_idents)
+    }
+
     fn get_dynamic_variable(&self, name: &str) -> bool {
         self.dynamic_variable_names
             .iter()
@@ -1175,14 +1185,12 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     fn visit_member_expression(&mut self, it: &mut oxc_ast::ast::MemberExpression<'alloc>) {
         if !self.scan_pass
             && let Some(property) = it.static_property_name()
-            && let Some(object) = it
-                .object()
-                .get_identifier_reference()
-                .map(|id| id.name.as_str())
-            && !self.variable_exists(object)
-            && let Some((_, remote_referenced_idents)) = self.namespace_imports.get_mut(object)
+            && let Some(object) = it.object().get_identifier_reference()
+            && let Some(remote_referenced_idents) = self.namespace_import_mut(&object.name)
         {
             remote_referenced_idents.insert(property.to_string());
+            // the namespace object isn't used as a whole, see `visit_expression`
+            return;
         }
 
         oxc_ast_visit::walk_mut::walk_member_expression(self, it);
@@ -1195,6 +1203,12 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if self.scan_pass {
             oxc_ast_visit::walk_mut::walk_expression(self, it);
             return;
+        }
+        // e.g. `pick(ns)` or `{ ...ns }`, other than its members
+        if let Expression::Identifier(ident) = it
+            && let Some(remote_referenced_idents) = self.namespace_import_mut(&ident.name)
+        {
+            remote_referenced_idents.insert(STAR_IMPORT.to_string());
         }
         if let Expression::TaggedTemplateExpression(template) = it
             && let Some(tag) = utils::tagged_template_get_tag(template)

@@ -37,8 +37,9 @@ let accent = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexp
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] ?? {}), accent,base,secondary};
 
-// /packages/vite/tests/reexports-2/entry.tsx: {"box", "css", "own", "palette", "primary", "scale", "secondary", "tokens"}
+// /packages/vite/tests/reexports-2/entry.tsx: {"Object", "Record", "box", "css", "own", "palette", "primary", "scale", "secondary", "sizes", "tokens", "total"}
 "use strict";
+const sizes = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/sizes.ts"];
 const tokens = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"]["tokens"];
 const palette = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"]["palette"];
 const own = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"]["own"];
@@ -46,6 +47,7 @@ const secondary = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexpor
 const primary = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"]["primary"];
 let { css } = require("/packages/core/dist/index.mjs");
 let scale = 2;
+let total = (values) => Object.values(values).reduce((a, b) => a + b);
 let box = new String("box-wt6b8t");
 box.css = `color: ${primary};
   background: ${secondary};
@@ -53,7 +55,8 @@ box.css = `color: ${primary};
   outline-color: ${palette.accent};
   caret-color: ${palette.secondary};
   text-decoration-color: ${tokens.base};
-  width: ${scale * 10}px;`;
+  width: ${scale * 10}px;
+  padding: ${total(sizes)}px;`;
 return [
 `.box-wt6b8t {
 ${box.css}
@@ -68,3 +71,10 @@ let secondary = "navy";
 const __styleThis_star_reexport_0 = { ...__styleThis_reexport_0 };
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/palette.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/palette.ts"] ?? {}), ...__styleThis_star_reexport_0,secondary};
+
+// /packages/vite/tests/reexports-2/sizes.ts (/packages/vite/tests/reexports-2/entry.tsx): {"__star__", "gap", "radius"}
+"use strict";
+let gap = 4;
+let radius = 2;
+
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/sizes.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/sizes.ts"] ?? {}), gap,radius};
