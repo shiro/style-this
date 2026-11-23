@@ -1,6 +1,24 @@
 import { readFileSync } from "fs";
+import path from "path";
 
 export type Filter = RegExp | ((filepath: string) => boolean);
+
+/**
+ * Posix path like vite ids (`path` returns `\` on Windows). Same as vite's `normalizePath`, but it follows
+ * `path` instead of the platform, so it's testable with `path.win32`.
+ */
+export const normalizePath = (filepath: string) => path.posix.normalize(filepath.replaceAll(path.sep, "/"));
+
+/**
+ * Path of the virtual id of `filepath`. Virtual ids end up in bundle output (e.g. region comments), keep them
+ * relative to `cwd` so output and chunk hashes don't depend on the project location.
+ */
+export const toVirtualPath = (cwd: string, filepath: string) => {
+  const relativePath = path.relative(cwd, filepath);
+  return normalizePath(relativePath.startsWith("..") || path.isAbsolute(relativePath) ? filepath : relativePath);
+};
+
+export const fromVirtualPath = (cwd: string, virtualPath: string) => normalizePath(path.resolve(cwd, virtualPath));
 
 /**
  * Whether `filepath` is inside any `node_modules`, e.g. the workspace root's in monorepos. `/` and `\`

@@ -1,6 +1,6 @@
 import { DevEnvironment, EnvironmentModuleNode, Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
-import { dirname, isAbsolute, relative, resolve as resolvePath } from "path";
+import { dirname, resolve as resolvePath } from "path";
 import {
   Transformer,
   initializeStyleThis,
@@ -9,7 +9,7 @@ import {
 } from "@style-this/core/compiler";
 import { generateCssSourceMap } from "@style-this/core/cssSourceMap";
 import { createRequire } from "node:module";
-import { Filter, filterMatches, isInNodeModules, timeoutPromise, TIMEOUT } from "./util";
+import { Filter, filterMatches, fromVirtualPath, isInNodeModules, normalizePath, timeoutPromise, TIMEOUT, toVirtualPath } from "./util";
 import { handleTransformError } from "./util";
 import { initializeSolidMocks } from "./solid";
 import {
@@ -126,13 +126,8 @@ const vitePlugin = (options: Options = {}) => {
   let cwd = process.cwd();
   const mocks = new Map<string, string>();
 
-  // resolved ids end up in bundle output (e.g. region comments), keep them relative to `cwd` so
-  // output and chunk hashes don't depend on the project location
-  const toVirtualId = (filepath: string) => {
-    const relativePath = relative(cwd, filepath);
-    return resolvedVirtualModulePrefix + (relativePath.startsWith("..") || isAbsolute(relativePath) ? filepath : relativePath);
-  };
-  const fromVirtualId = (id: string) => resolvePath(cwd, id.slice(resolvedVirtualModulePrefix.length));
+  const toVirtualId = (filepath: string) => resolvedVirtualModulePrefix + toVirtualPath(cwd, filepath);
+  const fromVirtualId = (id: string) => fromVirtualPath(cwd, id.slice(resolvedVirtualModulePrefix.length));
 
   const atomicEntrypointId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
   /**
@@ -362,10 +357,8 @@ const vitePlugin = (options: Options = {}) => {
           throw new Error(`Virtual module '${id}' must be imported from another module, not loaded directly`);
 
         const idPart = id.slice(virtualModulePrefix.length);
-        const importerDir = require('path').dirname(importer);
-        const absoluteIdPart = require('path').resolve(importerDir, idPart);
 
-        return toVirtualId(absoluteIdPart);
+        return toVirtualId(resolvePath(dirname(importer), idPart));
       }
 
       if (importer && importer.startsWith(resolvedVirtualModulePrefix) && importer.endsWith('.style-this.js')) {
@@ -373,9 +366,7 @@ const vitePlugin = (options: Options = {}) => {
         const sourceFilePath = virtualPath.slice(0, -'.style-this.js'.length);
 
         if ((id.startsWith('./') || id.startsWith('../')) && sourceFilePath) {
-          const path = require('path');
-          const resolvedPath = path.resolve(path.dirname(sourceFilePath), id);
-          return resolvedPath;
+          return normalizePath(resolvePath(dirname(sourceFilePath), id));
         }
       }
     },
@@ -484,14 +475,10 @@ const vitePlugin = (options: Options = {}) => {
           if (!isAtomicProgram) {
             const metadata = cssSourceMapMetadata.get(filepath);
             if (metadata) {
-              const absoluteSourcePath = sourceFilepath.startsWith('/')
-                ? sourceFilepath
-                : `/${sourceFilepath}`;
-
               const sourcemap = generateCssSourceMap(
                 resolved,
                 metadata.sourcemapData,
-                absoluteSourcePath,
+                sourceFilepath,
                 metadata.originalSource,
                 filepath,
               );
