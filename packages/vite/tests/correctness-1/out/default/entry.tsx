@@ -11,47 +11,56 @@ const Button = ({ variant }) => {
 	function gap() {
 		return 4;
 	}
-	return [mutate() ?? color, "__styleThis_17-no9e3s"];
+	return [mutate() ?? color, "__styleThis_19-rcdyrk"];
 };
 const mutate = (v) => v;
 const a1 = () => {
 	const a2 = () => {
 		const a3 = () => {
-			return "__styleThis_15-ibwxer";
+			return "__styleThis_17-ghy34l";
 		};
 		return a3();
 	};
 	const wi = a2();
-	const m = "m-stinkp";
+	const m = "m-7o5eb8";
 	return wi;
 };
-const b = "b-zwper0";
+const b = "b-no9e3s";
 const comp = () => {
 ("foob");
 	const b = () => {
-		const c = () => "__styleThis_10-abwhir";
-		const s1 = "s1-9ib41m";
+		const c = () => "__styleThis_12-ibwxer";
+		const s1 = "s1-stinkp";
 	};
 	mutate(b);
-	return "__styleThis_7-aj4l6b";
+	return "__styleThis_9-zwper0";
 };
 const { color } = { color: "blue" };
 const st = undefined;
-const s2 = "s2-irk5mb";
+const s2 = "s2-abwhir";
 // read themselves, the locals hoisted out of them go below them
 class Size {
 	static base = 2;
 	static gap() {
 		const gap = Size.base * 2;
-		return "__styleThis_4-gta3sx";
+		return "__styleThis_6-9ib41m";
 	}
 }
 const spacing = {
 	base: 3,
 	margin() {
 		const margin = spacing.base * 2;
-		return "__styleThis_2-q74xyr";
+		return "__styleThis_4-aj4l6b";
 	}
 };
-const sized = "sized-3ctqjk";
+const sized = "sized-irk5mb";
+// `accent` is included on its own and as part of `theme`, both need its CSS
+function theme() {
+	function accent() {
+		return "__styleThis_2-gta3sx";
+	}
+	const link = "link-q74xyr";
+	return accent();
+}
+const themed = "themed-3ctqjk";
 const unrelated = "unrelated-5y7cxe";

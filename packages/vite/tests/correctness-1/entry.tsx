@@ -89,6 +89,19 @@ const sized = css`
   ${spacing.margin().css}
 `;
 
+// `accent` is included on its own and as part of `theme`, both need its CSS
+function theme() {
+  function accent() {
+    return css`color: red;`;
+  }
+  const link = css`${accent().css}`;
+  return accent();
+}
+
+const themed = css`
+  ${theme().css}
+`;
+
 const unrelated = css`
   background: none;
   ${a.foo.css}

@@ -527,101 +527,65 @@ pub fn escape_raw_quasis<'alloc>(
     }
 }
 
+/// The replacements are kept, each copy of a declaration needs them, e.g. a nested class is
+/// included on its own and as part of the function declaring it.
 struct SpanReplacer<'a, 'alloc> {
-    ast_builder: Option<&'a AstBuilder<'alloc>>,
-    replacement_points: Option<&'a mut HashMap<Span, Expression<'alloc>>>,
+    ast_builder: &'a AstBuilder<'alloc>,
+    replacement_points: &'a HashMap<Span, Expression<'alloc>>,
 }
 
 pub fn replace_in_expression_using_spans<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     expression: &mut Expression<'alloc>,
-    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
+    replacement_points: &HashMap<Span, Expression<'alloc>>,
 ) {
-    let mut t = SpanReplacer {
-        ast_builder: None,
-        replacement_points: None,
-    };
-
     if replacement_points.is_empty() {
         return;
     }
 
-    t.ast_builder = Some(ast_builder);
-    t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
-
-    t.visit_expression(expression);
-
-    #[allow(unused_assignments)]
-    {
-        t.ast_builder = None;
-        t.replacement_points = None;
+    SpanReplacer {
+        ast_builder,
+        replacement_points,
     }
+    .visit_expression(expression);
 }
 
 pub fn replace_in_statement_using_spans<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     statement: &mut Statement<'alloc>,
-    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
+    replacement_points: &HashMap<Span, Expression<'alloc>>,
 ) {
-    let mut t = SpanReplacer {
-        ast_builder: None,
-        replacement_points: None,
-    };
-
     if replacement_points.is_empty() {
         return;
     }
 
-    t.ast_builder = Some(ast_builder);
-    t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
-
-    t.visit_statement(statement);
-
-    #[allow(unused_assignments)]
-    {
-        t.ast_builder = None;
-        t.replacement_points = None;
+    SpanReplacer {
+        ast_builder,
+        replacement_points,
     }
+    .visit_statement(statement);
 }
 
 pub fn replace_in_class_body_using_spans<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     class_body: &mut ClassBody<'alloc>,
-    replacement_points: &mut HashMap<Span, Expression<'alloc>>,
+    replacement_points: &HashMap<Span, Expression<'alloc>>,
 ) {
-    let mut t = SpanReplacer {
-        ast_builder: None,
-        replacement_points: None,
-    };
-
     if replacement_points.is_empty() {
         return;
     }
 
-    t.ast_builder = Some(ast_builder);
-    t.replacement_points = Some(unsafe { std::mem::transmute(replacement_points) });
-
-    t.visit_class_body(class_body);
-
-    #[allow(unused_assignments)]
-    {
-        t.ast_builder = None;
-        t.replacement_points = None;
+    SpanReplacer {
+        ast_builder,
+        replacement_points,
     }
+    .visit_class_body(class_body);
 }
 
 impl<'a, 'alloc> VisitMut<'alloc> for SpanReplacer<'a, 'alloc> {
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
-        let span = it.span();
-        if let Some(replacement) = self
-            .replacement_points
-            .as_deref_mut()
-            .unwrap()
-            .remove(&span)
-        {
-            let ast_builder = self.ast_builder.unwrap();
-
-            *it = replacement.clone_in(ast_builder.allocator);
+        if let Some(replacement) = self.replacement_points.get(&it.span()) {
+            *it = replacement.clone_in(self.ast_builder.allocator);
             return;
         }
 

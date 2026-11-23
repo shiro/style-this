@@ -372,7 +372,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                         replace_in_statement_using_spans(
                             self.ast_builder,
                             statement,
-                            &mut self.replacement_points,
+                            &self.replacement_points,
                         );
                     }
                 }
@@ -391,7 +391,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 replace_in_class_body_using_spans(
                     self.ast_builder,
                     &mut class.body,
-                    &mut self.replacement_points,
+                    &self.replacement_points,
                 );
 
                 VirtualProgramInsert::ClassDeclaration(class)
@@ -412,7 +412,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 replace_in_expression_using_spans(
                     self.ast_builder,
                     &mut right,
-                    &mut self.replacement_points,
+                    &self.replacement_points,
                 );
 
                 replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
