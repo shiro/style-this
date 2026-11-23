@@ -153,11 +153,39 @@ import { brand } from "./star";
 
 export const uStyle = ${css("color: ${brand.accent};\n  background: ${brand.ink};")};
 `,
+  "level1.ts": `export const size = "10px";
+export const color = "red";
+`,
+  "level2.ts": `import { size, color } from "./level1";
+
+export const size2 = \`calc(\${size} * 2)\`;
+export const color2 = \`dark\${color}\`;
+`,
+  "level3.ts": `import { size2 } from "./level2";
+
+export const size3 = \`max(\${size2}, 50px)\`;
+export const label = "x";
+`,
+  "level4.tsx": `${cssImport}
+import { size3 } from "./level3";
+
+export const level4Style = ${css("font-size: clamp(20px, ${size3}, 100px);")};
+`,
+  "level4-label.tsx": `${cssImport}
+import { label } from "./level3";
+
+export const level4LabelStyle = ${css('content: "${label}";')};
+`,
+  "level3-color.tsx": `${cssImport}
+import { color2 } from "./level2";
+
+export const level3ColorStyle = ${css("color: ${color2};")};
+`,
 };
 
 const entrypoints = [
   "b.tsx", "c.tsx", "d.tsx", "e.tsx", "f.tsx", "h.tsx", "i.tsx", "j.tsx", "k.tsx", "l.tsx", "nav.tsx", "header.tsx",
-  "w.tsx", "r.tsx", "s.tsx", "t.tsx", "u.tsx",
+  "w.tsx", "r.tsx", "s.tsx", "t.tsx", "u.tsx", "level4.tsx", "level4-label.tsx", "level3-color.tsx",
 ];
 
 const createEnvironment = (name = "client") => {
@@ -306,6 +334,22 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
 
     await transform("w.tsx");
     expect(await cssOf("w.tsx")).toContain("border: 2px dashed");
+  });
+
+  test("changes propagate through chains of derived exports", async () => {
+    expect(await cssOf("level4.tsx")).toContain("font-size: clamp(20px, max(calc(10px * 2), 50px), 100px)");
+
+    expect(await edit("level1.ts", (code) => code.replace("10px", "12px"))).toEqual(
+      ["level1.ts", "level2.ts", "level3.ts", "level4.tsx"],
+    );
+    expect(await edit("level1.ts", (code) => code.replace("red", "blue"))).toEqual(
+      ["level1.ts", "level2.ts", "level3-color.tsx"],
+    );
+
+    await transform("level4.tsx");
+    await transform("level3-color.tsx");
+    expect(await cssOf("level4.tsx")).toContain("font-size: clamp(20px, max(calc(12px * 2), 50px), 100px)");
+    expect(await cssOf("level3-color.tsx")).toContain("color: darkblue");
   });
 
   test("export specifiers and re-exports invalidate importers of the changed exports", async () => {
