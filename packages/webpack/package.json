@@ -35,14 +35,19 @@
   },
   "dependencies": {
     "@jridgewell/remapping": "^2.3.5",
-    "@style-this/core": "workspace:*",
-    "@types/node": "^24.10.1",
-    "webpack": "^5.0.0"
+    "@style-this/core": "workspace:*"
   },
   "peerDependencies": {
     "webpack": "^5.0.0"
   },
+  "peerDependenciesMeta": {
+    "webpack": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "@jridgewell/trace-mapping": "^0.3.31"
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "@types/node": "^24.10.1",
+    "webpack": "^5.0.0"
   }
 }

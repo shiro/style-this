@@ -300,14 +300,13 @@ importers:
         version: 5.2.7(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)(webpack-cli@6.0.1)(webpack@5.102.1)
 
   packages/core:
-    dependencies:
-      '@rollup/plugin-wasm':
-        specifier: 6.2.2
-        version: 6.2.2(rollup@4.62.4)
     devDependencies:
       '@eslint/js':
         specifier: 9.39.1
         version: 9.39.1
+      '@rollup/plugin-wasm':
+        specifier: 6.2.2
+        version: 6.2.2(rollup@4.62.4)
       '@vitest/eslint-plugin':
         specifier: 1.4.1
         version: 1.4.1(eslint@9.39.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)(vitest@4.0.8(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.33.0)(sass@1.90.0)(supports-color@10.2.2)(terser@5.44.1)(tsx@4.23.1))
@@ -332,16 +331,16 @@ importers:
       '@style-this/webpack':
         specifier: workspace:0.6.1
         version: link:../webpack
+    devDependencies:
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
-      webpack:
-        specifier: ^5.0.0
-        version: 5.102.1(esbuild@0.28.1)(webpack-cli@6.0.1)
-    devDependencies:
       next:
         specifier: 16.2.12
         version: 16.2.12(@babel/core@7.29.7(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.90.0)
+      webpack:
+        specifier: ^5.0.0
+        version: 5.102.1(esbuild@0.28.1)(webpack-cli@6.0.1)
 
   packages/react:
     dependencies:
@@ -383,16 +382,16 @@ importers:
       '@style-this/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@jridgewell/trace-mapping':
+        specifier: ^0.3.31
+        version: 0.3.31
       '@types/node':
         specifier: ^24.10.1
         version: 24.10.1
       webpack:
         specifier: ^5.0.0
         version: 5.102.1(esbuild@0.28.1)(webpack-cli@6.0.1)
-    devDependencies:
-      '@jridgewell/trace-mapping':
-        specifier: ^0.3.31
-        version: 0.3.31
 
 packages:
 

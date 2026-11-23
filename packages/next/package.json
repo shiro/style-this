@@ -33,15 +33,20 @@
   },
   "dependencies": {
     "@style-this/core": "workspace:0.6.1",
-    "@style-this/webpack": "workspace:0.6.1",
-    "@types/node": "^24.10.1",
-    "webpack": "^5.0.0"
+    "@style-this/webpack": "workspace:0.6.1"
   },
   "peerDependencies": {
     "next": ">=16.2",
     "webpack": "^5.0.0"
   },
+  "peerDependenciesMeta": {
+    "webpack": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "next": "16.2.12"
+    "@types/node": "^24.10.1",
+    "next": "16.2.12",
+    "webpack": "^5.0.0"
   }
 }

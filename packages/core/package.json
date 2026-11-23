@@ -16,8 +16,8 @@
       "default": "./dist/index.mjs"
     },
     "./compiler": {
-      "require": "./dist/compiler.cjs",
       "types": "./dist/compiler.d.cts",
+      "require": "./dist/compiler.cjs",
       "import": "./dist/compiler.cjs",
       "default": "./dist/compiler.cjs"
     },
@@ -48,13 +48,11 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
+    "@rollup/plugin-wasm": "6.2.2",
     "@vitest/eslint-plugin": "1.4.1",
     "eslint": "9.39.1",
     "tsdown": "0.16.1",
     "typescript-eslint": "8.46.3",
     "vitest": "4.0.8"
-  },
-  "dependencies": {
-    "@rollup/plugin-wasm": "6.2.2"
   }
 }
