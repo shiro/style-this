@@ -5,11 +5,12 @@ import type * as NextServer from "next/dist/server/config-shared";
 import type * as Webpack from "webpack";
 
 import {
+  dropRemovedFiles,
   regexFilepathQuery,
   regexNoopAtomicProgram,
   transformRuleConditions,
 } from "@style-this/webpack/core";
-import { noopAtomicCssFile, regexNoopCss, type LoaderOptions } from "./loaders/consts";
+import { loaderConfig, noopAtomicCssFile, regexNoopCss, type LoaderOptions } from "./loaders/consts";
 import { isCssLoader, isCssModule } from "./utils/webpack-utils";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -88,6 +89,8 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig, atomic: boole
         loader: path.resolve(__dirname, "./loaders/transformLoader.mjs"),
         options: loaderOptions,
       });
+
+      config.plugins.push({ apply: (compiler) => dropRemovedFiles(compiler, loaderConfig(loaderOptions)) });
     }
 
     if (typeof nextConfig.webpack === "function") {

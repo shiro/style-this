@@ -22,7 +22,9 @@ export const chainSourceMap = (sourcemap: string, inputSourceMap: InputSourceMap
 export const isInNodeModules = (filepath: string) => /[\\/]node_modules[\\/]/.test(filepath);
 
 export const makeLoadFile = (ctx: LoaderCtx) => {
-  const resolveSync = ctx.getResolve({ dependencyType: "esm" });
+  // the virtual module loaders resolve the imports of the source file with the options of their noop
+  // file, `.js` files of `"type": "module"` packages (like it) would require fully specified imports
+  const resolveSync = ctx.getResolve({ dependencyType: "esm", fullySpecified: false });
   const cwd = process.cwd();
 
   const importerDir = (importer: string) =>

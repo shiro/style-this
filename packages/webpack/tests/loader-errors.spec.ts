@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import transformLoader from "../src/loaders/transformLoader";
 import cssLoader from "../src/loaders/cssLoader";
-import { cssFiles } from "../src/shared";
-import { resolveRequest, runLoader, virtualImport } from "./util";
+import { loaderState, resolveRequest, runLoader, virtualImport } from "./util";
 
 const styled = (color: string) => `import { css } from "@style-this/core";
 export const cls = css\`
@@ -18,7 +17,7 @@ describe("transform loader errors", () => {
     const { err } = await runLoader(transformLoader, styled("red") + SYNTAX_ERROR, filepath);
 
     expect(err).toBeInstanceOf(Error);
-    expect(cssFiles.has(`${filepath}.css`)).toBe(false);
+    expect(loaderState().cssFiles.has(`${filepath}.css`)).toBe(false);
   });
 
   it("reports the resolver's error for unresolvable imports", async () => {

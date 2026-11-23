@@ -3,6 +3,7 @@ export {
   createAtomicProgramLoader,
   createCssLoader,
   createTransformLoader,
+  dropRemovedFiles,
   type LoaderConfig,
 } from "./loaders/transform";
 export {

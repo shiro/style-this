@@ -7,8 +7,10 @@ import {
   regexNoopAtomicProgram,
   regexNoopCss,
   transformRuleConditions,
+  webpackLoaderConfig,
   type LoaderOptions,
 } from "./loaders/consts";
+import { dropRemovedFiles } from "./loaders/transform";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,5 +52,7 @@ export class StyleThisPlugin {
         options,
       },
     );
+
+    dropRemovedFiles(compiler, webpackLoaderConfig(options));
   }
 }

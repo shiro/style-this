@@ -1,6 +1,7 @@
 import path from "path";
 import { createRequire } from "node:module";
-import type { LoaderOptions } from "../src/loaders/consts";
+import { webpackLoaderConfig, type LoaderOptions } from "../src/loaders/consts";
+import { getState } from "../src/loaders/transform";
 
 type LoaderResult = { err: Error | null | undefined; result?: string; map?: unknown };
 type ResolveCallback = (err: Error | null, result?: string) => void;
@@ -15,13 +16,22 @@ export const resolveRequest = (context: string, request: string, cb: ResolveCall
   }
 };
 
+// vitest's module runner doesn't support the dynamic `import()` of evaluations
+const loaderOptions = (options: LoaderOptions) => ({ useRequire: true, ...options });
+
+/** The transformer and virtual modules the loaders with `options` share. */
+export const loaderState = (options: LoaderOptions = {}) => getState(webpackLoaderConfig(loaderOptions(options)));
+
 /** `ctx` overrides fields of the loader context. */
 export const runLoader = (
   loader: Function,
   code: string,
   resource: string,
   options: LoaderOptions = {},
-  ctx: { addDependency?: (file: string) => void; getResolve?: () => typeof resolveRequest } = {},
+  ctx: {
+    addDependency?: (file: string) => void;
+    getResolve?: (options: { fullySpecified?: boolean }) => typeof resolveRequest;
+  } = {},
   inputSourceMap?: unknown,
 ) =>
   new Promise<LoaderResult>((resolve) => {
@@ -33,10 +43,8 @@ export const runLoader = (
         resourcePath: queryStart === -1 ? resource : resource.slice(0, queryStart),
         resourceQuery: queryStart === -1 ? "" : resource.slice(queryStart),
         async: () => callback,
-        // vitest's module runner doesn't support the dynamic `import()` of evaluations
-        getOptions: () => ({ useRequire: true, ...options }),
+        getOptions: () => loaderOptions(options),
         callback,
-        cacheable: () => {},
         addDependency: () => {},
         getResolve: () => resolveRequest,
         ...ctx,

@@ -31,6 +31,8 @@ describe("withStyleThis", () => {
     config.webpack!(webpackConfig, {} as any);
     expect(userWebpack).toHaveBeenCalledWith(webpackConfig, {});
     expect(webpackConfig.module.rules).toHaveLength(3);
+    // drops the cache of removed files
+    expect(webpackConfig.plugins).toHaveLength(1);
   });
 
   it.each([

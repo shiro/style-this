@@ -1,4 +1,4 @@
-import type { RawLoaderDefinitionFunction } from "webpack";
+import type { Compiler, RawLoaderDefinitionFunction } from "webpack";
 import {
   initializeStyleThis,
   Transformer,
@@ -7,14 +7,16 @@ import {
 } from "@style-this/core/compiler";
 import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
-import { atomicFiles, cacheRegistry, cssFiles } from "../shared";
 import { noopFileImportFilepath } from "./consts";
 import { chainSourceMap, makeLoadFile } from "./shared";
 
 type LoaderCtx = ThisParameterType<RawLoaderDefinitionFunction>;
 
 export type LoaderConfig = {
-  /** Loaders with the same `key` share a transformer, it's created with the config of the first one. */
+  /**
+   * Loaders with the same `key` share a transformer and its cache, it's created with the config of
+   * the first one. It must identify the config.
+   */
   key: string;
   atomic: boolean;
   resolveVirtualImport: (kind: VirtualImportKind, filepath: string) => string;
@@ -26,29 +28,75 @@ type GetConfig<Options> = (options: Options) => LoaderConfig;
 
 export const cssExtension = "css";
 export const atomicProgramExtension = "style-this.js";
-const transformers = new Map<string, Promise<Transformer>>();
 
-const getTransformer = (config: LoaderConfig, loadFile: ReturnType<typeof makeLoadFile>) => {
-  let transformer = transformers.get(config.key);
-  if (!transformer) {
-    transformer = initializeStyleThis().then(
+/**
+ * The transformer of a config with the virtual modules it resolved: the CSS of `<filepath>.css` in
+ * `cssFiles`, in atomic mode the class module of `<filepath>.style-this.js` in `atomicFiles`.
+ */
+type State = {
+  transformer: Promise<Transformer>;
+  cssFiles: Map<string, CssCachEntry>;
+  atomicFiles: Map<string, CssCachEntry>;
+};
+
+// per process and config rather than per compiler: Turbopack runs the loaders without one (in a pool of
+// processes), and compilers with the same config can share the cache, it's checked against the files on disk
+const states = new Map<string, State>();
+
+export const getState = (config: LoaderConfig) => {
+  let state = states.get(config.key);
+  if (!state) {
+    const cssFiles = new Map<string, CssCachEntry>();
+    const atomicFiles = new Map<string, CssCachEntry>();
+    const transformer = initializeStyleThis().then(
       () =>
         new Transformer({
           cwd: process.cwd(),
           ignoredImports: {},
-          loadFile,
+          // each transform passes the `loadFile` of its loader context
+          loadFile: async () => {
+            throw new Error("transform must be called with a loader context loadFile");
+          },
           resolveVirtualImport: config.resolveVirtualImport,
           createRequire: createRequire(import.meta.url),
-          cacheRegistry,
+          // the compiler resolves the virtual modules into these
+          cacheRegistry: {
+            initializeRefs(cssRef, atomicRef) {
+              Object.assign(globalThis, { [cssRef]: cssFiles, [atomicRef]: atomicFiles });
+            },
+          },
           cssExtension,
           useRequire: config.useRequire,
           atomic: config.atomic,
         }),
     );
-    transformers.set(config.key, transformer);
+    state = { transformer, cssFiles, atomicFiles };
+    states.set(config.key, state);
   }
-  return transformer;
+  return state;
 };
+
+/** Drops the virtual modules of `filepath`, they're evaluated again when requested. */
+const deleteVirtualModules = (state: State, filepath: string) => {
+  state.cssFiles.delete(`${filepath}.${cssExtension}`);
+  state.atomicFiles.delete(`${filepath}.${atomicProgramExtension}`);
+};
+
+/**
+ * Drops the cache of the files removed in watch mode (deleted or renamed) and the virtual modules of
+ * the files affected, they'd be kept for the lifetime of the process otherwise.
+ */
+export const dropRemovedFiles = (compiler: Compiler, config: LoaderConfig) =>
+  compiler.hooks.watchRun.tapPromise("StyleThisPlugin", async ({ removedFiles }) => {
+    const state = states.get(config.key);
+    if (!state || !removedFiles?.size) return;
+    const transformer = await state.transformer;
+    for (const file of removedFiles) {
+      for (const filepath of [file, ...(transformer.invalidate_file(file, undefined) as string[])]) {
+        deleteVirtualModules(state, filepath);
+      }
+    }
+  });
 
 const createEntry = (code: string) => {
   let resolve: CssCachEntry["resolve"] | undefined;
@@ -65,7 +113,8 @@ const createEntry = (code: string) => {
  * modules of the files affected by the change. Loaders aren't told which files changed (and
  * Turbopack runs them in several processes, each with its own cache), so they're read again.
  */
-const refreshDependencies = async (ctx: LoaderCtx, transformer: Transformer, filepath: string) => {
+const refreshDependencies = async (ctx: LoaderCtx, state: State, filepath: string) => {
+  const transformer = await state.transformer;
   const dependencies = transformer.get_evaluated_dependencies(filepath) as string[];
 
   await Promise.all(
@@ -74,21 +123,18 @@ const refreshDependencies = async (ctx: LoaderCtx, transformer: Transformer, fil
       ctx.addDependency(dependency);
       const code = await readFile(dependency, "utf-8").catch(() => undefined);
       for (const importer of transformer.invalidate_file(dependency, code) as string[]) {
-        cssFiles.delete(`${importer}.${cssExtension}`);
-        atomicFiles.delete(`${importer}.${atomicProgramExtension}`);
+        deleteVirtualModules(state, importer);
       }
     }),
   );
 };
 
-/**
- * Transforms `code`, its CSS is stored in `cssFiles` under `<filepath>.css` and in atomic mode its
- * class module in `atomicFiles` under `<filepath>.style-this.js`, for the virtual module loaders.
- */
+/** Transforms `code`, its virtual modules are stored in the config's `State` for their loaders. */
 const transformFile = async (ctx: LoaderCtx, config: LoaderConfig, code: string, filepath: string) => {
-  const loadFile = makeLoadFile(ctx);
-  const transformer = await getTransformer(config, loadFile);
-  await refreshDependencies(ctx, transformer, filepath);
+  const state = getState(config);
+  const { cssFiles, atomicFiles } = state;
+  const transformer = await state.transformer;
+  await refreshDependencies(ctx, state, filepath);
 
   const cssFilepath = `${filepath}.${cssExtension}`;
   const atomicProgramFilepath = `${filepath}.${atomicProgramExtension}`;
@@ -96,19 +142,18 @@ const transformFile = async (ctx: LoaderCtx, config: LoaderConfig, code: string,
     cssFiles.get(cssFilepath)?.code === code &&
     (!config.atomic || atomicFiles.get(atomicProgramFilepath)?.code === code);
 
-  // resolved by the compiler through `cacheRegistry`
+  // resolved by the compiler through the transformer's `cacheRegistry`
   if (!skipCssEval) {
     cssFiles.set(cssFilepath, createEntry(code));
     if (config.atomic) atomicFiles.set(atomicProgramFilepath, createEntry(code));
   }
 
   try {
-    return await transformer.transform(code, filepath, skipCssEval, loadFile);
+    return await transformer.transform(code, filepath, skipCssEval, makeLoadFile(ctx));
   } catch (err) {
     // the compiler resolves the stored entries with the error, drop them or later transforms would
     // skip CSS evaluation and keep serving the error
-    cssFiles.delete(cssFilepath);
-    atomicFiles.delete(atomicProgramFilepath);
+    deleteVirtualModules(state, filepath);
     throw err;
   }
 };
@@ -118,8 +163,6 @@ export const createTransformLoader =
   <Options extends object>(getConfig: GetConfig<Options>): RawLoaderDefinitionFunction<Options> =>
   function (code, inputSourceMap) {
     const callback = this.async();
-    // TODO remove this when done
-    this.cacheable(false);
 
     transformFile(this, getConfig(this.getOptions()), code.toString(), this.resourcePath).then(
       (result) =>
@@ -138,8 +181,6 @@ const virtualModuleLoader =
   ): RawLoaderDefinitionFunction<Options> =>
   function () {
     const callback = this.async();
-    // TODO remove this when done
-    this.cacheable(false);
 
     // the loader rules only match imports with `?filepath=`
     const filepath = noopFileImportFilepath(this.resourcePath, this.resourceQuery);
@@ -151,34 +192,35 @@ const virtualModuleLoader =
   };
 
 /**
- * Loads the virtual module of `filepath` stored in `store` under `key`. Turbopack runs loaders in a
- * pool of processes, so the file may have been transformed in another process, it's transformed
- * again if this process has no (or an outdated) module for it.
+ * Loads the virtual module of `filepath` stored in the `store` of the config's `State` under `key`.
+ * Turbopack runs loaders in a pool of processes (and webpack caches the transformed file), so the
+ * file may not have been transformed in this process, it's transformed again if this process has no
+ * (or an outdated) module for it.
  */
 const loadVirtualModule = async (
   ctx: LoaderCtx,
   config: LoaderConfig,
   filepath: string,
-  store: Map<string, CssCachEntry>,
+  store: "cssFiles" | "atomicFiles",
   key: string,
 ) => {
   ctx.addDependency(filepath);
   const code = await readFile(filepath, "utf-8").catch(() => undefined);
 
   // the module is outdated if dependencies changed, even though `filepath` didn't
-  const transformer = await transformers.get(config.key);
-  if (transformer) await refreshDependencies(ctx, transformer, filepath);
+  const state = getState(config);
+  await refreshDependencies(ctx, state, filepath);
 
-  if (code !== undefined && store.get(key)?.code !== code) {
+  if (code !== undefined && state[store].get(key)?.code !== code) {
     if (!(await transformFile(ctx, config, code, filepath))) return "";
   }
 
-  const module = await store.get(key);
+  const module = await state[store].get(key);
   if (module instanceof Error) throw module;
 
   // the transform loader is done before its evaluation resolves (and adds) the dependencies
-  const dependencies = (await transformers.get(config.key))?.get_evaluated_dependencies(filepath) ?? [];
-  for (const dependency of dependencies as string[]) ctx.addDependency(dependency);
+  const dependencies = (await state.transformer).get_evaluated_dependencies(filepath) as string[];
+  for (const dependency of dependencies) ctx.addDependency(dependency);
 
   return module ?? "";
 };
@@ -190,17 +232,15 @@ const wrapAtomicCss = (css: string) => `${atomicLayerOrder}\n@layer utilities {\
 /** Serves the CSS of the file in `?filepath=`, in atomic mode including the atomic CSS it uses. */
 export const createCssLoader = <Options extends object>(getConfig: GetConfig<Options>) =>
   virtualModuleLoader(getConfig, async (ctx, config, filepath) => {
-    const css = await loadVirtualModule(ctx, config, filepath, cssFiles, `${filepath}.${cssExtension}`);
+    const css = await loadVirtualModule(ctx, config, filepath, "cssFiles", `${filepath}.${cssExtension}`);
     // Turbopack has no hook to collect the atomic CSS of all files (and runs loaders in several processes),
     // every file's CSS includes the atomic CSS it uses instead, as of its latest evaluation in this process
-    const atomicCss = config.atomic
-      ? (await transformers.get(config.key))?.get_file_atomic_css(filepath)
-      : "";
+    const atomicCss = config.atomic ? (await getState(config).transformer).get_file_atomic_css(filepath) : "";
     return [css, atomicCss && wrapAtomicCss(atomicCss)].filter(Boolean).join("\n");
   });
 
 /** Serves the atomic class module of the file in `?filepath=`. */
 export const createAtomicProgramLoader = <Options extends object>(getConfig: GetConfig<Options>) =>
   virtualModuleLoader(getConfig, (ctx, config, filepath) =>
-    loadVirtualModule(ctx, config, filepath, atomicFiles, `${filepath}.${atomicProgramExtension}`),
+    loadVirtualModule(ctx, config, filepath, "atomicFiles", `${filepath}.${atomicProgramExtension}`),
   );
