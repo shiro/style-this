@@ -5,9 +5,10 @@ sidebar:
   order: 5
 ---
 
-In atomic mode every top-level declaration becomes its own class, shared by every style using the
-same declaration. CSS size then grows with the number of *unique declarations* instead of the number
-of components. Your code stays the same, only the output changes.
+In atomic mode every top-level declaration of a [supported property](#output) becomes its own class,
+shared by every style using the same declaration. CSS size then grows with the number of *unique
+declarations* instead of the number of components. Your code stays the same, only the output
+changes.
 
 ## Enabling
 
@@ -97,6 +98,9 @@ outer === "outer-mvwhqz w-Yb3Gw";
 - **`!important` declarations aren't atomized.** [Layers](#cascade-layers) reverse the cascade of
   `!important`, so a layered one would beat the unlayered `!important` of nested rules like
   `&.active { … }` that are meant to override it.
+- **Only properties with a prefix are atomized.** Custom properties (`--accent`), vendor-prefixed
+  and less common properties stay in the per-file CSS. Their classes couldn't be de-duplicated by
+  property, so the winner among them would be arbitrary.
 
 ### Where the atomic CSS is loaded
 

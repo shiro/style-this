@@ -1271,8 +1271,7 @@ pub async fn evaluate_program<'alloc>(
                 let declarations = dedupe_atomic_declarations(parse_result.atomizable);
                 let atomic_classes: BTreeSet<String> = declarations
                     .iter()
-                    .map(|decl| add_atomic(decl.as_str(), &transformer.cache_registry))
-                    .filter(|s: &String| !s.is_empty())
+                    .filter_map(|decl| add_atomic(decl.as_str(), &transformer.cache_registry))
                     .collect();
                 atomic_declarations.extend(declarations.into_iter().map(|decl| decl.trim().to_string()));
 

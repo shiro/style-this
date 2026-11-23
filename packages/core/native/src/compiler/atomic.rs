@@ -82,10 +82,13 @@ pub fn sort_atomic_rules(rules: &mut [(&String, &String)]) {
 pub fn rank_layered_atomic_css<'a>(declarations: impl IntoIterator<Item = &'a String>) -> String {
     let mut ranks: BTreeMap<usize, Vec<(&String, String)>> = BTreeMap::new();
     for declaration in declarations {
+        let Some(class) = generate_atomic_class_name(declaration) else {
+            continue;
+        };
         ranks
             .entry(property_rank(declaration_property(declaration)))
             .or_default()
-            .push((declaration, generate_atomic_class_name(declaration)));
+            .push((declaration, class));
     }
     let Some(&max_rank) = ranks.keys().next_back() else {
         return String::new();
@@ -106,30 +109,24 @@ pub fn rank_layered_atomic_css<'a>(declarations: impl IntoIterator<Item = &'a St
     css
 }
 
-/// Generate the atomic class name for a declaration, `<prefix>-<hash>` for supported properties
-/// and a bare hash otherwise. The hash only depends on the declaration, so it's stable across builds.
-pub fn generate_atomic_class_name(statement: &str) -> String {
-    let hash = generate_atomic_hash(statement);
-    match atomic_prefix(declaration_property(statement)) {
-        Some(prefix) => format!("{prefix}-{hash}"),
-        None => hash,
-    }
+/// Generate the atomic class name `<prefix>-<hash>` for a declaration, `None` if its property has
+/// no prefix. The hash only depends on the declaration, so it's stable across builds.
+pub fn generate_atomic_class_name(statement: &str) -> Option<String> {
+    atomic_prefix(declaration_property(statement))
+        .map(|prefix| format!("{prefix}-{}", generate_atomic_hash(statement)))
 }
 
-/// Keep only the last declaration of each prefixed property and drop longhands followed by their
-/// shorthand (`margin-top` before `margin`), mirroring `mergeStyles` semantics. Longhands always
-/// win against shorthands in the atomic CSS (see `property_rank`), so they can't be kept.
+/// Keep only the last declaration of each property and drop longhands followed by their shorthand
+/// (`margin-top` before `margin`), mirroring `mergeStyles` semantics. Longhands always win against
+/// shorthands in the atomic CSS (see `property_rank`), so they can't be kept.
 pub fn dedupe_atomic_declarations(declarations: Vec<String>) -> Vec<String> {
-    // prefixed properties set by a later declaration
+    // properties set by a later declaration
     let mut overridden = HashSet::new();
     let mut result: Vec<String> = declarations
         .into_iter()
         .rev()
         .filter(|decl| {
             let property = declaration_property(decl).to_ascii_lowercase();
-            if atomic_prefix(&property).is_none() {
-                return true;
-            }
             if !overridden.insert(property.clone()) {
                 return false;
             }
@@ -306,11 +303,11 @@ fn parse_css_recursive(css: &str, declarations: &mut Vec<CssDeclaration>) {
 }
 
 /// Create atomic class for a CSS declaration
-pub fn add_atomic(declaration: &str, cache_registry: &CacheRegistry) -> String {
+pub fn add_atomic(declaration: &str, cache_registry: &CacheRegistry) -> Option<String> {
     let key = declaration.trim().to_string();
-    let class_name = generate_atomic_class_name(&key);
+    let class_name = generate_atomic_class_name(&key)?;
     cache_registry.insert_atomic_class(key, class_name.clone());
-    class_name
+    Some(class_name)
 }
 
 /// In non-atomic mode there are no atomic classes to de-dupe, so `mergeStyles` imports from
@@ -428,14 +425,16 @@ mod tests {
         assert_eq!(atomic_prefix(" Padding-Top "), Some("pt"));
         assert_eq!(
             generate_atomic_class_name("margin: 8px"),
-            format!("m-{}", generate_atomic_hash("margin: 8px"))
+            Some(format!("m-{}", generate_atomic_hash("margin: 8px")))
         );
-        assert_eq!(generate_atomic_class_name("margin: 8px"), "m-EY4CD");
-        assert_eq!(generate_atomic_class_name("color: red"), "c-TwPQN");
+        assert_eq!(generate_atomic_class_name("margin: 8px").unwrap(), "m-EY4CD");
+        assert_eq!(generate_atomic_class_name("color: red").unwrap(), "c-TwPQN");
+        assert_eq!(generate_atomic_class_name("--custom: 1"), None);
     }
 
     #[test]
     fn class_name_edge_cases() {
+        let generate_atomic_class_name = |decl| generate_atomic_class_name(decl).unwrap();
         // property is matched case-insensitively, but the hash covers the exact declaration
         assert!(generate_atomic_class_name("MARGIN: 8px").starts_with("m-"));
         assert!(generate_atomic_class_name("margin: 8px !important").starts_with("m-"));
@@ -463,31 +462,13 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_property_uses_bare_hash() {
-        for decl in ["-webkit-line-clamp: 3", "--custom: 1", "foo: bar", "nonsense"] {
-            assert_eq!(generate_atomic_class_name(decl), generate_atomic_hash(decl));
-            assert_eq!(generate_atomic_class_name(decl).len(), 5);
-        }
-    }
-
-    #[test]
-    fn dedupe_keeps_last_declaration_per_prefix() {
-        let result = dedupe_atomic_declarations(vec![
-            "padding: 16px".to_string(),
-            "margin: 1px".to_string(),
-            "-webkit-line-clamp: 2".to_string(),
-            "padding: 8px".to_string(),
-            "-webkit-line-clamp: 3".to_string(),
-        ]);
-        assert_eq!(
-            result,
-            vec![
-                "margin: 1px",
-                "-webkit-line-clamp: 2",
-                "padding: 8px",
-                "-webkit-line-clamp: 3",
-            ]
+    fn dedupe_keeps_last_declaration_per_property() {
+        let result = dedupe_atomic_declarations(
+            ["padding: 16px", "margin: 1px", "color: red", "padding: 8px", "Color: blue"]
+                .map(String::from)
+                .to_vec(),
         );
+        assert_eq!(result, vec!["margin: 1px", "padding: 8px", "Color: blue"]);
     }
 
     #[test]
@@ -495,6 +476,7 @@ mod tests {
         let result = dedupe_atomic_declarations(
             [
                 "margin-inline-start: 1px",
+                "border-top-color: red",
                 "margin-top: 2px",
                 "border-radius: 4px",
                 "margin: 0",
@@ -523,11 +505,25 @@ mod tests {
         }
     }
 
+    /// Longhands of atomized shorthands must be atomized too. Unlayered (per-file) ones would win
+    /// against later shorthands, and `mergeStyles` couldn't drop them.
+    #[test]
+    fn shorthand_table_covers_longhands() {
+        use lightningcss::properties::PropertyId;
+
+        for property in ATOMIC_PREFIXES.keys() {
+            let listed = ATOMIC_SHORTHANDS.get(property).cloned().unwrap_or_default();
+            for longhand in PropertyId::from(*property).longhands().into_iter().flatten() {
+                assert!(listed.contains(&longhand.name()), "'{property}' is missing '{}'", longhand.name());
+            }
+        }
+    }
+
     #[test]
     fn shorthands_sort_before_longhands() {
         let decls = ["margin-top: 1px", "margin: 0", "top: 0", "inset: 0", "flex-direction: row", "flex-flow: row"]
             .map(String::from);
-        let classes = decls.clone().map(|d| generate_atomic_class_name(&d));
+        let classes = decls.clone().map(|d| generate_atomic_class_name(&d).unwrap());
         let mut entries: Vec<(&String, &String)> = decls.iter().zip(classes.iter()).collect();
         sort_atomic_rules(&mut entries);
         let order: Vec<&str> = entries.iter().map(|(d, _)| d.as_str()).collect();
@@ -540,7 +536,7 @@ mod tests {
     #[test]
     fn rank_layers_are_declared_up_to_the_highest_rank() {
         let decls = ["margin-top: 1px", "border-top-width: 2px", "margin: 0"].map(String::from);
-        let class = generate_atomic_class_name;
+        let class = |decl| generate_atomic_class_name(decl).unwrap();
         assert_eq!(
             rank_layered_atomic_css(&decls),
             format!(

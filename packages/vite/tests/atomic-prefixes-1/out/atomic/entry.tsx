@@ -4,7 +4,7 @@ import "@style-this/core/atomic";
 import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
 import "virtual:style-this:/entry.tsx.css";
 // duplicate properties and longhands followed by their shorthand: the last declaration wins in
-// atomic mode too
+// atomic mode too. Properties without a prefix aren't atomized, they keep their source order.
 const duplicates = _styleThisClasses.duplicates;
 // shorthands must be emitted before longhands
 const shorthands = _styleThisClasses.shorthands;

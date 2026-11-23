@@ -141,10 +141,6 @@ describe('mergeStyles', () => {
   });
 
   describe('non-atomic classes', () => {
-    it('keeps bare hashes of unsupported properties', () => {
-      expect(mergeStyles('kG3jH', 'T5iL9')).toBe('kG3jH T5iL9');
-    });
-
     it('keeps component classes', () => {
       expect(mergeStyles('Button-abc123', 'Link-def456')).toBe('Button-abc123 Link-def456');
     });

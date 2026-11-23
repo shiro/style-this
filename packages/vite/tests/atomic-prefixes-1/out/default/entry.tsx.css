@@ -1,9 +1,11 @@
 .duplicates-ijw9ev {
-padding: 16px;
+--accent: red;
+  padding: 16px;
   color: red;
   padding-left: 4px;
   padding: 8px;
   -webkit-line-clamp: 2;
+  --accent: blue;
 }
 .shorthands-bcdq7s {
 margin: 8px;

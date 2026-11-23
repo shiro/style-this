@@ -1,3 +1,4 @@
+use super::atomic::{atomic_prefix, declaration_property};
 use lightningcss::rules::CssRule;
 use lightningcss::stylesheet::{ParserOptions, StyleSheet};
 
@@ -178,15 +179,21 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     segments
 }
 
-/// Check if a declaration is a single valid declaration terminated by `;`, without `!important`.
+/// Check if a declaration is a single valid declaration terminated by `;`, without `!important`,
+/// of a property with an atomic prefix.
 /// Layers reverse the cascade of `!important` declarations, layered (atomic) ones would beat the
 /// unlayered ones of nested rules that are meant to override them.
+/// Properties without a prefix (custom, vendor-prefixed, ...) can't be de-duped by `mergeStyles`,
+/// so atomic ones would be ordered by class name instead of by the order they're applied in.
 fn is_atomizable_declaration(decl_text: &str) -> bool {
     let trimmed = decl_text.trim();
 
     let Some(without_semi) = trimmed.strip_suffix(';') else {
         return false;
     };
+    if atomic_prefix(declaration_property(without_semi)).is_none() {
+        return false;
+    }
 
     let wrapped = format!("a {{ {} }}", without_semi);
 
@@ -237,6 +244,7 @@ mod tests {
             margin-top: var(--mt);
             padding: var(--var1-abc)px var(--var2-abc, 2px);
             --accent: var(--brand);
+            -webkit-line-clamp: 2;
             margin-bottom: calc( 100% - 20px );
         "};
         let expected = Some(indoc! {"
@@ -246,13 +254,14 @@ mod tests {
             @media (max-width: 600px) {
                 .btn { color: blue; }
             }
+            --accent: var(--brand);
+            -webkit-line-clamp: 2;
         "});
         let expected_atomics = HashSet::from([
             "color: red".to_string(),
             "background: something-random-but-valid".to_string(),
             "margin-top: var(--mt)".to_string(),
             "padding: var(--var1-abc)px var(--var2-abc, 2px)".to_string(),
-            "--accent: var(--brand)".to_string(),
             "margin-bottom: calc( 100% - 20px )".to_string(),
         ]);
 
@@ -403,7 +412,7 @@ mod tests {
     fn strings_and_escapes() {
         let input = indoc! {r#"
             content: 'something { nice';
-            quotes: "a \" ; }" '\';';
+            content: "a \" ; }" '\';';
             content: "\\";
             font-family: '\\'; /* ; */
             color: red;
@@ -417,7 +426,7 @@ mod tests {
             result.atomizable,
             vec![
                 "content: 'something { nice'".to_string(),
-                r#"quotes: "a \" ; }" '\';'"#.to_string(),
+                r#"content: "a \" ; }" '\';'"#.to_string(),
                 r#"content: "\\""#.to_string(),
                 r"font-family: '\\'".to_string(),
                 "color: red".to_string(),
@@ -437,7 +446,7 @@ mod tests {
     fn semicolons_and_braces_in_parentheses() {
         let input = indoc! {r"
             background: url(data:image/png;base64,iVBORw0KGgo=);
-            mask: url(data:image/svg+xml;utf8,<svg><style>a{fill:red}</style></svg>);
+            background-image: url(data:image/svg+xml;utf8,<svg><style>a{fill:red}</style></svg>);
             cursor: url(a\)b;c.png), auto;
             &:hover {
               background-image: url(data:image/png;base64,AAAA);
@@ -450,7 +459,7 @@ mod tests {
             result.atomizable,
             vec![
                 "background: url(data:image/png;base64,iVBORw0KGgo=)".to_string(),
-                "mask: url(data:image/svg+xml;utf8,<svg><style>a{fill:red}</style></svg>)"
+                "background-image: url(data:image/svg+xml;utf8,<svg><style>a{fill:red}</style></svg>)"
                     .to_string(),
                 r"cursor: url(a\)b;c.png), auto".to_string(),
                 "color: red".to_string(),

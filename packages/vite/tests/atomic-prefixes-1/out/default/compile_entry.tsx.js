@@ -2,11 +2,13 @@
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let duplicates = new String("duplicates-ijw9ev");
-duplicates.css = `padding: 16px;
+duplicates.css = `--accent: red;
+  padding: 16px;
   color: red;
   padding-left: 4px;
   padding: 8px;
-  -webkit-line-clamp: 2;`;
+  -webkit-line-clamp: 2;
+  --accent: blue;`;
 let shorthands = new String("shorthands-bcdq7s");
 shorthands.css = `margin: 8px;
   margin-top: 4px;

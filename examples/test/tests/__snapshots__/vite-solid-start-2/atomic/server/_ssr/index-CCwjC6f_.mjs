@@ -1,0 +1,394 @@
+import { D as createSignal, L as splitProps, a as escape, d as ssrAttribute, f as ssrElement, j as mergeProps, p as ssrHydrationKey, u as ssr, x as createComponent } from "../_libs/solid-js.mjs";
+//#region node_modules/.nitro/vite/services/ssr/_build/assets/index-CCwjC6f_.js
+var atomicPrefixes_default = {
+	margin: "m",
+	"margin-top": "mt",
+	"margin-right": "mr",
+	"margin-bottom": "mb",
+	"margin-left": "ml",
+	"margin-inline": "mx",
+	"margin-block": "my",
+	"margin-inline-start": "ms",
+	"margin-inline-end": "me",
+	"margin-block-start": "mbs",
+	"margin-block-end": "mbe",
+	padding: "p",
+	"padding-top": "pt",
+	"padding-right": "pr",
+	"padding-bottom": "pb",
+	"padding-left": "pl",
+	"padding-inline": "px",
+	"padding-block": "py",
+	"padding-inline-start": "ps",
+	"padding-inline-end": "pe",
+	"padding-block-start": "pbs",
+	"padding-block-end": "pbe",
+	width: "w",
+	"min-width": "min-w",
+	"max-width": "max-w",
+	height: "h",
+	"min-height": "min-h",
+	"max-height": "max-h",
+	"aspect-ratio": "aspect",
+	"box-sizing": "box",
+	display: "d",
+	position: "pos",
+	inset: "inset",
+	"inset-inline": "inset-x",
+	"inset-block": "inset-y",
+	"inset-inline-start": "inset-s",
+	"inset-inline-end": "inset-e",
+	"inset-block-start": "inset-bs",
+	"inset-block-end": "inset-be",
+	top: "top",
+	right: "right",
+	bottom: "bottom",
+	left: "left",
+	"z-index": "z",
+	float: "float",
+	clear: "clear",
+	isolation: "isolate",
+	overflow: "overflow",
+	"overflow-x": "overflow-x",
+	"overflow-y": "overflow-y",
+	visibility: "visibility",
+	opacity: "opacity",
+	flex: "flex",
+	"flex-direction": "flex-d",
+	"flex-wrap": "flex-w",
+	"flex-flow": "flex-f",
+	"flex-grow": "grow",
+	"flex-shrink": "shrink",
+	"flex-basis": "basis",
+	order: "order",
+	gap: "gap",
+	"row-gap": "gap-y",
+	"column-gap": "gap-x",
+	"align-items": "items",
+	"align-content": "content",
+	"align-self": "self",
+	"justify-content": "justify",
+	"justify-items": "justify-items",
+	"justify-self": "justify-self",
+	"place-items": "place-items",
+	"place-content": "place-content",
+	"place-self": "place-self",
+	grid: "grid",
+	"grid-template": "grid-t",
+	"grid-template-columns": "grid-cols",
+	"grid-template-rows": "grid-rows",
+	"grid-template-areas": "grid-areas",
+	"grid-auto-flow": "grid-flow",
+	"grid-auto-columns": "auto-cols",
+	"grid-auto-rows": "auto-rows",
+	"grid-area": "area",
+	"grid-column": "col",
+	"grid-column-start": "col-start",
+	"grid-column-end": "col-end",
+	"grid-row": "row",
+	"grid-row-start": "row-start",
+	"grid-row-end": "row-end",
+	columns: "columns",
+	color: "c",
+	font: "f",
+	"font-family": "ff",
+	"font-size": "fs",
+	"font-weight": "fw",
+	"font-style": "fst",
+	"font-variant": "fv",
+	"font-variant-caps": "fvc",
+	"font-stretch": "fstr",
+	"line-height": "lh",
+	"letter-spacing": "ls",
+	"word-spacing": "wsp",
+	"text-align": "ta",
+	"text-decoration": "td",
+	"text-decoration-line": "tdl",
+	"text-decoration-thickness": "tdt",
+	"text-decoration-style": "tds",
+	"text-decoration-color": "tdc",
+	"text-transform": "tt",
+	"text-overflow": "to",
+	"text-indent": "ti",
+	"text-shadow": "tsh",
+	"white-space": "ws",
+	"word-break": "wb",
+	"overflow-wrap": "ow",
+	"vertical-align": "va",
+	"list-style": "list",
+	"list-style-type": "list-t",
+	"list-style-position": "list-p",
+	"list-style-image": "list-i",
+	content: "cnt",
+	background: "bg",
+	"background-color": "bgc",
+	"background-image": "bgi",
+	"background-size": "bgs",
+	"background-position": "bgp",
+	"background-position-x": "bgpx",
+	"background-position-y": "bgpy",
+	"background-repeat": "bgr",
+	"background-clip": "bgcl",
+	"background-attachment": "bga",
+	"background-origin": "bgo",
+	"background-blend-mode": "bgbm",
+	border: "b",
+	"border-top": "bt",
+	"border-right": "br",
+	"border-bottom": "bb",
+	"border-left": "bl",
+	"border-inline": "bx",
+	"border-block": "by",
+	"border-width": "bw",
+	"border-style": "bs",
+	"border-color": "bc",
+	"border-top-width": "btw",
+	"border-top-style": "bts",
+	"border-top-color": "btc",
+	"border-right-width": "brw",
+	"border-right-style": "brs",
+	"border-right-color": "brc",
+	"border-bottom-width": "bbw",
+	"border-bottom-style": "bbs",
+	"border-bottom-color": "bbc",
+	"border-left-width": "blw",
+	"border-left-style": "bls",
+	"border-left-color": "blc",
+	"border-inline-start-width": "bxsw",
+	"border-inline-start-style": "bxss",
+	"border-inline-start-color": "bxsc",
+	"border-inline-end-width": "bxew",
+	"border-inline-end-style": "bxes",
+	"border-inline-end-color": "bxec",
+	"border-block-start-width": "bysw",
+	"border-block-start-style": "byss",
+	"border-block-start-color": "bysc",
+	"border-block-end-width": "byew",
+	"border-block-end-style": "byes",
+	"border-block-end-color": "byec",
+	"border-radius": "r",
+	"border-top-left-radius": "rtl",
+	"border-top-right-radius": "rtr",
+	"border-bottom-right-radius": "rbr",
+	"border-bottom-left-radius": "rbl",
+	"border-collapse": "b-collapse",
+	"border-spacing": "b-spacing",
+	outline: "ol",
+	"outline-width": "olw",
+	"outline-style": "ols",
+	"outline-color": "olc",
+	"outline-offset": "olo",
+	"box-shadow": "shadow",
+	filter: "filter",
+	"backdrop-filter": "backdrop",
+	"mix-blend-mode": "blend",
+	"object-fit": "object",
+	"object-position": "object-p",
+	transform: "transform",
+	"transform-origin": "origin",
+	transition: "transition",
+	"transition-property": "transition-p",
+	"transition-duration": "duration",
+	"transition-timing-function": "ease",
+	"transition-delay": "delay",
+	animation: "animate",
+	"animation-name": "animate-name",
+	"animation-duration": "animate-duration",
+	"animation-timing-function": "animate-ease",
+	"animation-iteration-count": "animate-count",
+	"animation-direction": "animate-direction",
+	"animation-play-state": "animate-state",
+	"animation-delay": "animate-delay",
+	"animation-fill-mode": "animate-fill",
+	"animation-timeline": "animate-timeline",
+	"will-change": "will",
+	cursor: "cursor",
+	"pointer-events": "ptr",
+	"user-select": "select",
+	resize: "resize",
+	appearance: "appearance",
+	"scroll-behavior": "scroll",
+	"caret-color": "caret",
+	"accent-color": "accent",
+	"table-layout": "table",
+	fill: "fill",
+	stroke: "stroke",
+	"stroke-width": "stroke-w"
+};
+var atomicShorthands_default = {
+	margin: "margin-top margin-right margin-bottom margin-left margin-inline margin-block margin-inline-start margin-inline-end margin-block-start margin-block-end",
+	"margin-inline": "margin-inline-start margin-inline-end",
+	"margin-block": "margin-block-start margin-block-end",
+	padding: "padding-top padding-right padding-bottom padding-left padding-inline padding-block padding-inline-start padding-inline-end padding-block-start padding-block-end",
+	"padding-inline": "padding-inline-start padding-inline-end",
+	"padding-block": "padding-block-start padding-block-end",
+	inset: "top right bottom left inset-inline inset-block inset-inline-start inset-inline-end inset-block-start inset-block-end",
+	"inset-inline": "inset-inline-start inset-inline-end",
+	"inset-block": "inset-block-start inset-block-end",
+	overflow: "overflow-x overflow-y",
+	flex: "flex-grow flex-shrink flex-basis",
+	"flex-flow": "flex-direction flex-wrap",
+	gap: "row-gap column-gap",
+	"place-items": "align-items justify-items",
+	"place-content": "align-content justify-content",
+	"place-self": "align-self justify-self",
+	grid: "grid-template grid-template-columns grid-template-rows grid-template-areas grid-auto-flow grid-auto-columns grid-auto-rows",
+	"grid-template": "grid-template-columns grid-template-rows grid-template-areas",
+	"grid-area": "grid-column grid-row grid-column-start grid-column-end grid-row-start grid-row-end",
+	"grid-column": "grid-column-start grid-column-end",
+	"grid-row": "grid-row-start grid-row-end",
+	font: "font-family font-size font-weight font-style font-variant line-height font-variant-caps font-stretch",
+	"font-variant": "font-variant-caps",
+	"text-decoration": "text-decoration-line text-decoration-thickness text-decoration-style text-decoration-color",
+	"list-style": "list-style-type list-style-position list-style-image",
+	background: "background-color background-image background-size background-position background-repeat background-clip background-attachment background-origin background-position-x background-position-y",
+	"background-position": "background-position-x background-position-y",
+	border: "border-top border-right border-bottom border-left border-inline border-block border-width border-style border-color border-top-width border-top-style border-top-color border-right-width border-right-style border-right-color border-bottom-width border-bottom-style border-bottom-color border-left-width border-left-style border-left-color border-inline-start-width border-inline-start-style border-inline-start-color border-inline-end-width border-inline-end-style border-inline-end-color border-block-start-width border-block-start-style border-block-start-color border-block-end-width border-block-end-style border-block-end-color",
+	"border-top": "border-top-width border-top-style border-top-color",
+	"border-right": "border-right-width border-right-style border-right-color",
+	"border-bottom": "border-bottom-width border-bottom-style border-bottom-color",
+	"border-left": "border-left-width border-left-style border-left-color",
+	"border-inline": "border-inline-start-width border-inline-start-style border-inline-start-color border-inline-end-width border-inline-end-style border-inline-end-color",
+	"border-block": "border-block-start-width border-block-start-style border-block-start-color border-block-end-width border-block-end-style border-block-end-color",
+	"border-width": "border-top-width border-right-width border-bottom-width border-left-width",
+	"border-style": "border-top-style border-right-style border-bottom-style border-left-style",
+	"border-color": "border-top-color border-right-color border-bottom-color border-left-color",
+	"border-radius": "border-top-left-radius border-top-right-radius border-bottom-right-radius border-bottom-left-radius",
+	outline: "outline-width outline-style outline-color",
+	transition: "transition-property transition-duration transition-timing-function transition-delay",
+	animation: "animation-name animation-duration animation-timing-function animation-iteration-count animation-direction animation-play-state animation-delay animation-fill-mode animation-timeline"
+};
+var ATOMIC_PREFIXES = new Set(Object.values(atomicPrefixes_default));
+var prefixOf = (property) => atomicPrefixes_default[property];
+/** Prefix of a shorthand -> prefixes of the longhands it overrides, e.g. `m` -> `mt`, `mb`, ... */
+var LONGHAND_PREFIXES = new Map(Object.entries(atomicShorthands_default).map(([shorthand, longhands]) => [prefixOf(shorthand), longhands.split(" ").map(prefixOf)]));
+var ATOMIC_CLASS = /^(.+)-[A-Z][\w-]{4}$/;
+var getAtomicPrefix = (className) => {
+	const prefix = ATOMIC_CLASS.exec(className)?.[1];
+	return prefix && ATOMIC_PREFIXES.has(prefix) ? prefix : void 0;
+};
+/**
+* Joins class lists, de-duping atomic classes of the same property (e.g. `m-xxxxx`), the last one wins.
+* Atomic classes of longhands followed by their shorthand (e.g. `mt-xxxxx` before `m-xxxxx`) are dropped
+* too, longhands would win otherwise. Other classes are only de-duped if identical. Falsy values are ignored.
+* In non-atomic mode the transform replaces this with `joinStyles`.
+*/
+var mergeStyles = (...classes) => {
+	const merged = /* @__PURE__ */ new Map();
+	for (const classList of classes) {
+		if (!classList) continue;
+		for (const className of classList.split(/\s+/)) {
+			if (!className) continue;
+			const prefix = getAtomicPrefix(className);
+			if (prefix) for (const longhand of LONGHAND_PREFIXES.get(prefix) ?? []) merged.delete(longhand);
+			const key = prefix ?? className;
+			merged.delete(key);
+			merged.set(key, className);
+		}
+	}
+	return [...merged.values()].join(" ");
+};
+/**
+* Merges a styled component's CSS variables with the `style` prop, which wins on conflicts.
+* The `style` prop may be a CSS string (e.g. in Solid), in which case CSS text is returned.
+*/
+var mergeInlineStyles = (vars, style$1) => {
+	if (typeof style$1 !== "string") return {
+		...vars,
+		...style$1
+	};
+	let res = "";
+	for (const [name, value] of Object.entries(vars)) if (value != null) res += `${name}:${value};`;
+	return res + style$1;
+};
+var CounterStyle$1 = "CounterStyle-ezk5qn b-ZeplZ bg-LPp8Q d-W_vHB gap-Td5yX items-Im4M1 m-AuUyl p-DLlYK r-K5PNW something";
+var __styleThis_var_FancyButton_6 = "FancyButton-diz892 b-ZeplZ bg-Kk7Cm p-BtACh r-TbAuj";
+var __styleThis_var_FancyButton2_4 = "FancyButton2-r4dezo bg-Iavgi cursor-ALqk3 m-HWQDy min-h-YBEdZ";
+var _tmpl$$1 = [
+	"<div",
+	"><!--$-->",
+	"<!--/--><!--$-->",
+	"<!--/--></div>"
+];
+var CounterStyle = CounterStyle$1;
+var FancyButton = (() => {
+	let __styleThis__class = __styleThis_var_FancyButton_6;
+	let __styleThis__comp = (__styleThis__props) => {
+		const [, __styleThis__rest] = splitProps(__styleThis__props, ["styleProps", "style"]);
+		return ssrElement("button", mergeProps(__styleThis__rest, {
+			get ["class"]() {
+				return mergeStyles(__styleThis__class, __styleThis__props.class);
+			},
+			get style() {
+				return mergeInlineStyles({ "--var1-azc1aj": (({ a }) => `${a}px`)({
+					...__styleThis__props.styleProps,
+					"props": __styleThis__props
+				}) }, __styleThis__props.style);
+			}
+		}), void 0, true);
+	};
+	__styleThis__comp.toString = () => __styleThis__class;
+	return __styleThis__comp;
+})();
+var FancyButton2 = (() => {
+	let __styleThis__class = __styleThis_var_FancyButton2_4;
+	let __styleThis__comp = (__styleThis__props) => {
+		return createComponent(FancyButton, mergeProps(__styleThis__props, {
+			get ["class"]() {
+				return mergeStyles(__styleThis__class, __styleThis__props.class);
+			},
+			get style() {
+				return mergeInlineStyles({
+					"--var1-nspajg": (({ b }) => `${b}px`)({
+						...__styleThis__props.styleProps,
+						"props": __styleThis__props
+					}),
+					"--var2-k1yf81": (({ b }) => `${b}px`)({
+						...__styleThis__props.styleProps,
+						"props": __styleThis__props
+					}),
+					"--var3-z85yv8": (({ props }) => props.disabled ? "red" : "green")({
+						...__styleThis__props.styleProps,
+						"props": __styleThis__props
+					})
+				}, __styleThis__props.style);
+			}
+		}));
+	};
+	__styleThis__comp.toString = () => __styleThis__class;
+	return __styleThis__comp;
+})();
+function Counter() {
+	const [count, setCount] = createSignal(0);
+	return ssr(_tmpl$$1, ssrHydrationKey() + ssrAttribute("class", escape(CounterStyle, true), false), escape(count()), escape(createComponent(FancyButton2, {
+		styleProps: {
+			a: 8,
+			b: 16
+		},
+		onClick: () => setCount(count() + 1),
+		get disabled() {
+			return count() >= 3;
+		},
+		children: "count me"
+	})));
+}
+var ContainerStyle$1 = "ContainerStyle-3s1eng d-W_vHB flex-d-Fbcuz";
+var colorStyle$1 = "colorStyle-gpyfg1 bg-BX1ye c-JjnMJ";
+var highlightStyle$1 = "highlightStyle-r01i7c c-AMx_p";
+var _tmpl$ = [
+	"<div",
+	" class=\"",
+	"\"><!--$-->",
+	"<!--/-->hello<span",
+	">world</span></div>"
+];
+var ContainerStyle = ContainerStyle$1;
+var colorStyle = colorStyle$1;
+var highlightStyle = highlightStyle$1;
+function Main() {
+	return ssr(_tmpl$, ssrHydrationKey(), `${escape(ContainerStyle, true)} Global__Main`, escape(createComponent(Counter, {})), ssrAttribute("class", escape(mergeStyles(colorStyle, highlightStyle), true), false));
+}
+var id$$ = "src/routes/index.tsx?pick=default&pick=$css&lang.tsx";
+var index_tsx_pick_default_pick_$css_lang_default = Main;
+//#endregion
+export { index_tsx_pick_default_pick_$css_lang_default as default, id$$ };

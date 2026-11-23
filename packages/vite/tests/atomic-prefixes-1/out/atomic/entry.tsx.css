@@ -1,4 +1,6 @@
-.duplicates-ijw9ev { /* marker */ }
+.duplicates-ijw9ev { --accent: red;
+  -webkit-line-clamp: 2;
+  --accent: blue; }
 .shorthands-bcdq7s { /* marker */ }
 .sameDeclaration-rc1qzs { /* marker */ }
 .important-v4pm30 { color: red !important;

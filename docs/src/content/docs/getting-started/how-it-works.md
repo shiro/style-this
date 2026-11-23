@@ -69,7 +69,7 @@ reproducible across machines.
 ## Output modes
 
 - **Default**: one rule per style, in a stylesheet per file. This is what the example above shows.
-- **[Atomic](/guides/atomic-css/)**: every top-level declaration becomes its own class, shared by
-  all styles using the same declaration.
+- **[Atomic](/guides/atomic-css/)**: every top-level declaration of a common property becomes its
+  own class, shared by all styles using the same declaration.
 
 Both modes use the same source code, you switch between them in the plugin config.

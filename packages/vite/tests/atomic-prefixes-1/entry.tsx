@@ -2,13 +2,15 @@ import { css, mergeStyles } from "@style-this/core";
 import "@style-this/core/atomic";
 
 // duplicate properties and longhands followed by their shorthand: the last declaration wins in
-// atomic mode too
+// atomic mode too. Properties without a prefix aren't atomized, they keep their source order.
 const duplicates = css`
+  --accent: red;
   padding: 16px;
   color: red;
   padding-left: 4px;
   padding: 8px;
   -webkit-line-clamp: 2;
+  --accent: blue;
 `;
 
 // shorthands must be emitted before longhands
