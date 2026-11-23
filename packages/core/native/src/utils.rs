@@ -550,9 +550,9 @@ pub fn replace_in_expression_using_spans<'alloc>(
     .visit_expression(expression);
 }
 
-pub fn replace_in_statement_using_spans<'alloc>(
+pub fn replace_in_function_using_spans<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
-    statement: &mut Statement<'alloc>,
+    function: &mut oxc_ast::ast::Function<'alloc>,
     replacement_points: &HashMap<Span, Expression<'alloc>>,
 ) {
     if replacement_points.is_empty() {
@@ -563,7 +563,7 @@ pub fn replace_in_statement_using_spans<'alloc>(
         ast_builder,
         replacement_points,
     }
-    .visit_statement(statement);
+    .visit_function(function, ScopeFlags::Function);
 }
 
 pub fn replace_in_class_body_using_spans<'alloc>(

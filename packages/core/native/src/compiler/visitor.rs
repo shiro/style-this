@@ -10,7 +10,7 @@ use crate::utils::{
     self, binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
     replace_in_class_using_identifiers, replace_in_expression_using_identifiers,
     replace_in_expression_using_spans, replace_in_function_using_identifiers,
-    replace_in_statement_using_spans,
+    replace_in_function_using_spans,
 };
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::AstBuilder;
@@ -367,17 +367,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     for ident in right_references {
                         self.reference_variable(ident);
                     }
-
-                    // transform
-                    for statement in &mut body.statements {
-                        replace_in_statement_using_spans(
-                            self.ast_builder,
-                            statement,
-                            &self.replacement_points,
-                        );
-                    }
                 }
 
+                replace_in_function_using_spans(
+                    self.ast_builder,
+                    &mut function,
+                    &self.replacement_points,
+                );
                 replace_in_function_using_identifiers(self.ast_builder, &mut function, &|name| {
                     self.get_alias(name).map(|v| v.to_string())
                 });
@@ -1644,6 +1640,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             .last_mut()
             .unwrap()
             .extend(idents);
+
+        // transforms the templates in default values
+        oxc_ast_visit::walk_mut::walk_formal_parameter(self, it);
     }
 }
 

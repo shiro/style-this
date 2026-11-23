@@ -109,6 +109,15 @@ const themed = css`
   ${accent().css}
 `;
 
+// parameter defaults are transformed like the rest of the function
+function card({ padding = css`padding: 2px;` } = {}) {
+  return padding;
+}
+
+const carded = css`
+  ${card().css}
+`;
+
 const unrelated = css`
   background: none;
   ${a.foo.css}
