@@ -1,17 +1,23 @@
-.FancyButton-p2r0he {
+.FancyButton-o5uj8x {
 background: none;
   border: 1px solid blue;
   border-radius: 2px;
   padding: var(--var1-q3ctyv)px;
   gap: var(--var2-pino9q)px;
 }
-.ui-052fkl {
+.ui-fs5q7g {
 color: var(--var1-xazw1e);
   
 }
-.component_0-3slijs {
+.component_0-p2r0he {
 color: var(--var1-eb8x63);
 }
-.unrelated-96jgdy {
+.unrelated-052fkl {
 background: none;
+}
+.Link-3slijs {
+font-size: var(--var1-8dybk9)px;
+}
+.Panel-96jgdy {
+border-color: var(--var1-i7wlu7);
 }

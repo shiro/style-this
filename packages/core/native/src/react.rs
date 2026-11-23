@@ -1,5 +1,5 @@
 use crate::{styled_component_transformer::*, *};
-use oxc_ast::ast::JSXExpression;
+use oxc_ast::ast::{JSXElementName, JSXExpression};
 
 const FORWARD_REF_LOCAL_NAME: &str = "__styleThis__forwardRef";
 const REF_LOCAL_NAME: &str = "__styleThis__ref";
@@ -22,7 +22,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
     fn transform_styled_component(
         &mut self,
         expression: &mut Expression<'alloc>,
-        jsx_tag: &'alloc str,
+        element: JSXElementName<'alloc>,
         is_extending_custom_component: bool,
     ) {
         self.base.component_counter += 1;
@@ -179,7 +179,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
             attributes.push(style_attr);
         }
 
-        let jsx_element_expression = self.base.build_jsx_element(span, jsx_tag, attributes);
+        let jsx_element_expression = self.base.build_jsx_element(span, element, attributes);
 
         // For React, the component has a block body when filtering props
         let component_body_statements = if should_filter_props {
@@ -300,37 +300,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for ReactStyledComponentTransformer<'a, 'alloc
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
-        if let Expression::TaggedTemplateExpression(tagged_template_expression) = &it
-            && let Expression::CallExpression(call_expression) = &tagged_template_expression.tag
-            && let Expression::Identifier(identifier) = &call_expression.callee
-            && identifier.name == "styled"
-            && call_expression.arguments.len() == 1
-            && let oxc_ast::ast::Argument::Identifier(component_identifier) =
-                &call_expression.arguments[0]
+        if let Expression::TaggedTemplateExpression(template) = it
+            && let Some((element, is_component)) = self.base.styled_element(template)
         {
-            let base_component_name = component_identifier.name.as_str();
-
-            let mut modified_tagged_template_expression =
-                tagged_template_expression.clone_in(self.base.ast_builder.allocator);
-            modified_tagged_template_expression.tag = Expression::Identifier(
-                self.base.ast_builder
-                    .alloc_identifier_reference(it.span(), self.base.ast_builder.atom("style")),
-            );
-
-            *it = Expression::TaggedTemplateExpression(modified_tagged_template_expression);
-            self.transform_styled_component(it, base_component_name, true); // true = extending custom component
-
-            return;
-        }
-
-        if let Expression::TaggedTemplateExpression(tagged_template_expression) = it
-            && let Expression::StaticMemberExpression(static_member_expression) =
-                &tagged_template_expression.tag
-            && let Expression::Identifier(object_identifier) = &static_member_expression.object
-            && object_identifier.name == "styled"
-        {
-            let jsx_tag = static_member_expression.property.name.as_str();
-            self.transform_styled_component(it, jsx_tag, false); // false = extending HTML element
+            self.transform_styled_component(it, element, is_component);
             return;
         }
 

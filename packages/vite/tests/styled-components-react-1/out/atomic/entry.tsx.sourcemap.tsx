@@ -5,10 +5,10 @@
 //     "/packages/vite/tests/styled-components-react-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { styled } from \"@style-this/react\";\nimport { css } from \"@style-this/core\";\n\n// must not be shadowed by the generated wrapper's props\nconst props = { gap: 4 };\n\nexport const FancyButton = styled.button<{ a: number }>`\n  background: none;\n  border: 1px solid blue;\n  border-radius: 2px;\n  padding: ${({ a }) => a}px;\n  gap: ${() => props.gap}px;\n`;\n\n// must not be shadowed by the generated wrapper's class variable\nconst ui = {\n  accent: \"red\",\n  Card: styled.div`\n    color: ${() => ui.accent};\n  `,\n};\n\nexport default styled.div`\n  color: ${() => ui.accent};\n`;\n\nconst unrelated = css`\n  background: none;\n`;\n"
+//     "import { styled } from \"@style-this/react\";\nimport { css } from \"@style-this/core\";\n\n// must not be shadowed by the generated wrapper's props\nconst props = { gap: 4 };\n\nexport const FancyButton = styled.button<{ a: number }>`\n  background: none;\n  border: 1px solid blue;\n  border-radius: 2px;\n  padding: ${({ a }) => a}px;\n  gap: ${() => props.gap}px;\n`;\n\n// must not be shadowed by the generated wrapper's class variable\nconst ui = {\n  accent: \"red\",\n  Card: styled.div`\n    color: ${() => ui.accent};\n  `,\n};\n\nexport default styled.div`\n  color: ${() => ui.accent};\n`;\n\nconst unrelated = css`\n  background: none;\n`;\n\nexport const Link = styled(\"a\")<{ size: number }>`\n  font-size: ${({ size }) => size}px;\n`;\n\nexport const Panel = styled(ui.Card)`\n  border-color: ${() => ui.accent};\n`;\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAM2B;AAWnB;AAKO;AAIG"
+//   "mappings": "AAM2B;AAWnB;AAKO;AAIG;AAIE;AAIC"
 // }
 
 import { styled } from "@style-this/react";
@@ -39,4 +39,12 @@ export default styled.div`
 
 const unrelated = css`
   background: none;
+`;
+
+export const Link = styled("a")<{ size: number }>`
+  font-size: ${({ size }) => size}px;
+`;
+
+export const Panel = styled(ui.Card)`
+  border-color: ${() => ui.accent};
 `;

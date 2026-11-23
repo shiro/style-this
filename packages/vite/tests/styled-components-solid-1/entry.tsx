@@ -27,3 +27,11 @@ export default styled.div`
 const unrelated = css`
   background: none;
 `;
+
+export const Link = styled("a")<{ size: number }>`
+  font-size: ${({ size }) => size}px;
+`;
+
+export const Panel = styled(ui.Card)`
+  border-color: ${() => ui.accent};
+`;

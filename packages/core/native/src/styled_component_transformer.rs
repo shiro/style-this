@@ -1,5 +1,8 @@
 use crate::{utils::SeededRandom, *};
-use oxc_ast::ast::JSXAttributeItem;
+use oxc_ast::ast::{
+    Argument, JSXAttributeItem, JSXElementName, JSXMemberExpression, JSXMemberExpressionObject,
+    StaticMemberExpression,
+};
 
 pub const MERGE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeStyles";
 pub const MERGE_INLINE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeInlineStyles";
@@ -399,17 +402,71 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         )
     }
 
+    /// The element of a styled template, and whether it's a component: `styled.div`, `styled("div")`,
+    /// `styled(Component)` or `styled(ui.Component)`.
+    pub fn styled_element(
+        &self,
+        template: &TaggedTemplateExpression<'alloc>,
+    ) -> Option<(JSXElementName<'alloc>, bool)> {
+        let span = template.span;
+        match &template.tag {
+            Expression::StaticMemberExpression(member)
+                if matches!(&member.object, Expression::Identifier(object) if object.name == "styled") =>
+            {
+                Some((self.ast_builder.jsx_element_name_identifier(span, member.property.name), false))
+            }
+            Expression::CallExpression(call)
+                if matches!(&call.callee, Expression::Identifier(callee) if callee.name == "styled")
+                    && call.arguments.len() == 1 =>
+            {
+                match &call.arguments[0] {
+                    Argument::StringLiteral(element) => {
+                        Some((self.ast_builder.jsx_element_name_identifier(span, element.value), false))
+                    }
+                    Argument::Identifier(component) => {
+                        Some((self.ast_builder.jsx_element_name_identifier(span, component.name), true))
+                    }
+                    Argument::StaticMemberExpression(member) => Some((
+                        JSXElementName::MemberExpression(self.jsx_member_expression(span, member)?),
+                        true,
+                    )),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// `ui.Component` as a JSX element name, `None` for other member expressions (e.g. `this.x`).
+    fn jsx_member_expression(
+        &self,
+        span: oxc_span::Span,
+        member: &StaticMemberExpression<'alloc>,
+    ) -> Option<oxc_allocator::Box<'alloc, JSXMemberExpression<'alloc>>> {
+        let object = match &member.object {
+            Expression::Identifier(object) => {
+                self.ast_builder.jsx_member_expression_object_identifier_reference(span, object.name)
+            }
+            Expression::StaticMemberExpression(object) => {
+                JSXMemberExpressionObject::MemberExpression(self.jsx_member_expression(span, object)?)
+            }
+            _ => return None,
+        };
+        let property = self.ast_builder.jsx_identifier(span, member.property.name);
+        Some(self.ast_builder.alloc_jsx_member_expression(span, object, property))
+    }
+
     pub fn build_jsx_element(
         &self,
         span: oxc_span::Span,
-        jsx_tag: &'alloc str,
+        name: JSXElementName<'alloc>,
         attributes: Vec<JSXAttributeItem<'alloc>>,
     ) -> Expression<'alloc> {
         Expression::JSXElement(self.ast_builder.alloc_jsx_element(
             span,
             self.ast_builder.alloc_jsx_opening_element(
                 span,
-                self.ast_builder.jsx_element_name_identifier(span, jsx_tag),
+                name,
                 None as Option<oxc_allocator::Box<_>>,
                 self.ast_builder.vec_from_iter(attributes),
             ),
