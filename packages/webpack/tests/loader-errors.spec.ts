@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import transformLoader from "../src/loaders/transformLoader";
 import cssLoader from "../src/loaders/cssLoader";
 import { cssFiles } from "../src/shared";
-import { runLoader, virtualImport } from "./util";
+import { resolveRequest, runLoader, virtualImport } from "./util";
 
 const styled = (color: string) => `import { css } from "@style-this/core";
 export const cls = css\`
@@ -19,6 +19,19 @@ describe("transform loader errors", () => {
 
     expect(err).toBeInstanceOf(Error);
     expect(cssFiles.has(`${filepath}.css`)).toBe(false);
+  });
+
+  it("reports the resolver's error for unresolvable imports", async () => {
+    const filepath = "/tmp/style-this-unresolvable.tsx";
+    const code = `import { color } from "./style-this-missing";\n${styled("${color}")}`;
+    const resolveError = new Error("Can't resolve './style-this-missing' in '/tmp'");
+    const { result } = await runLoader(transformLoader, code, filepath, {}, {
+      getResolve: () => (context, request, cb) =>
+        request === "./style-this-missing" ? cb(resolveError) : resolveRequest(context, request, cb),
+    });
+    const { err } = await runLoader(cssLoader, "", virtualImport(filepath, result!, "style-this.css"));
+
+    expect(err?.cause).toBe(resolveError);
   });
 
   it("evaluates the CSS once a syntax error is fixed", async () => {

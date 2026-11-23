@@ -31,17 +31,17 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
   const resolve = (
     token: string,
     importer: string,
-  ): Promise<string | undefined> => {
+  ): Promise<[resolveError: Error | null, resolved: string | undefined]> => {
     const context = importerDir(importer);
     return new Promise((ok) => {
       resolveSync(context, token, (err, result) => {
         if (err) {
-          ok(undefined);
+          ok([err, undefined]);
         } else if (result) {
           ctx.addDependency(result.split("?", 1)[0]);
-          ok(result);
+          ok([null, result]);
         } else {
-          ok(undefined);
+          ok([null, undefined]);
         }
       });
     });
@@ -51,7 +51,7 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
     importSourceId: string,
     importer: string,
   ): Promise<[string, string]> => {
-    const resolved = await resolve(importSourceId, importer);
+    const [resolveError, resolved] = await resolve(importSourceId, importer);
     const [resolvedPath, query] = resolved?.split("?", 2) ?? [];
 
     // modules with a query (e.g. `?raw`) are generated from the file by the compiler
@@ -76,7 +76,13 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
     // also do not load the contents, the transformer should require(...) it as-is
     // like Node from the importer, monorepo packages can have their own dependencies, then from the project
     // for files outside of it
-    filepath = require.resolve(importSourceId, { paths: [importerDir(importer), cwd] });
+    // this also covers imports webpack failed to resolve (e.g. Node builtins for web targets), if Node can't
+    // resolve them either, the resolver's error is the accurate one
+    try {
+      filepath = require.resolve(importSourceId, { paths: [importerDir(importer), cwd] });
+    } catch (err) {
+      throw resolveError ?? err;
+    }
     return [filepath, ""];
   };
 
