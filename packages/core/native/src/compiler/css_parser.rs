@@ -179,18 +179,16 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     segments
 }
 
-/// Check if a declaration is a single valid declaration terminated by `;`, without `!important`,
-/// of a property with an atomic prefix.
+/// Check if a declaration is a single valid declaration without `!important`, of a property with
+/// an atomic prefix. The `;` is optional, since the last declaration of a template may omit it.
 /// Layers reverse the cascade of `!important` declarations, layered (atomic) ones would beat the
 /// unlayered ones of nested rules that are meant to override them.
 /// Properties without a prefix (custom, vendor-prefixed, ...) can't be de-duped by `mergeStyles`,
 /// so atomic ones would be ordered by class name instead of by the order they're applied in.
 fn is_atomizable_declaration(decl_text: &str) -> bool {
     let trimmed = decl_text.trim();
+    let without_semi = trimmed.strip_suffix(';').unwrap_or(trimmed);
 
-    let Some(without_semi) = trimmed.strip_suffix(';') else {
-        return false;
-    };
     if atomic_prefix(declaration_property(without_semi)).is_none() {
         return false;
     }
@@ -309,6 +307,20 @@ mod tests {
         assert_eq!(
             result.non_atomizable.as_deref(),
             Some("@media (max-width: 500px) {\n  .a {\n    color: blue;\n  }\n}")
+        );
+    }
+
+    #[test]
+    fn last_declaration_without_semicolon() {
+        let result = parse_css("color: red");
+        assert_eq!(result.atomizable, vec!["color: red".to_string()]);
+        assert_eq!(result.non_atomizable, None);
+
+        let result = parse_css("&:hover {\n  color: blue;\n}\nmargin-top: 1px /* ; */");
+        assert_eq!(result.atomizable, vec!["margin-top: 1px".to_string()]);
+        assert_eq!(
+            result.non_atomizable.as_deref(),
+            Some("&:hover {\n  color: blue;\n}")
         );
     }
 
