@@ -48,6 +48,7 @@ describe("loaderConfig", () => {
     const { resolveVirtualImport } = loaderConfig({ bundler: "turbopack" });
 
     expect(resolveVirtualImport("css", "/app/src/pages/_app.tsx")).toMatch(/style-this\.global\.css\?filepath=/);
+    expect(resolveVirtualImport("css", "/app/src/pages/_app.mjs")).toMatch(/style-this\.global\.css\?filepath=/);
     expect(resolveVirtualImport("css", "/app/src/pages/index.tsx")).toMatch(/style-this\.module\.css\?filepath=/);
   });
 });

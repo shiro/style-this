@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import path from "path";
 import type { VirtualImportKind } from "@style-this/core/compiler";
-import { noopFileImport, type LoaderConfig } from "@style-this/webpack/core";
+import { noopFileImport, transformExtensions, type LoaderConfig } from "@style-this/webpack/core";
 
 const packageRoot = path.dirname(
   createRequire(import.meta.url).resolve("@style-this/next/package.json"),
@@ -29,8 +29,8 @@ export const noopAtomicProgramFile = path.join(packageRoot, "style-this.atomic-p
 export const regexNoopCss = /[\\/]style-this\.(module|global)\.css$/;
 
 // the pages router only allows global CSS imports from `_app`
-const cssQualifier = (filepath: string) =>
-  /[\\/]pages[\\/]_app\.[jt]sx?$/.test(filepath) ? "global" : "module";
+const regexPagesApp = new RegExp(`[\\\\/]pages[\\\\/]_app\\.(${transformExtensions.join("|")})$`);
+const cssQualifier = (filepath: string) => (regexPagesApp.test(filepath) ? "global" : "module");
 
 const resolveVirtualImport = (kind: VirtualImportKind, filepath: string) =>
   noopFileImport(kind === "css" ? noopCssFiles[cssQualifier(filepath)] : noopAtomicProgramFile, filepath);
