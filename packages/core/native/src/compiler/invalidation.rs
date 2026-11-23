@@ -4,7 +4,6 @@
 //! needed to evaluate it (its slice) and the imports that slice reads. Exports are considered
 //! changed if their slice or its imports differ, or if one of the imported values changed.
 
-use super::cache::CSS_CLASSNAME_CACHE;
 use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::evaluator::{program_imports, slice_program};
 use super::transformer::Transformer;
@@ -99,27 +98,14 @@ fn slice_exports(
         return HashMap::new();
     }
 
-    // slicing generates class names, they must not replace the ones cached for the entrypoint
-    let class_names = CSS_CLASSNAME_CACHE.with(|cache| cache.borrow().get(filepath).cloned());
-
-    let slices = exports
+    exports
         .iter()
         .filter_map(|export| {
             let mut program = parsed.program.clone_in(&allocator);
             let slice = slice_export(&ast_builder, transformer, filepath, code, &mut program, export)?;
             Some((export.clone(), slice))
         })
-        .collect();
-
-    CSS_CLASSNAME_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        match class_names {
-            Some(class_names) => cache.insert(filepath.to_string(), class_names),
-            None => cache.remove(filepath),
-        };
-    });
-
-    slices
+        .collect()
 }
 
 fn slice_export<'alloc>(

@@ -1,5 +1,4 @@
 use super::atomic::ATOMIC_CLASSES_IDENT;
-use super::cache::CSS_CLASSNAME_CACHE;
 use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::error::TransformError;
 use super::types::{CssVariableIdentifier, VirtualProgramInsert};
@@ -28,7 +27,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 pub struct VisitorTransformer<'a, 'alloc> {
     ast_builder: &'a AstBuilder<'alloc>,
     allocator: &'alloc Allocator,
-    entrypoint: bool,
     cwd: &'a str,
     program_filepath: &'a str,
     program_code: &'a str,
@@ -85,7 +83,6 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     pub fn new(
         ast_builder: &'a AstBuilder<'alloc>,
         allocator: &'alloc Allocator,
-        entrypoint: bool,
         store: &str,
         referenced_idents: HashSet<String>,
         cwd: &'a str,
@@ -101,7 +98,6 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         Self {
             ast_builder,
             allocator,
-            entrypoint,
             cwd,
             program_filepath,
             program_code,
@@ -468,26 +464,11 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         self.insert_into_virtual_program(declaration, Some(pos));
     }
 
-    /// creates a class name or gets it from cache
     fn create_virtual_css_template(&mut self, variable_name: &str) -> String {
         let unique_number = self.css_unique_number();
 
-        // Try to get from cache if entrypoint
-        if self.entrypoint {
-            if let Some(cached) = CSS_CLASSNAME_CACHE.with(|cache| {
-                cache
-                    .borrow()
-                    .get(self.program_filepath)
-                    .and_then(|file_cache| file_cache.get(&unique_number))
-                    .cloned()
-            }) {
-                return cached;
-            }
-        }
-
-        // Generate new class name
         // For _Global prefixed variables, use the variable name as-is without random suffix
-        let class_name = if variable_name.starts_with("_Global") {
+        if variable_name.starts_with("_Global") {
             variable_name.to_string()
         } else {
             let relative_program_filepath = self
@@ -504,18 +485,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             let variable_name = variable_name.replace('$', "__");
 
             format!("{variable_name}-{random_suffix}")
-        };
-
-        // Cache it
-        CSS_CLASSNAME_CACHE.with(|cache| {
-            cache
-                .borrow_mut()
-                .entry(self.program_filepath.to_string())
-                .or_default()
-                .insert(unique_number, class_name.clone());
-        });
-
-        class_name
+        }
     }
 
     /// Name used for the class name and atomic export key of a declaration, the styled wrapper's

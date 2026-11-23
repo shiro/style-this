@@ -747,8 +747,6 @@ pub(crate) struct ProgramSlice<'alloc> {
 
 /// Runs the prepasses on `program` and extracts the parts needed to evaluate
 /// `referenced_idents` and the program's CSS into a separate program.
-///
-/// Updates `CSS_CLASSNAME_CACHE` with the generated class names.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn slice_program<'alloc>(
     ast_builder: &'alloc AstBuilder<'alloc>,
@@ -870,7 +868,6 @@ pub(crate) fn slice_program<'alloc>(
     let mut css_transformer = VisitorTransformer::new(
         ast_builder,
         ast_builder.allocator,
-        entrypoint,
         &store,
         referenced_idents,
         cwd,

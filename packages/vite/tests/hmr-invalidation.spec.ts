@@ -509,11 +509,11 @@ export const Toolbar = css\`
     environment.addModule(path("button.tsx"));
     environment.addModule(path("toolbar.tsx"));
 
-    const buttonClass = async () => {
+    const buttonClass = async (name = "Button") => {
       const code = atomic
         ? await loadCode(plugin, `${VIRTUAL_PREFIX}${path("button.tsx")}.style-this.js`)
         : await loadCode(plugin, `${VIRTUAL_PREFIX}${path("button.tsx")}.css`);
-      return code.match(/(Button-\w+)/)![1];
+      return code.match(new RegExp(`\\b(${name}-\\w+)`))![1];
     };
 
     await transform("button.tsx");
@@ -526,6 +526,12 @@ export const Toolbar = css\`
     );
     for (const name of invalidated) await transform(name);
     expect(await cssOf("toolbar.tsx")).toContain(`.${await buttonClass()}`);
+
+    // renames change the class name
+    const renamed = await edit("button.tsx", (code) => code.replace("Button", "PrimaryButton"));
+    await edit("toolbar.tsx", (code) => code.replaceAll("Button", "PrimaryButton"));
+    for (const name of new Set([...renamed, "toolbar.tsx"])) await transform(name);
+    expect(await cssOf("toolbar.tsx")).toContain(`.${await buttonClass("PrimaryButton")}`);
   });
 
   describe("Svelte", () => {
