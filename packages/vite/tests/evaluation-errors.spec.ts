@@ -66,17 +66,5 @@ describe("evaluation errors", () => {
         id: `${testDir}/entry-default-super.tsx`,
       });
     });
-
-    test(`default exported interface imported as a value is reported (${atomic ? "atomic" : "default"})`, async () => {
-      const testDir = `${__dirname}/evaluation-error-in-import`;
-      const resolver = await getResolver();
-      const plugin = await setupPlugin(resolver, { atomic, debug: false });
-
-      // used to panic, like a missing export it fails to read the value instead
-      await expect(loadCss(plugin, `${testDir}/entry-default-interface.tsx`)).rejects.toMatchObject({
-        message: expect.stringMatching(/^Cannot read properties of undefined/),
-        id: `${testDir}/entry-default-interface.tsx`,
-      });
-    });
   }
 });

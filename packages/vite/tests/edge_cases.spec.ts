@@ -32,6 +32,13 @@ describe("edge-cases", () => {
     await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });
 
+  test("edge-cases-imports-without-values", async (ctx) => {
+    const testDir = `${__dirname}/${ctx.task.name}`;
+    const resolver = await getResolver();
+
+    await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
+  });
+
   test("edge-cases-css-escapes", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name}`;
     const resolver = await getResolver(testDir);

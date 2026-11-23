@@ -28,6 +28,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"]
 // /packages/vite/tests/reexports-2/d.ts (/packages/vite/tests/reexports-2/c.ts): {}
 "use strict";
 
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] ?? {}), };
 
 // /packages/vite/tests/reexports-2/d.ts (/packages/vite/tests/reexports-2/palette.ts): {"__star__", "accent", "base", "secondary"}
 "use strict";

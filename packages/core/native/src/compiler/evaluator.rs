@@ -1092,7 +1092,9 @@ pub async fn evaluate_program<'alloc>(
     // we append all exported idents we evaluated to the cache
     let cached_exports = CachedExports::new(value_cache, exported_idents.keys().cloned().collect());
 
-    if !exported_idents.is_empty() {
+    // importers (which evaluate the file as a non-entrypoint) read the store even if none of the
+    // names they import are values (e.g. types)
+    if !entrypoint || !exported_idents.is_empty() {
         // the program's own exports take precedence over the ones of `export * from`
         let star_reexports = exported_idents
             .remove(STAR_IMPORT)
