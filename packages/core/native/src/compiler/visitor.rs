@@ -53,6 +53,9 @@ pub struct VisitorTransformer<'a, 'alloc> {
     namespace_imports: HashMap<String, (String, HashSet<String>)>,
     unique_number_counter: u32,
     css_unique_number_counter: u32,
+    /// separate from `unique_number_counter`, the anonymous `css` class names can't depend on
+    /// what's included or aliased
+    anonymous_number_counter: u32,
 
     replacement_points: HashMap<Span, Expression<'alloc>>,
 
@@ -124,6 +127,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             namespace_imports: Default::default(),
             unique_number_counter: 0,
             css_unique_number_counter: 0,
+            anonymous_number_counter: 0,
 
             random: Default::default(),
             tmp_program: utils::build_new_ast(allocator).program,
@@ -1116,6 +1120,11 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         self.css_unique_number_counter += 1;
         self.css_unique_number_counter
     }
+
+    fn anonymous_number(&mut self) -> u32 {
+        self.anonymous_number_counter += 1;
+        self.anonymous_number_counter
+    }
 }
 
 impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
@@ -1231,7 +1240,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
 
             let span = template.span;
-            let variable_name = &format!("{PREFIX}_{}", self.unique_number());
+            let variable_name = &format!("{PREFIX}_{}", self.anonymous_number());
 
             let right_references = utils::tagged_template_expression_get_references(template);
 

@@ -33,3 +33,6 @@ const decoration = "none";
 // `accent` and `borderStyle` move up with it
 const border = `1px ${borderStyle} ${accent}`;
 const borderStyle = "solid";
+// destructured into a temporary when the importer evaluates it, which doesn't change the class
+// names above
+export const { weight } = { weight: "bold" };

@@ -1,12 +1,12 @@
 // @ts-nocheck
 import { css } from "@style-this/core";
-import { getLink, Theme } from "./b";
+import { getLink, Theme, weight } from "./b";
 import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
 import "virtual:style-this:/entry.tsx.css";
 const color = "red";
 const nav = _styleThisClasses.nav;
 export function Button() {
-	const button = _styleThisClasses.__styleThis_var_button_4;
+	const button = _styleThisClasses.__styleThis_var_button_1;
 	return button;
 }
 export class Card {

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { css } from "@style-this/core";
-import { getLink, Theme } from "./b";
+import { getLink, Theme, weight } from "./b";
 import "virtual:style-this:/entry.tsx.css";
 const color = "red";
 const nav = "nav-4xyb4t";

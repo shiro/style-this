@@ -1,4 +1,4 @@
-// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "__styleThis_3", "accent", "border", "borderStyle", "css", "decoration", "focus", "getLink", "outline", "underline"}
+// /packages/vite/tests/exported-declarations-1/b.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"Theme", "__styleThis_1", "__styleThis_2", "__styleThis_3", "accent", "border", "borderStyle", "css", "decoration", "focus", "getLink", "outline", "underline", "weight"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let __styleThis_3 = new String("__styleThis_3-7styr4");
@@ -30,18 +30,21 @@ __styleThis_1.css = `color: ${accent};
 class Theme {
 	static accent = __styleThis_1;
 }
+let __styleThis_expression_1 = { weight: "bold" };
+let { weight } = __styleThis_expression_1;
 
-global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] ?? {}), Theme,getLink};
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"] ?? {}), Theme,getLink,weight};
 
-// /packages/vite/tests/exported-declarations-1/entry.tsx: {"Theme", "__styleThis_1", "__styleThis_2", "__styleThis_3", "color", "css", "getLink", "nav"}
+// /packages/vite/tests/exported-declarations-1/entry.tsx: {"Theme", "__styleThis_1", "__styleThis_2", "__styleThis_3", "color", "css", "getLink", "nav", "weight"}
 "use strict";
+const weight = __styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"]["weight"];
 const Theme = __styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"]["Theme"];
 const getLink = __styleThis_value_cache_ggghhhii["/packages/vite/tests/exported-declarations-1/b.tsx"]["getLink"];
 let { css } = require("/packages/core/dist/index.mjs");
 let color = "red";
 let nav = new String("nav-4xyb4t");
 nav.css = `.${getLink()}, .${Theme.accent} {
-    font-weight: bold;
+    font-weight: ${weight};
   }`;
 let __styleThis_1 = new String("__styleThis_1-t6jshu");
 __styleThis_1.css = `display: flex;
@@ -52,15 +55,15 @@ __styleThis_3.css = `margin: 8px;
 let __styleThis_2 = new String("__styleThis_2-nwt6zk");
 __styleThis_2.css = `padding: 4px;
   `;
-let __styleThis_var_button_4 = new String("button-lajgtq");
-__styleThis_var_button_4.css = `color: ${color};
+let __styleThis_var_button_1 = new String("button-lajgtq");
+__styleThis_var_button_1.css = `color: ${color};
   `;
 return [
 `.nav-4xyb4t {
 ${nav.css}
 }`,
 `.button-lajgtq {
-${__styleThis_var_button_4.css}
+${__styleThis_var_button_1.css}
 }`,
 `.__styleThis_3-avo1ib {
 ${__styleThis_3.css}

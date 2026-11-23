@@ -1,11 +1,11 @@
 import { css } from "@style-this/core";
-import { getLink, Theme } from "./b";
+import { getLink, Theme, weight } from "./b";
 
 const color = "red";
 
 const nav = css`
   .${getLink()}, .${Theme.accent} {
-    font-weight: bold;
+    font-weight: ${weight};
   }
 `;
 
