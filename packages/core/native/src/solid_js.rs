@@ -9,11 +9,12 @@ struct SolidStyledComponentTransformer<'a, 'alloc> {
 impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
     fn new(
         ast_builder: &'a AstBuilder<'alloc>,
+        styled_name: &'a str,
         skip_jsx: bool,
         filepath: String,
     ) -> Self {
         Self {
-            base: StyledComponentTransformer::new(ast_builder, skip_jsx, filepath, "class"),
+            base: StyledComponentTransformer::new(ast_builder, styled_name, skip_jsx, filepath, "class"),
             uses_merge_inline_styles: false,
         }
     }
@@ -37,7 +38,7 @@ impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
             tagged_template_expression.clone_in(self.base.ast_builder.allocator);
         simple_tagged_template_expression.tag = Expression::Identifier(
             self.base.ast_builder
-                .alloc_identifier_reference(span, self.base.ast_builder.atom("css")),
+                .alloc_identifier_reference(span, self.base.ast_builder.atom(CSS_TAG_LOCAL_NAME)),
         );
 
         let captured_expressions =
@@ -280,12 +281,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for SolidStyledComponentTransformer<'a, 'alloc
 
 pub fn solid_js_prepass<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
+    styled_name: &str,
     filepath: String,
     program: &mut Program<'alloc>,
     skip_jsx: bool,
     class_display_names: &mut ClassDisplayNames,
-) -> bool {
-    let mut transformer = SolidStyledComponentTransformer::new(ast_builder, skip_jsx, filepath);
+) {
+    let mut transformer = SolidStyledComponentTransformer::new(ast_builder, styled_name, skip_jsx, filepath);
     transformer.visit_program(program);
     class_display_names.extend(std::mem::take(&mut transformer.base.class_display_names));
 
@@ -338,6 +340,4 @@ pub fn solid_js_prepass<'alloc>(
             .body
             .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
     }
-
-    transformer.base.component_counter > 0
 }

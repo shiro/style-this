@@ -5,7 +5,7 @@ use super::types::{CssVariableIdentifier, VirtualProgramInsert};
 use crate::PREFIX;
 use crate::ast;
 use crate::error_mapping::get_pos_from_offset;
-use crate::styled_component_transformer::ClassDisplayNames;
+use crate::styled_component_transformer::{CSS_TAG_LOCAL_NAME, ClassDisplayNames};
 use crate::utils::{
     self, binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
     replace_in_class_using_identifiers, replace_in_expression_using_identifiers,
@@ -490,6 +490,11 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         self.class_display_names
             .get(&init_span)
             .map_or(binding_name, String::as_str)
+    }
+
+    /// The user's `css` tag, or the tag of the templates generated for styled components.
+    fn is_css_tag(&self, tag: &str) -> bool {
+        tag == CSS_TAG_LOCAL_NAME || Some(tag) == self.css_function_name.as_deref()
     }
 
     fn get_alias(&self, name: &str) -> Option<&str> {
@@ -1212,7 +1217,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
         if let Expression::TaggedTemplateExpression(template) = it
             && let Some(tag) = utils::tagged_template_get_tag(template)
-            && (Some(tag) == self.css_function_name.as_deref()
+            && (self.is_css_tag(tag)
                 || Some(tag) == self.style_function_name.as_deref())
         {
             oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
@@ -1237,7 +1242,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 .to_string();
 
             match tag {
-                tag if Some(tag) == self.css_function_name.as_deref() => {
+                tag if self.is_css_tag(tag) => {
                     let class_name = self.create_virtual_css_template(variable_name);
                     let extra_classes = self.extract_extra_classes(template);
 
@@ -1347,7 +1352,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         if let Expression::TaggedTemplateExpression(template) = init
             && let Some(tag) = utils::tagged_template_get_tag(template)
-            && (Some(tag) == self.css_function_name.as_deref()
+            && (self.is_css_tag(tag)
                 || Some(tag) == self.style_function_name.as_deref())
         {
             let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
@@ -1383,7 +1388,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 .to_string();
 
             match tag {
-                tag if Some(tag) == self.css_function_name.as_deref() => {
+                tag if self.is_css_tag(tag) => {
                     let display_name = self.get_display_name(span, variable_name).to_string();
                     let class_name = self.create_virtual_css_template(&display_name);
                     let extra_classes = self.extract_extra_classes(template);

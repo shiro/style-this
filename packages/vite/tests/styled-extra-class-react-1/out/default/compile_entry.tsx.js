@@ -1,4 +1,4 @@
-// /packages/vite/tests/styled-extra-class-react-1/entry.tsx: {"css", "extraClass", "unrelated"}
+// /packages/vite/tests/styled-extra-class-react-1/entry.tsx: {"__styleThis__css", "css", "extraClass", "unrelated"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let unrelated = new String("unrelated-l2rcte");

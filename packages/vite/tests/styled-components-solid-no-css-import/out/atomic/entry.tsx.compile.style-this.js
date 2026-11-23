@@ -1,1 +1,0 @@
-export const __styleThis_var_FancyButton_2 = "FancyButton-izw5mn b-ZeplZ bg-Kk7Cm"

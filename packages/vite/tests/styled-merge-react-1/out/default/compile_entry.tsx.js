@@ -1,4 +1,4 @@
-// /packages/vite/tests/styled-merge-react-1/entry.tsx: {"css", "override"}
+// /packages/vite/tests/styled-merge-react-1/entry.tsx: {"__styleThis__css", "css", "override"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let override = new String("override-w9ezgl");

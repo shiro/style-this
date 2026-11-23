@@ -9,7 +9,7 @@ describe("styled-components-solid", () => {
     await evaluateProgramBothModes(testDir, "entry.tsx", resolver);
   });
 
-  test("styled-components-solid-no-css-import", async (ctx) => {
+  test("styled-components-solid-aliased-imports", async (ctx) => {
     const testDir = `${__dirname}/${ctx.task.name}`;
     const resolver = await getResolver();
 

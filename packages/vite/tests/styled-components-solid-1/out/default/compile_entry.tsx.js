@@ -1,4 +1,4 @@
-// /packages/vite/tests/styled-components-solid-1/entry.tsx: {"css", "unrelated"}
+// /packages/vite/tests/styled-components-solid-1/entry.tsx: {"__styleThis__css", "css", "unrelated"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let __styleThis_var_component_0_7 = new String("component_0-p2r0he");

@@ -1,4 +1,4 @@
-// /packages/vite/tests/extra-class-edge-cases/entry.tsx: {"css", "extraClass", "test1", "test2", "test3", "test4", "test5", "test6", "test7"}
+// /packages/vite/tests/extra-class-edge-cases/entry.tsx: {"__styleThis__css", "css", "extraClass", "test1", "test2", "test3", "test4", "test5", "test6", "test7"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
 let test1 = new String("test1-6z85mr");

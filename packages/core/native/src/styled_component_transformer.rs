@@ -14,8 +14,11 @@ pub const PROPS_LOCAL_NAME: &str = "__styleThis__props";
 pub const REST_PROPS_LOCAL_NAME: &str = "__styleThis__rest";
 // the class name is derived from the display name instead, see `ClassDisplayNames`
 pub const CLASS_LOCAL_NAME: &str = "__styleThis__class";
+/// Tag of the generated `css` templates, independent of the user's `css` import (or another
+/// library's `css`).
+pub const CSS_TAG_LOCAL_NAME: &str = "__styleThis__css";
 
-/// Span of a generated `let __styleThis__class = css\`...\`` template -> name the compiler uses
+/// Span of a generated `let __styleThis__class = __styleThis__css\`...\`` template -> name the compiler uses
 /// for its class name and atomic export key (e.g. `Button` for `const Button = styled.button`).
 pub type ClassDisplayNames = HashMap<oxc_span::Span, String>;
 
@@ -85,6 +88,8 @@ pub struct ComponentTransformContext<'alloc> {
 
 pub struct StyledComponentTransformer<'a, 'alloc> {
     pub ast_builder: &'a AstBuilder<'alloc>,
+    /// local name of the `styled` import
+    styled_name: &'a str,
     pub skip_jsx: bool,
     pub variable_name: Option<String>,
     pub current_statement_index: usize,
@@ -98,12 +103,14 @@ pub struct StyledComponentTransformer<'a, 'alloc> {
 impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     pub fn new(
         ast_builder: &'a AstBuilder<'alloc>,
+        styled_name: &'a str,
         skip_jsx: bool,
         filepath: String,
         class_prop_name: &'static str,
     ) -> Self {
         Self {
             ast_builder,
+            styled_name,
             skip_jsx,
             filepath,
             variable_name: None,
@@ -411,12 +418,12 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         let span = template.span;
         match &template.tag {
             Expression::StaticMemberExpression(member)
-                if matches!(&member.object, Expression::Identifier(object) if object.name == "styled") =>
+                if matches!(&member.object, Expression::Identifier(object) if object.name == self.styled_name) =>
             {
                 Some((self.ast_builder.jsx_element_name_identifier(span, member.property.name), false))
             }
             Expression::CallExpression(call)
-                if matches!(&call.callee, Expression::Identifier(callee) if callee.name == "styled")
+                if matches!(&call.callee, Expression::Identifier(callee) if callee.name == self.styled_name)
                     && call.arguments.len() == 1 =>
             {
                 match &call.arguments[0] {

@@ -763,8 +763,8 @@ pub(crate) fn slice_program<'alloc>(
 
     // find "css" import or quit early if entrypoint
     let mut return_early = entrypoint;
-    let mut solid_prepass = false;
-    let mut react_prepass_enabled = false;
+    let mut solid_styled_name = None;
+    let mut react_styled_name = None;
     let mut style_function_name = None;
     let mut css_function_name = None;
     let mut extra_class_function_name = None;
@@ -804,21 +804,17 @@ pub(crate) fn slice_program<'alloc>(
                     };
                     return_early = false;
                 }
-                LIBRARY_SOLID_JS_IMPORT_NAME => {
-                    solid_prepass = true;
+                source @ (LIBRARY_SOLID_JS_IMPORT_NAME | LIBRARY_REACT_IMPORT_NAME) => {
                     if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
                         specifier
-                        && spec.local.name == "styled"
+                        && spec.imported.name() == "styled"
                     {
-                        return_early = false;
-                    }
-                }
-                LIBRARY_REACT_IMPORT_NAME => {
-                    react_prepass_enabled = true;
-                    if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
-                        specifier
-                        && spec.local.name == "styled"
-                    {
+                        let styled_name = if source == LIBRARY_SOLID_JS_IMPORT_NAME {
+                            &mut solid_styled_name
+                        } else {
+                            &mut react_styled_name
+                        };
+                        *styled_name = Some(spec.local.name.to_string());
                         return_early = false;
                     }
                 }
@@ -832,12 +828,12 @@ pub(crate) fn slice_program<'alloc>(
         .unwrap_or(program_filepath)
         .to_string();
 
-    let mut transformed_styled_components = false;
     let mut class_display_names = ClassDisplayNames::new();
 
-    if solid_prepass {
-        transformed_styled_components |= solid_js_prepass(
+    if let Some(styled_name) = &solid_styled_name {
+        solid_js_prepass(
             ast_builder,
+            styled_name,
             relative_program_filepath.clone(),
             program,
             false,
@@ -845,20 +841,15 @@ pub(crate) fn slice_program<'alloc>(
         );
     }
 
-    if react_prepass_enabled {
-        transformed_styled_components |= react_prepass(
+    if let Some(styled_name) = &react_styled_name {
+        react_prepass(
             ast_builder,
+            styled_name,
             relative_program_filepath,
             program,
             false,
             &mut class_display_names,
         );
-    }
-
-    // the prepasses rewrite styled templates into `css` templates, which need to be picked up even
-    // if `css` itself isn't imported
-    if transformed_styled_components && css_function_name.is_none() {
-        css_function_name = Some("css".to_string());
     }
 
     let rewrote_merge_styles = !transformer.atomic && rewrite_merge_styles_imports(program, ast_builder);
