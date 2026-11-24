@@ -1,4 +1,4 @@
-import { DevEnvironment, EnvironmentModuleNode, Plugin, UserConfig, ViteDevServer } from "vite";
+import { DevEnvironment, Environment, EnvironmentModuleNode, Plugin, UserConfig, ViteDevServer } from "vite";
 import { readFile } from "fs/promises";
 import { dirname, resolve as resolvePath } from "path";
 import {
@@ -56,7 +56,7 @@ const TIMEOUT_DURATION = 5 * 60 * 1000; // 5 minutes
 const transformExtensionRegex = /\.(?:[jt]sx?|[mc][jt]s)$/;
 export const DefaultImport = Symbol();
 
-export interface Options {
+export interface StyleThisViteOptions {
   cssExtension?: string;
   filter?: Filter | Filter[];
   ignoredImports?: Record<string, true | (string | typeof DefaultImport)[]>;
@@ -76,7 +76,7 @@ export interface ExtraFields {
   getTransitiveImporters(filepath: string, changedExports: string[]): string[];
 }
 
-const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
+const vitePlugin = (options: StyleThisViteOptions = {}): Plugin & ExtraFields => {
   let { cssExtension = "css", filter = [], debug = false, atomic = false, useRequire, cacheRegistry = new CacheRegistry() } = options;
 
   if (!Array.isArray(filter)) filter = [filter];
@@ -119,6 +119,8 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
   type Resolve = (id: string, importer: string) => Promise<string | undefined>;
   let createLoadFile: (resolve: Resolve) => (id: string, importer: string) => Promise<[string, string]>;
   let server: ViteDevServer | undefined;
+  // the plugin instance can be reused for a build after serving, the build must not take the dev paths
+  const devServer = (environment: Environment | undefined) => (environment?.mode === "build" ? undefined : server);
   let styleThis: Transformer;
   let cwd = process.cwd();
   const mocks = new Map<string, string>();
@@ -370,6 +372,7 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
       if (!fullId.startsWith(resolvedVirtualModulePrefix)) return;
 
       const [id] = splitQuery(fullId);
+      const server = devServer(this.environment);
 
       if (id === atomicEntrypointId) {
         if (atomic) {
@@ -499,40 +502,46 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
       }
     },
 
-    async generateBundle(_outputOptions, bundle) {
-      if (!atomic) return;
+    generateBundle: {
+      // after vite's CSS plugin, which emits the single stylesheet of builds without CSS code splitting (e.g. library
+      // mode) here
+      order: "post",
+      async handler(_outputOptions, bundle) {
+        // vite drops the assets of environments that don't emit them (SSR by default)
+        if (!atomic || this.environment?.config.build.emitAssets === false) return;
 
-      const finalAtomicCss = wrapAtomicCss(styleThis.get_atomic_css());
+        const finalAtomicCss = wrapAtomicCss(styleThis.get_atomic_css());
 
-      const chunks = Object.values(bundle).filter((output) => output.type === 'chunk');
-      const getImportedCss = (chunk: (typeof chunks)[number]): string[] =>
-        [...((chunk as any).viteMetadata?.importedCss ?? [])].filter((fileName: string) => fileName.endsWith('.css'));
+        const chunks = Object.values(bundle).filter((output) => output.type === 'chunk');
+        const getImportedCss = (chunk: (typeof chunks)[number]): string[] =>
+          [...((chunk as any).viteMetadata?.importedCss ?? [])].filter((fileName: string) => fileName.endsWith('.css'));
 
-      // the atomic CSS belongs to the stylesheet of the chunk importing `@style-this/core/atomic`,
-      // falling back to the entry chunks' stylesheets, then to any stylesheet
-      const containsAtomicEntrypoint = (chunk: (typeof chunks)[number]) =>
-        [...(chunk.moduleIds ?? []), ...Object.keys(chunk.modules ?? {})].some(
-          (id) => id.split('?', 1)[0] === atomicEntrypointId,
-        );
-      const candidates = [
-        ...chunks.filter(containsAtomicEntrypoint).flatMap(getImportedCss),
-        ...chunks.filter((chunk) => chunk.isEntry).flatMap(getImportedCss),
-        ...Object.keys(bundle).filter((fileName) => fileName.endsWith('.css')),
-      ];
+        // the atomic CSS belongs to the stylesheet of the chunk importing `@style-this/core/atomic`,
+        // falling back to the entry chunks' stylesheets, then to any stylesheet
+        const containsAtomicEntrypoint = (chunk: (typeof chunks)[number]) =>
+          [...(chunk.moduleIds ?? []), ...Object.keys(chunk.modules ?? {})].some(
+            (id) => id.split('?', 1)[0] === atomicEntrypointId,
+          );
+        const candidates = [
+          ...chunks.filter(containsAtomicEntrypoint).flatMap(getImportedCss),
+          ...chunks.filter((chunk) => chunk.isEntry).flatMap(getImportedCss),
+          ...Object.keys(bundle).filter((fileName) => fileName.endsWith('.css')),
+        ];
 
-      const cssFileName = candidates.find((fileName) => bundle[fileName]?.type === 'asset');
-      const cssAsset = cssFileName ? bundle[cssFileName] : undefined;
+        const cssFileName = candidates.find((fileName) => bundle[fileName]?.type === 'asset');
+        const cssAsset = cssFileName ? bundle[cssFileName] : undefined;
 
-      if (cssAsset?.type === 'asset') {
-        const existingCss = typeof cssAsset.source === 'string' ? cssAsset.source : cssAsset.source.toString();
-        cssAsset.source = `${existingCss}\n${finalAtomicCss}`;
-      } else {
-        this.emitFile({
-          type: 'asset',
-          fileName: 'assets/atomic.css',
-          source: finalAtomicCss,
-        });
-      }
+        if (cssAsset?.type === 'asset') {
+          const existingCss = typeof cssAsset.source === 'string' ? cssAsset.source : cssAsset.source.toString();
+          cssAsset.source = `${existingCss}\n${finalAtomicCss}`;
+        } else {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'assets/atomic.css',
+            source: finalAtomicCss,
+          });
+        }
+      },
     },
 
     async hotUpdate({ file, type, timestamp, modules, read }) {
@@ -633,6 +642,7 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
           debugLog(`transformed ${filepath} in ${(performance.now() - startTime).toFixed(1)}ms`);
           watchedFiles.add(filepath);
 
+          const server = devServer(this.environment);
           if (server && !skipCssEval) {
             for (const environment of Object.values(server.environments)) {
               if (environment.config.consumer !== "client") continue;

@@ -1,4 +1,6 @@
 import { describe, test, expect } from "vitest";
+import { build, createServer, type InlineConfig, type Rollup } from "vite";
+import vitePlugin from "../src/index";
 import { setupPlugin } from "./util/testUtil";
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
@@ -121,6 +123,54 @@ describe("atomic CSS layer", () => {
       await plugin.generateBundle({}, bundle);
       expect(bundle["assets/app.css"].source).toBe(".component { color: blue }");
       expect(bundle["assets/atomic.css"]).toBeUndefined();
+    });
+  });
+
+  describe("vite build", () => {
+    const root = `${__dirname}/atomic-build`;
+    const buildCss = async (plugin: ReturnType<typeof vitePlugin>, config: InlineConfig["build"]) => {
+      const result = (await build({
+        root,
+        configFile: false,
+        logLevel: "silent",
+        plugins: [plugin],
+        build: { write: false, minify: false, cssMinify: false, ...config },
+      })) as Rollup.RollupOutput | Rollup.RollupOutput[];
+      const [{ output }] = [result].flat();
+      return output.filter((file) => file.type === "asset" && file.fileName.endsWith(".css")) as Rollup.OutputAsset[];
+    };
+
+    test("library mode: atomic CSS is appended to the library stylesheet", async () => {
+      const css = await buildCss(vitePlugin({ useRequire: true, atomic: true }), {
+        lib: { entry: "main.ts", formats: ["es"], cssFileName: "lib" },
+      });
+
+      expect(css.map((file) => file.fileName)).toEqual(["lib.css"]);
+      expect(css[0].source).toContain("color: red");
+    });
+
+    test("SSR build: no atomic stylesheet is emitted", async () => {
+      const css = await buildCss(vitePlugin({ useRequire: true, atomic: true }), { ssr: "main.ts" });
+
+      expect(css).toEqual([]);
+    });
+
+    test("build after serving with the same plugin instance takes the build paths", async () => {
+      const plugin = vitePlugin({ useRequire: true, atomic: true });
+      const server = await createServer({
+        root,
+        configFile: false,
+        logLevel: "silent",
+        plugins: [plugin],
+        server: { middlewareMode: true, ws: false },
+      });
+      await server.transformRequest("/main.ts");
+      await server.close();
+
+      const css = await buildCss(plugin, { rollupOptions: { input: `${root}/main.ts` } });
+
+      expect(css).toHaveLength(1);
+      expect(String(css[0].source).match(/color: red/g)).toHaveLength(1);
     });
   });
 });

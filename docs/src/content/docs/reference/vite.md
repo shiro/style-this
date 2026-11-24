@@ -6,9 +6,9 @@ sidebar:
 ---
 
 ```ts
-import styleThis, { DefaultImport, type Options } from "@style-this/vite";
+import styleThis, { DefaultImport, type StyleThisViteOptions } from "@style-this/vite";
 
-styleThis(options?: Options): Plugin
+styleThis(options?: StyleThisViteOptions): Plugin
 ```
 
 The plugin is named `vite:style-this` and runs with `enforce: "pre"`. Its transform has `order: "pre"`, so
@@ -94,5 +94,6 @@ The plugin adjusts your Vite config:
 | `@style-this/core/atomic` | atomic stylesheet (layer order and `@layer utilities`) |
 
 In atomic builds the atomic CSS is appended to the stylesheet of the chunk importing
-`@style-this/core/atomic`, falling back to an entry chunk's stylesheet. If there's no stylesheet at
-all, it's emitted as `assets/atomic.css`.
+`@style-this/core/atomic`, falling back to an entry chunk's stylesheet. Without CSS code splitting (the
+default in library mode) that's the single bundled stylesheet. If there's no stylesheet at all, it's emitted as
+`assets/atomic.css`.

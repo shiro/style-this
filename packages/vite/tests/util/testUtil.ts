@@ -46,9 +46,7 @@ const getAtomicEntrypointCss = async (
 ): Promise<string> => {
   // Call generateBundle to generate the atomic CSS entrypoint
   const bundle: Record<string, BundleObject> = {};
-  if (plugin.generateBundle) {
-    await plugin.generateBundle({} as OutputOptions, bundle);
-  }
+  await plugin.generateBundle({} as OutputOptions, bundle);
 
   const atomicEntrypointRaw = bundle["assets/atomic.css"].source;
   if (typeof atomicEntrypointRaw !== "string") throw new Error("Failed to get atomic css entrypoint");
@@ -308,7 +306,7 @@ export const setupPlugin = async (
     __getDebugVirtualModules: plugin.__getDebugVirtualModules.bind(ctx),
     // emitted assets are written into the passed bundle
     generateBundle: (outputOptions: any, bundle: Record<string, any>) =>
-      plugin.generateBundle?.call(
+      plugin.generateBundle.handler.call(
         {
           ...ctx,
           emitFile: (file: { fileName: string }) => {
