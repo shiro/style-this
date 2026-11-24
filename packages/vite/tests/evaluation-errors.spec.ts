@@ -39,6 +39,19 @@ describe("evaluation errors", () => {
       expect(typeof css === "object" && css?.code).toContain(".button-");
     });
 
+    test(`error in a template is located in the source (${atomic ? "atomic" : "default"})`, async () => {
+      const testDir = `${__dirname}/evaluation-error-in-import`;
+      const resolver = await getResolver();
+      const plugin = await setupPlugin(resolver, { atomic, debug: false });
+
+      // the column is in UTF-16 code units like JS strings, the emoji before the error is 2
+      await expect(loadCss(plugin, `${testDir}/template.tsx`)).rejects.toMatchObject({
+        message: "no color",
+        loc: { file: `${testDir}/template.tsx`, line: 6, column: 55 },
+        stack: expect.stringContaining(`at <anonymous> (${testDir}/template.tsx:6:55)`),
+      });
+    });
+
     test(`module dropped by a failing sibling is reported (${atomic ? "atomic" : "default"})`, async () => {
       const testDir = `${__dirname}/evaluation-error-in-import`;
       const resolver = await getResolver();

@@ -1,3 +1,5 @@
+use crate::error_mapping::get_pos_from_offset;
+use oxc_parser::ParserReturn;
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 
@@ -47,6 +49,23 @@ pub enum TransformError {
         option: &'static str,
         expected: &'static str,
     },
+}
+
+impl TransformError {
+    /// Located at the first error of the failed parse of `code`.
+    pub fn parse_failed(filepath: String, code: &str, ast: &ParserReturn) -> Self {
+        let error = ast.errors.first();
+        let offset = error
+            .and_then(|error| error.labels.iter().flatten().next())
+            .map_or(0, |label| label.offset());
+        let (row, column) = get_pos_from_offset(code, offset);
+        Self::RawParseFailed {
+            filepath,
+            message: error.map_or_else(|| "failed to parse".to_string(), |error| error.message.to_string()),
+            row,
+            column,
+        }
+    }
 }
 
 impl From<TransformError> for JsValue {

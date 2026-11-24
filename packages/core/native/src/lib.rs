@@ -1,5 +1,3 @@
-#![feature(try_blocks)]
-
 mod utils;
 use oxc_ast::ast::JSXExpression;
 use std::collections::HashMap;

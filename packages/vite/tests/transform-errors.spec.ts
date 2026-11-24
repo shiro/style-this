@@ -107,12 +107,15 @@ describe.each([false, true])("transform errors (atomic: %s)", (atomic) => {
   });
 
   test.each([
-    ["syntax errors", syntaxError, "failed to parse program"],
-    ["dynamic variable access", dynamicVariableAccess, "tried to access dynamic variable 'color'"],
-    ["destructured templates", destructuredTemplate, "'css' templates can't be destructured"],
-  ])("%s don't block the virtual modules", async (_, code, message) => {
+    ["syntax errors", syntaxError, "failed to parse program", { line: 8, column: 1 }],
+    ["dynamic variable access", dynamicVariableAccess, "tried to access dynamic variable 'color'", { line: 3, column: 41 }],
+    ["destructured templates", destructuredTemplate, "'css' templates can't be destructured", { line: 3, column: 14 }],
+  ])("%s don't block the virtual modules", async (_, code, message, loc) => {
     await writeFile(path("broken.tsx"), code);
-    await expect(transform("broken.tsx")).rejects.toMatchObject({ message: expect.stringContaining(message) });
+    await expect(transform("broken.tsx")).rejects.toMatchObject({
+      message: expect.stringContaining(message),
+      loc: { file: path("broken.tsx"), ...loc },
+    });
     await expectError("broken.tsx", message);
     await expectCss("good.tsx", "color: red");
   });

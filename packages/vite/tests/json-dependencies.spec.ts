@@ -192,7 +192,10 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
   });
 
   test("invalid JSON is reported", async () => {
-    await expect(cssOf("invalid.tsx")).rejects.toThrow(/failed to parse program/);
+    await expect(cssOf("invalid.tsx")).rejects.toMatchObject({
+      message: expect.stringMatching(/failed to parse program/),
+      loc: { file: join(dir, "invalid.json"), line: 1, column: 19 },
+    });
     expect(await cssOf("working.tsx")).toContain("color: purple");
   });
 

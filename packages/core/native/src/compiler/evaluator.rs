@@ -545,12 +545,7 @@ fn evaluate_dependencies<'alloc>(
                     .parse();
 
                 if ast.panicked {
-                    return Err(TransformError::RawParseFailed {
-                        filepath: remote_filepath,
-                        message: ast.errors.first().unwrap().message.to_string(),
-                        row: 1,
-                        column: 1,
-                    });
+                    return Err(TransformError::parse_failed(remote_filepath, &code, &ast));
                 }
 
                 let mut remote_program = ast.program;
@@ -656,11 +651,22 @@ fn raw_module(code: &str) -> String {
 /// Module of a JSON file, like Vite it default-exports the JSON and exports top level keys that
 /// are valid identifiers by name.
 fn json_module(filepath: &str, code: &str) -> Result<String, TransformError> {
-    let parse_error = |cause: JsValue| TransformError::RawParseFailed {
-        filepath: filepath.to_string(),
-        message: js_sys::Error::from(cause).message().into(),
-        row: 1,
-        column: 1,
+    let parse_error = |cause: JsValue| {
+        let message = String::from(js_sys::Error::from(cause).message());
+        // V8 locates JSON syntax errors as `... in JSON at position 16 (line 3 column 6)`
+        let (row, column) = message
+            .rsplit_once(" (line ")
+            .and_then(|(_, position)| {
+                let (row, column) = position.strip_suffix(')')?.split_once(" column ")?;
+                Some((row.parse().ok()?, column.parse().ok()?))
+            })
+            .unwrap_or((1, 1));
+        TransformError::RawParseFailed {
+            filepath: filepath.to_string(),
+            message,
+            row,
+            column,
+        }
     };
     let value = js_sys::JSON::parse(code).map_err(parse_error)?;
 
@@ -977,6 +983,8 @@ pub async fn evaluate_program<'alloc>(
     // NOTE: We MUST do this even when skip_css_eval is true, because import registration
     // happens inside evaluate_dependencies. If we skip it, dependency tracking won't work.
     let mut eval_program = tmp_program;
+    // its nodes keep their spans in the program, they're mapped to it in errors
+    eval_program.source_text = program.source_text;
 
     let css_file_store_ref = &transformer.css_file_store_ref;
 
@@ -1147,10 +1155,8 @@ pub async fn evaluate_program<'alloc>(
         );
 
         let evaluated = match evaluate(
-            allocator,
             transformer.debug,
             &program_filepath,
-            program_code,
             &eval_program,
             &eval_program_js,
         )
@@ -1264,10 +1270,8 @@ pub async fn evaluate_program<'alloc>(
     );
 
     let evaluated = match evaluate(
-        allocator,
         transformer.debug,
         &program_filepath,
-        program_code,
         &eval_program,
         &eval_program_js,
     )
@@ -1294,10 +1298,8 @@ pub async fn evaluate_program<'alloc>(
 
 /// Evaluates the wrapped program, mapping the error locations of the evaluated code to the source.
 async fn evaluate(
-    allocator: &oxc_allocator::Allocator,
     debug: bool,
     program_filepath: &str,
-    program_code: &str,
     eval_program: &Program<'_>,
     eval_program_js: &str,
 ) -> Result<JsValue, TransformError> {
@@ -1311,14 +1313,7 @@ async fn evaluate(
     wasm_bindgen_futures::JsFuture::from(js_sys::Promise::from(promise))
         .await
         .map_err(|cause| {
-            error_mapping::resolve_err(
-                allocator,
-                &cause,
-                program_filepath,
-                program_code,
-                eval_program,
-                eval_program_js,
-            );
+            error_mapping::resolve_err(&cause, program_filepath, eval_program, eval_program_js);
             evaluation_failed(cause)
         })
 }

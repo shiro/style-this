@@ -58,15 +58,7 @@ impl Transformer {
                 .parse();
 
             if ast.panicked {
-                report(
-                    tx,
-                    TransformError::RawParseFailed {
-                        filepath: filepath.clone(),
-                        message: ast.errors.first().unwrap().message.to_string(),
-                        row: 1,
-                        column: 1,
-                    },
-                );
+                report(tx, TransformError::parse_failed(filepath.clone(), &code, &ast));
                 return;
             }
 
