@@ -5,10 +5,10 @@
 //     "/packages/vite/tests/styled-components-solid-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { styled } from \"@style-this/solid\";\nimport { css } from \"@style-this/core\";\n\n// must not be shadowed by the generated wrapper's props\nconst props = { gap: 4 };\n\nexport const FancyButton = styled.button<{ a: number }>`\n  background: none;\n  border: 1px solid blue;\n  border-radius: 2px;\n  padding: ${({ a }) => a}px;\n  gap: ${() => props.gap}px;\n`;\n\n// must not be shadowed by the generated wrapper's class variable\nconst ui = {\n  accent: \"red\",\n  Card: styled.div`\n    color: ${() => ui.accent};\n  `,\n};\n\nexport default styled.div`\n  color: ${() => ui.accent};\n`;\n\nconst unrelated = css`\n  background: none;\n`;\n\nexport const Link = styled(\"a\")<{ size: number }>`\n  font-size: ${({ size }) => size}px;\n`;\n\nexport const Panel = styled(ui.Card)`\n  border-color: ${() => ui.accent};\n`;\n\n// lowercase and computed bases are components, not HTML elements\nconst card = (p: { class?: string }) => <div class={p.class} />;\nconst components = { Card: card };\n\nexport const LowercaseBase = styled(card)`\n  color: red;\n`;\n\nexport const ComputedBase = styled(components[\"Card\"])`\n  color: ${() => ui.accent};\n`;\n\nexport const TemplateTag = styled(`span`)`\n  color: blue;\n`;\n\n// wrapped and non-arrow functions are runtime style functions too\nexport const StyleFunctions = styled.div<{ size: number }>`\n  width: ${function ({ size }) {\n    return size;\n  }}px;\n  height: ${(({ size }) => size) as (p: { size: number }) => number}px;\n  margin: ${(({ size }) => size) satisfies (p: { size: number }) => number}px;\n  padding: ${(({ size }) => size)!}px;\n`;\n"
+//     "import { styled } from \"@style-this/solid\";\nimport { css } from \"@style-this/core\";\n\n// must not be shadowed by the generated wrapper's props\nconst props = { gap: 4 };\n\nexport const FancyButton = styled.button<{ a: number }>`\n  background: none;\n  border: 1px solid blue;\n  border-radius: 2px;\n  padding: ${({ a }) => a}px;\n  gap: ${() => props.gap}px;\n`;\n\n// must not be shadowed by the generated wrapper's class variable\nconst ui = {\n  accent: \"red\",\n  Card: styled.div`\n    color: ${() => ui.accent};\n  `,\n};\n\nexport default styled.div`\n  color: ${() => ui.accent};\n`;\n\nconst unrelated = css`\n  background: none;\n`;\n\nexport const Link = styled(\"a\")<{ size: number }>`\n  font-size: ${({ size }) => size}px;\n`;\n\nexport const Panel = styled(ui.Card)`\n  border-color: ${() => ui.accent};\n`;\n\n// lowercase and computed bases are components, not HTML elements\nconst card = (p: { class?: string }) => <div class={p.class} />;\nconst components = { Card: card };\n\nexport const LowercaseBase = styled(card)`\n  color: red;\n`;\n\nexport const ComputedBase = styled(components[\"Card\"])`\n  color: ${() => ui.accent};\n`;\n\nexport const TemplateTag = styled(`span`)`\n  color: blue;\n`;\n\n// wrapped and non-arrow functions are runtime style functions too\nexport const StyleFunctions = styled.div<{ size: number }>`\n  width: ${function ({ size }) {\n    return size;\n  }}px;\n  height: ${(({ size }) => size) as (p: { size: number }) => number}px;\n  margin: ${(({ size }) => size) satisfies (p: { size: number }) => number}px;\n  padding: ${(({ size }) => size)!}px;\n`;\n\n// styled components are scoped even with a `_Global` name\nexport const _GlobalBar = styled.div`\n  color: green;\n`;\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAM2B;AAWnB;AAKO;AAIG;AAIE;AAIC;AAQQ;AAID;AAID;AAKG"
+//   "mappings": "AAM2B;AAWnB;AAKO;AAIG;AAIE;AAIC;AAQQ;AAID;AAID;AAKG;AAUJ"
 // }
 
 import { styled } from "@style-this/solid";
@@ -73,4 +73,9 @@ export const StyleFunctions = styled.div<{ size: number }>`
   height: ${(({ size }) => size) as (p: { size: number }) => number}px;
   margin: ${(({ size }) => size) satisfies (p: { size: number }) => number}px;
   padding: ${(({ size }) => size)!}px;
+`;
+
+// styled components are scoped even with a `_Global` name
+export const _GlobalBar = styled.div`
+  color: green;
 `;

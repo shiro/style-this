@@ -1,38 +1,41 @@
-.FancyButton-ox634h {
+.FancyButton-kdmfwx {
 background: none;
   border: 1px solid blue;
   border-radius: 2px;
   padding: var(--var1-q3ctyv)px;
   gap: var(--var2-pino9q)px;
 }
-.ui-s9abk5 {
+.ui-ox634h {
 color: var(--var1-xazw1e);
   
 }
-.component_0-r81ubc {
+.component_0-s9abk5 {
 color: var(--var1-eb8x63);
 }
-.unrelated-xavwp2 {
+.unrelated-r81ubc {
 background: none;
 }
-.Link-o5uj8x {
+.Link-xavwp2 {
 font-size: var(--var1-8dybk9)px;
 }
-.Panel-fs5q7g {
+.Panel-o5uj8x {
 border-color: var(--var1-i7wlu7);
 }
-.LowercaseBase-p2r0he {
+.LowercaseBase-fs5q7g {
 color: red;
 }
-.ComputedBase-052fkl {
+.ComputedBase-p2r0he {
 color: var(--var1-xu3sdu);
 }
-.TemplateTag-3slijs {
+.TemplateTag-052fkl {
 color: blue;
 }
-.StyleFunctions-96jgdy {
+.StyleFunctions-3slijs {
 width: var(--var1-7g9y7o)px;
   height: var(--var2-tabwt2)px;
   margin: var(--var3-od23od)px;
   padding: var(--var4-m7412v)px;
+}
+._GlobalBar-96jgdy {
+color: green;
 }

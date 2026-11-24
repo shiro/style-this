@@ -1101,7 +1101,7 @@ pub async fn evaluate_program<'alloc>(
                     let classname = &css_var.classname;
                     let var = &css_var.variable_name;
 
-                    if css_var.classname.starts_with("_Global") {
+                    if css_var.global {
                         return format!("`${{{var}.css}}\n`");
                     }
 
@@ -1192,7 +1192,7 @@ pub async fn evaluate_program<'alloc>(
                 let classname = &css_var.classname;
 
                 // Global styles don't need a wrapper selector
-                if css_var.classname.starts_with("_Global") {
+                if css_var.global {
                     module_css.push_str(&format!("{}\n", css_string));
                     continue;
                 }

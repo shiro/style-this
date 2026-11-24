@@ -9,7 +9,7 @@ import "virtual:style-this:/entry.tsx.css";
 // must not be shadowed by the generated wrapper's props
 const props = { gap: 4 };
 export const FancyButton = (() => {
-	let __styleThis__class = _styleThisClasses.__styleThis_var_FancyButton_24;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_FancyButton_26;
 	let __styleThis__comp = (__styleThis__props) => {
 		const [, __styleThis__rest] = __styleThis__splitProps(__styleThis__props, ["styleProps", "style"]);
 		return <button {...__styleThis__rest} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({
@@ -30,7 +30,7 @@ export const FancyButton = (() => {
 const ui = {
 	accent: "red",
 	Card: (() => {
-		let __styleThis__class = _styleThisClasses.__styleThis_var_ui_21;
+		let __styleThis__class = _styleThisClasses.__styleThis_var_ui_23;
 		let __styleThis__comp = (__styleThis__props) => {
 			const [, __styleThis__rest] = __styleThis__splitProps(__styleThis__props, ["styleProps", "style"]);
 			return <div {...__styleThis__rest} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({ "--var1-xazw1e": (() => ui.accent)({
@@ -43,7 +43,7 @@ const ui = {
 	})()
 };
 export default (() => {
-	let __styleThis__class = _styleThisClasses.__styleThis_var_component_0_18;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_component_0_20;
 	let __styleThis__comp = (__styleThis__props) => {
 		const [, __styleThis__rest] = __styleThis__splitProps(__styleThis__props, ["styleProps", "style"]);
 		return <div {...__styleThis__rest} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({ "--var1-eb8x63": (() => ui.accent)({
@@ -56,7 +56,7 @@ export default (() => {
 })();
 const unrelated = _styleThisClasses.unrelated;
 export const Link = (() => {
-	let __styleThis__class = _styleThisClasses.__styleThis_var_Link_15;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_Link_17;
 	let __styleThis__comp = (__styleThis__props) => {
 		const [, __styleThis__rest] = __styleThis__splitProps(__styleThis__props, ["styleProps", "style"]);
 		return <a {...__styleThis__rest} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({ "--var1-8dybk9": (({ size }) => size)({
@@ -68,7 +68,7 @@ export const Link = (() => {
 	return __styleThis__comp;
 })();
 export const Panel = (() => {
-	let __styleThis__class = _styleThisClasses.__styleThis_var_Panel_13;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_Panel_15;
 	let __styleThis__comp = (__styleThis__props) => {
 		return <ui.Card {...__styleThis__props} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({ "--var1-i7wlu7": (() => ui.accent)({
 			...__styleThis__props.styleProps,
@@ -85,7 +85,7 @@ const card = (p: {
 const components = { Card: card };
 export const LowercaseBase = (() => {
 	const __styleThis__Base = card;
-	let __styleThis__class = _styleThisClasses.__styleThis_var_LowercaseBase_10;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_LowercaseBase_12;
 	let __styleThis__comp = (__styleThis__props) => {
 		return <__styleThis__Base {...__styleThis__props} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} />;
 	};
@@ -95,7 +95,7 @@ export const LowercaseBase = (() => {
 })();
 export const ComputedBase = (() => {
 	const __styleThis__Base = components["Card"];
-	let __styleThis__class = _styleThisClasses.__styleThis_var_ComputedBase_7;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_ComputedBase_9;
 	let __styleThis__comp = (__styleThis__props) => {
 		return <__styleThis__Base {...__styleThis__props} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({ "--var1-xu3sdu": (() => ui.accent)({
 			...__styleThis__props.styleProps,
@@ -106,7 +106,7 @@ export const ComputedBase = (() => {
 	return __styleThis__comp;
 })();
 export const TemplateTag = (() => {
-	let __styleThis__class = _styleThisClasses.__styleThis_var_TemplateTag_5;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_TemplateTag_7;
 	let __styleThis__comp = (__styleThis__props) => {
 		return <span {...__styleThis__props} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} />;
 	};
@@ -116,7 +116,7 @@ export const TemplateTag = (() => {
 })();
 // wrapped and non-arrow functions are runtime style functions too
 export const StyleFunctions = (() => {
-	let __styleThis__class = _styleThisClasses.__styleThis_var_StyleFunctions_2;
+	let __styleThis__class = _styleThisClasses.__styleThis_var_StyleFunctions_4;
 	let __styleThis__comp = (__styleThis__props) => {
 		const [, __styleThis__rest] = __styleThis__splitProps(__styleThis__props, ["styleProps", "style"]);
 		return <div {...__styleThis__rest} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} style={__styleThis__mergeInlineStyles({
@@ -140,6 +140,16 @@ export const StyleFunctions = (() => {
 			})
 		}, __styleThis__props.style)} />;
 	};
+	__styleThis__comp.toString = () => __styleThis__class;
+	return __styleThis__comp;
+})();
+// styled components are scoped even with a `_Global` name
+export const _GlobalBar = (() => {
+	let __styleThis__class = _styleThisClasses.__styleThis_var__GlobalBar_2;
+	let __styleThis__comp = (__styleThis__props) => {
+		return <div {...__styleThis__props} class={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.class)} />;
+	};
+	__styleThis__comp.css = __styleThis__class.css;
 	__styleThis__comp.toString = () => __styleThis__class;
 	return __styleThis__comp;
 })();

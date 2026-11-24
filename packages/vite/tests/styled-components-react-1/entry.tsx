@@ -61,3 +61,8 @@ export const StyleFunctions = styled.div<{ size: number }>`
   margin: ${(({ size }) => size) satisfies (p: { size: number }) => number}px;
   padding: ${(({ size }) => size)!}px;
 `;
+
+// styled components are scoped even with a `_Global` name
+export const _GlobalBar = styled.div`
+  color: green;
+`;

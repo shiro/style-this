@@ -568,11 +568,11 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         self.insert_into_virtual_program(declaration, Some(pos));
     }
 
-    fn create_virtual_css_template(&mut self, variable_name: &str) -> String {
+    fn create_virtual_css_template(&mut self, variable_name: &str, global: bool) -> String {
         let unique_number = self.css_unique_number();
 
-        // For _Global prefixed variables, use the variable name as-is without random suffix
-        if variable_name.starts_with("_Global") {
+        // global styles use the variable name as-is without random suffix
+        if global {
             variable_name.to_string()
         } else {
             let relative_program_filepath = self
@@ -584,8 +584,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 .random
                 .random_string(6, &format!("{relative_program_filepath}_{unique_number}"));
 
-            // `$` is valid in JS identifiers but not in CSS class names, `__` instead of `_` so
-            // `$Global` doesn't become a `_Global` class
+            // `$` is valid in JS identifiers but not in CSS class names
             let variable_name = variable_name.replace('$', "__");
 
             format!("{variable_name}-{random_suffix}")
@@ -873,6 +872,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         it: &TaggedTemplateExpression<'alloc>,
         variable_name: &str,
         class_name: &str,
+        global: bool,
         extra_classes: BTreeSet<String>,
     ) {
         let span = it.span;
@@ -946,6 +946,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .push(CssVariableIdentifier::new(
                 variable_name.to_string(),
                 class_name.to_string(),
+                global,
                 extra_classes,
                 span,
             ));
@@ -1416,13 +1417,14 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             match export {
                 LibraryExport::Css => {
-                    let class_name = self.create_virtual_css_template(variable_name);
+                    let class_name = self.create_virtual_css_template(variable_name, false);
                     let extra_classes = self.extract_extra_classes(template);
 
                     self.insert_into_virtual_program_css(
                         template,
                         &resolved_variable_name,
                         &class_name,
+                        false,
                         extra_classes.clone(),
                     );
 
@@ -1566,14 +1568,17 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
             match export {
                 LibraryExport::Css => {
+                    // by the binding, styled components (bound to `__styleThis__class`) are never global
+                    let global = variable_name.starts_with("_Global");
                     let display_name = self.get_display_name(span, variable_name).to_string();
-                    let class_name = self.create_virtual_css_template(&display_name);
+                    let class_name = self.create_virtual_css_template(&display_name, global);
                     let extra_classes = self.extract_extra_classes(template);
 
                     self.insert_into_virtual_program_css(
                         template,
                         &resolved_variable_name,
                         &class_name,
+                        global,
                         extra_classes.clone(),
                     );
 

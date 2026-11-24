@@ -54,6 +54,8 @@ pub struct CssVariableIdentifier {
     pub variable_name: String,
     /// The generated CSS class name for non-atomic CSS (e.g., "myClass-abc123")
     pub classname: String,
+    /// Declared with a `_Global` prefix, the CSS is emitted without a wrapping class
+    pub global: bool,
     /// Extra classes from extraClass() calls
     pub extra_classes: BTreeSet<String>,
     /// Source span of the original css`...` block
@@ -64,12 +66,14 @@ impl CssVariableIdentifier {
     pub fn new(
         variable_name: String,
         non_atomic_class: String,
+        global: bool,
         extra_classes: BTreeSet<String>,
         span: Span,
     ) -> Self {
         Self {
             variable_name,
             classname: non_atomic_class,
+            global,
             extra_classes,
             span,
         }
