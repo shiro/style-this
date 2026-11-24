@@ -31,7 +31,9 @@ pub struct VisitorTransformer<'a, 'alloc> {
     cwd: &'a str,
     program_filepath: &'a str,
     program_code: &'a str,
-    value_cache: &'a mut HashSet<String>,
+    value_cache: &'a HashSet<String>,
+    /// top level values whose export is cached, local name -> exported name
+    cached_locals: HashMap<String, String>,
 
     style_function_name: Option<String>,
     css_function_name: Option<String>,
@@ -92,7 +94,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         cwd: &'a str,
         program_filepath: &'a str,
         program_code: &'a str,
-        value_cache: &'a mut HashSet<String>,
+        value_cache: &'a HashSet<String>,
         css_function_name: Option<String>,
         style_function_name: Option<String>,
         extra_class_function_name: Option<String>,
@@ -106,6 +108,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             program_filepath,
             program_code,
             value_cache,
+            cached_locals: Default::default(),
 
             css_function_name,
             style_function_name,
@@ -674,16 +677,17 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         // if cached, grab from cache. A destructuring pattern with any uncached name is copied
         // whole, which declares the cached names as well
-        if variable_names
+        if let Some(cached) = variable_names
             .iter()
-            .all(|variable_name| self.value_cache.contains(variable_name))
+            .map(|variable_name| Some((variable_name, self.cached_locals.get(variable_name)?)))
+            .collect::<Option<Vec<_>>>()
         {
-            for variable_name in &variable_names {
+            for (variable_name, exported) in cached {
                 let variable_declaration = ast::build_variable_declaration_ident(
                     self.ast_builder,
                     span,
                     self.get_alias(variable_name).unwrap_or(variable_name),
-                    &format!("{}['{variable_name}']", self.store),
+                    &format!("{}[{exported:?}]", self.store),
                 );
 
                 self.tmp_program_statement_buffer
@@ -1230,6 +1234,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
         self.scan_pass = false;
         if self.scope_depth == 1 {
+            self.cached_locals = cached_locals(it, self.value_cache);
             self.reference_export_specifiers(it);
         }
         self.pending_declarations
@@ -1887,6 +1892,41 @@ fn program_declared_values(statements: &[Statement]) -> HashSet<String> {
     }
 
     names
+}
+
+/// Top level values whose export is cached, local name -> exported name. The value cache and the
+/// store are keyed by exported name, e.g. `const a = 1; export { a as b };` caches `b`.
+fn cached_locals(statements: &[Statement], value_cache: &HashSet<String>) -> HashMap<String, String> {
+    let mut locals = HashMap::new();
+    let mut insert = |exported: String, local: String| {
+        if value_cache.contains(&exported) {
+            locals.insert(local, exported);
+        }
+    };
+
+    for stmt in statements {
+        match stmt {
+            // declared as the sentinel, see `visit_default_export_expression`
+            Statement::ExportDefaultDeclaration(_) => {
+                insert(DEFAULT_EXPORT.to_string(), DEFAULT_EXPORT.to_string());
+            }
+            Statement::ExportNamedDeclaration(export) if export.source.is_none() => {
+                for specifier in &export.specifiers {
+                    let exported = match specifier.exported.name().as_str() {
+                        "default" => DEFAULT_EXPORT.to_string(),
+                        name => name.to_string(),
+                    };
+                    insert(exported, specifier.local.name().to_string());
+                }
+                for name in program_declared_values(std::slice::from_ref(stmt)) {
+                    insert(name.clone(), name);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    locals
 }
 
 /// Names the program exports itself, i.e. not through `export * from`.

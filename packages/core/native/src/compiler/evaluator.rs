@@ -757,7 +757,7 @@ pub(crate) fn slice_program<'alloc>(
     program_code: &str,
     program: &mut Program<'alloc>,
     referenced_idents: HashSet<String>,
-    value_cache: &mut HashSet<String>,
+    value_cache: &HashSet<String>,
 ) -> Result<ProgramSlice<'alloc>, TransformError> {
     let store = value_store(transformer, program_filepath);
 
@@ -924,9 +924,12 @@ pub async fn evaluate_program<'alloc>(
 
     // released while awaiting dependencies, otherwise circular imports (also across concurrent
     // evaluations) deadlock
-    let mut value_cache = value_cache_guard.lock().await;
+    let value_cache = value_cache_guard.lock().await;
 
     referenced_idents.retain(|ident| !value_cache.contains(ident));
+    // the namespace is the store, requesting it evaluates all exports into it, so it can be cached
+    // even without `export * from`
+    let namespace_requested = referenced_idents.contains(STAR_IMPORT);
 
     // We used to return early here if !entrypoint && referenced_idents.is_empty(),
     // but we need to continue to extract exports for dependency tracking
@@ -952,7 +955,7 @@ pub async fn evaluate_program<'alloc>(
         program_code,
         program,
         referenced_idents,
-        &mut value_cache,
+        &value_cache,
     ) {
         Ok(slice) => slice,
         Err(error) => {
@@ -1090,7 +1093,14 @@ pub async fn evaluate_program<'alloc>(
         .code;
 
     // we append all exported idents we evaluated to the cache
-    let cached_exports = CachedExports::new(value_cache, exported_idents.keys().cloned().collect());
+    let cached_exports = CachedExports::new(
+        value_cache,
+        exported_idents
+            .keys()
+            .cloned()
+            .chain(namespace_requested.then(|| STAR_IMPORT.to_string()))
+            .collect(),
+    );
 
     // importers (which evaluate the file as a non-entrypoint) read the store even if none of the
     // names they import are values (e.g. types)
@@ -1383,11 +1393,11 @@ async fn evaluate(
 /// the next importer evaluates them again instead of reading the missing values from the store.
 struct CachedExports<'a> {
     value_cache: futures::lock::MutexGuard<'a, HashSet<String>>,
-    exports: Vec<String>,
+    exports: HashSet<String>,
 }
 
 impl<'a> CachedExports<'a> {
-    fn new(mut value_cache: futures::lock::MutexGuard<'a, HashSet<String>>, exports: Vec<String>) -> Self {
+    fn new(mut value_cache: futures::lock::MutexGuard<'a, HashSet<String>>, exports: HashSet<String>) -> Self {
         value_cache.extend(exports.iter().cloned());
         Self { value_cache, exports }
     }

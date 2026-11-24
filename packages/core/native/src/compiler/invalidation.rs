@@ -125,7 +125,7 @@ fn slice_export<'alloc>(
         code,
         program,
         HashSet::from([export.to_string()]),
-        &mut HashSet::new(),
+        &HashSet::new(),
     )
     .ok()?;
 

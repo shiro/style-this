@@ -30,7 +30,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/share
 // /packages/vite/tests/edge-cases-1/shared.tsx: {"Math", "css", "num", "shared"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let num = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"]['num'];
+let num = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/shared.tsx"]["num"];
 let shared = new String("shared-ar0tez");
 shared.css = `margin: ${num}px;`;
 

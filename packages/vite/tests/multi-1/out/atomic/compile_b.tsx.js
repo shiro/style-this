@@ -10,7 +10,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-1/b.tsx"] = 
 // /packages/vite/tests/multi-1/b.tsx: {"color", "css", "exported"}
 "use strict";
 let { css } = require("/packages/core/dist/index.mjs");
-let color = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-1/b.tsx"]['color'];
+let color = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-1/b.tsx"]["color"];
 let exported = new String("exported-w5y7wh");
 exported.css = `background: ${color};`;
 

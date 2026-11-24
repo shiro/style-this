@@ -30,13 +30,10 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"]
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] ?? {}), };
 
-// /packages/vite/tests/reexports-2/d.ts (/packages/vite/tests/reexports-2/palette.ts): {"__star__", "accent", "base", "secondary"}
+// /packages/vite/tests/reexports-2/d.ts (/packages/vite/tests/reexports-2/palette.ts): {}
 "use strict";
-let base = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"]['base'];
-let secondary = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"]['secondary'];
-let accent = global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"]['accent'];
 
-global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] ?? {}), accent,base,secondary};
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"] ?? {}), };
 
 // /packages/vite/tests/reexports-2/entry.tsx: {"Object", "Record", "box", "css", "own", "palette", "primary", "scale", "secondary", "sizes", "tokens", "total"}
 "use strict";
