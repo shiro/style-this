@@ -303,6 +303,29 @@ impl ExpressionCollectorVisitor {
         };
         self.scopes[idx].declared.extend(names);
     }
+
+    /// Declarations declare their name in the outer scope, named expressions only inside them.
+    fn visit_named(
+        &mut self,
+        id: Option<&oxc_ast::ast::BindingIdentifier>,
+        declaration: bool,
+        walk: impl FnOnce(&mut Self),
+    ) {
+        let Some(id) = id else {
+            return walk(self);
+        };
+        let name = id.name.to_string();
+        if declaration {
+            self.declare([name], false);
+            return walk(self);
+        }
+        self.scopes.push(CollectorScope {
+            declared: HashSet::from([name]),
+            ..Default::default()
+        });
+        walk(self);
+        self.leave_scope();
+    }
 }
 
 use oxc_ast_visit::walk;
@@ -332,20 +355,14 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
         walk::walk_variable_declarator(self, it);
     }
     fn visit_function(&mut self, it: &oxc_ast::ast::Function<'a>, flags: ScopeFlags) {
-        if it.is_declaration()
-            && let Some(id) = &it.id
-        {
-            self.declare([id.name.to_string()], false);
-        }
-        walk::walk_function(self, it, flags);
+        self.visit_named(it.id.as_ref(), it.is_declaration(), |this| {
+            walk::walk_function(this, it, flags)
+        });
     }
     fn visit_class(&mut self, it: &oxc_ast::ast::Class<'a>) {
-        if it.is_declaration()
-            && let Some(id) = &it.id
-        {
-            self.declare([id.name.to_string()], false);
-        }
-        walk::walk_class(self, it);
+        self.visit_named(it.id.as_ref(), it.is_declaration(), |this| {
+            walk::walk_class(this, it)
+        });
     }
     fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
         self.declare(binding_pattern_kind_get_idents(&it.pattern.kind), false);

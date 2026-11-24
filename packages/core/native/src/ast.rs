@@ -110,12 +110,13 @@ pub fn build_variable_declarator<'alloc>(
 pub fn build_variable_declarator_pattern<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     span: Span,
+    kind: VariableDeclarationKind,
     variable_pattern: BindingPattern<'alloc>,
     value: Expression<'alloc>,
 ) -> VariableDeclarator<'alloc> {
     ast_builder.variable_declarator(
         span,
-        VariableDeclarationKind::Const,
+        kind,
         variable_pattern,
         Some(value),
         false,
@@ -125,15 +126,16 @@ pub fn build_variable_declarator_pattern<'alloc>(
 pub fn build_variable_declaration_ident<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
     span: Span,
+    kind: VariableDeclarationKind,
     variable_name: &str,
     identifier: &str,
 ) -> Statement<'alloc> {
     Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
         span,
-        VariableDeclarationKind::Let,
+        kind,
         ast_builder.vec1(ast_builder.variable_declarator(
             span,
-            VariableDeclarationKind::Const,
+            kind,
             ast_builder.binding_pattern(
                 BindingPatternKind::BindingIdentifier(
                     ast_builder.alloc_binding_identifier(span, ast_builder.atom(variable_name)),

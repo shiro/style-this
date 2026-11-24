@@ -8,10 +8,10 @@ function spaced() {
 	if (true) {
 		var gap = 2;
 	}
-	return _styleThisClasses.__styleThis_14;
+	return _styleThisClasses.__styleThis_16;
 }
 function margined() {
-	const margin = () => _styleThisClasses.__styleThis_13;
+	const margin = () => _styleThisClasses.__styleThis_15;
 	if (true) {
 		var gap = 4;
 	}
@@ -19,9 +19,17 @@ function margined() {
 }
 // the CSS in the closure is evaluated where it's called, below `gap`
 function gapped() {
-	const margin = () => _styleThisClasses.__styleThis_12;
+	const margin = () => _styleThisClasses.__styleThis_14;
 	const gap = 3;
-	return _styleThisClasses.__styleThis_11;
+	return _styleThisClasses.__styleThis_13;
+}
+// `var`s can be redeclared, also in nested blocks
+function redeclared() {
+	var gap = 5;
+	if (true) {
+		var gap = 6;
+	}
+	return _styleThisClasses.__styleThis_12;
 }
 const spacedOut = _styleThisClasses.spacedOut;
 // the locals shadow the parameters, also when declared below their use or inside an expression
@@ -39,9 +47,22 @@ function Spacer(size, Unit, error) {
 				return error;
 			}
 		})();
-		return _styleThisClasses.__styleThis_10;
+		return _styleThisClasses.__styleThis_11;
 	}
 	return styles();
+}
+// the names of function and class expressions are only declared inside them
+function Counter(count, Count) {
+	const countdown = function count(n) {
+		return n > 1 ? count(n - 1) : n;
+	};
+	const Doubled = class Count {
+		static size = 2;
+		static double() {
+			return Count.size * 2;
+		}
+	};
+	return _styleThisClasses.__styleThis_10;
 }
 // locals shadowing the top level names used below
 const Button = ({ variant }) => {

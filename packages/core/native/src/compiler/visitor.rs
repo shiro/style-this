@@ -460,7 +460,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 VirtualProgramInsert::ClassDeclaration(class)
             }
             VirtualProgramInsert::VariableDeclarator(declarator) => {
-                let VariableDeclarator { span, id, init, .. } = declarator;
+                let VariableDeclarator {
+                    span,
+                    kind,
+                    id,
+                    init,
+                    ..
+                } = declarator;
                 let Some(mut right) = init else { return };
                 let init_span = right.span();
 
@@ -488,6 +494,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 let variable_declarator = ast::build_variable_declarator_pattern(
                     self.ast_builder,
                     span,
+                    kind,
                     self.ast_builder.binding_pattern(
                         aliased_idents,
                         None as Option<oxc_allocator::Box<_>>,
@@ -688,6 +695,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     ) -> Option<String> {
         let variable_names = it.name()?;
         let span = it.span();
+        // `var`s can be redeclared, e.g. `var a = 1; var a = 2;`
+        let kind = match &it {
+            VirtualProgramInsert::VariableDeclarator(declarator) if declarator.kind.is_var() => {
+                VariableDeclarationKind::Var
+            }
+            _ => VariableDeclarationKind::Let,
+        };
 
         // if cached, grab from cache. A destructuring pattern with any uncached name is copied
         // whole, which declares the cached names as well
@@ -700,6 +714,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 let variable_declaration = ast::build_variable_declaration_ident(
                     self.ast_builder,
                     span,
+                    kind,
                     self.get_alias(variable_name).unwrap_or(variable_name),
                     &format!("{}[{exported:?}]", self.store),
                 );
@@ -723,7 +738,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                         Statement::VariableDeclaration(
                             self.ast_builder.alloc_variable_declaration(
                                 span,
-                                VariableDeclarationKind::Let,
+                                kind,
                                 self.ast_builder.vec1(variable_declarator),
                                 false,
                             ),
@@ -750,6 +765,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     let destructure_declarator = ast::build_variable_declarator_pattern(
                         self.ast_builder,
                         span,
+                        kind,
                         pattern,
                         ast::build_identifier(self.ast_builder, span, &variable_name),
                     );
@@ -772,7 +788,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     let s = Statement::VariableDeclaration(
                         self.ast_builder.alloc_variable_declaration(
                             span,
-                            VariableDeclarationKind::Let,
+                            kind,
                             self.ast_builder.vec1(destructure_declarator),
                             false,
                         ),

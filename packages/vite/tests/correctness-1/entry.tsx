@@ -24,10 +24,20 @@ function gapped() {
   return css`${margin().css} gap: ${gap}px;`;
 }
 
+// `var`s can be redeclared, also in nested blocks
+function redeclared() {
+  var gap = 5;
+  if (true) {
+    var gap = 6;
+  }
+  return css`row-gap: ${gap}px;`;
+}
+
 const spacedOut = css`
   ${spaced().css}
   ${margined().css}
   ${gapped().css}
+  ${redeclared().css}
 `;
 
 // the locals shadow the parameters, also when declared below their use or inside an expression
@@ -48,6 +58,20 @@ function Spacer(size, Unit, error) {
     return css`margin: ${double()}${unit};`;
   }
   return styles();
+}
+
+// the names of function and class expressions are only declared inside them
+function Counter(count, Count) {
+  const countdown = function count(n) {
+    return n > 1 ? count(n - 1) : n;
+  };
+  const Doubled = class Count {
+    static size = 2;
+    static double() {
+      return Count.size * 2;
+    }
+  };
+  return css`margin: ${countdown(3)}px ${Doubled.double()}px;`;
 }
 
 // locals shadowing the top level names used below
