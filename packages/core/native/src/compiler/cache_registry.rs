@@ -391,6 +391,20 @@ impl CacheRegistry {
         }
     }
     
+    /// Drop the registrations of `filepath` on files it no longer imports, see
+    /// `DependencyTracker::retain_file_imports`
+    pub fn retain_file_imports(&self, filepath: &str, module_ids: &HashSet<String>) {
+        let unimported = self
+            .dependency_tracker
+            .borrow()
+            .retain_file_imports(filepath, module_ids);
+        // changes of files nothing imports aren't checked, their values would become outdated
+        for file in unimported {
+            self.clear_file(&file);
+            self.update_module_code(&file, None);
+        }
+    }
+
     /// Get reference to dependency tracker
     pub fn dependency_tracker(&self) -> Rc<RefCell<DependencyTracker>> {
         self.dependency_tracker.clone()

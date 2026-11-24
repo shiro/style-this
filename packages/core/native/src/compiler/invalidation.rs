@@ -17,7 +17,7 @@ use oxc_ast::ast::{Expression, ImportDeclarationSpecifier, Program, Statement};
 use oxc_codegen::Codegen;
 use oxc_parser::{ParseOptions, Parser};
 use oxc_span::SourceType;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
 
@@ -70,6 +70,8 @@ impl ChangedExports {
 
 #[derive(Debug, PartialEq)]
 struct ExportSlice {
+    /// exported name -> local name, all exports for the namespace (`STAR_IMPORT`)
+    exports: BTreeMap<String, String>,
     code: String,
     /// (module id, imported name)
     imports: BTreeSet<(String, String)>,
@@ -129,10 +131,16 @@ fn slice_export<'alloc>(
     )
     .ok()?;
 
-    let local = slice.exported_idents.get(export)?;
+    // the namespace consists of all exports, including the ones of `export * from`
+    let exports: BTreeMap<String, String> = if export == STAR_IMPORT {
+        slice.exported_idents.into_iter().collect()
+    } else {
+        let local = slice.exported_idents.get(export)?;
+        BTreeMap::from([(export.to_string(), local.clone())])
+    };
 
     let mut slice_program = slice.tmp_program;
-    let references = prune_slice(&mut slice_program, local);
+    let references = prune_slice(&mut slice_program, exports.values().cloned().collect());
 
     // same as the imports `evaluate_dependencies` evaluates
     let mut imports = BTreeSet::new();
@@ -159,23 +167,24 @@ fn slice_export<'alloc>(
     }
 
     Some(ExportSlice {
+        exports,
         code: Codegen::new().build(&slice_program).code,
         imports,
     })
 }
 
-/// Removes top level statements `local` doesn't depend on, returns the identifiers it references.
+/// Removes top level statements `locals` don't depend on, returns the identifiers they reference.
 ///
 /// The visitor only adds referenced declarations to slices, but always adds all CSS of the program
 /// since entrypoints need it.
-fn prune_slice(program: &mut Program, local: &str) -> HashSet<String> {
+fn prune_slice(program: &mut Program, locals: HashSet<String>) -> HashSet<String> {
     let statements: Vec<_> = program
         .body
         .iter()
         .map(|stmt| (statement_declared_names(stmt), statement_get_references(stmt)))
         .collect();
 
-    let mut references = HashSet::from([local.to_string()]);
+    let mut references = locals;
     let mut kept = vec![false; statements.len()];
     let mut changed = true;
     while changed {
@@ -247,6 +256,10 @@ impl Transformer {
             (Some(old_code), Some(code)) => self.changed_exports(filepath, &old_code, code),
             _ => ChangedExports::All,
         };
+        // deleted files don't import anything
+        if code.is_none() {
+            self.cache_registry.retain_file_imports(filepath, &HashSet::new());
+        }
 
         let tracker = self.cache_registry.dependency_tracker();
         let mut importer_slices = HashMap::new();
@@ -330,19 +343,16 @@ impl Transformer {
         let old_slices = slice_exports(self, filepath, old_code, &exports);
         let slices = slice_exports(self, filepath, code, &exports);
 
-        let mut changed: HashSet<String> = exports
-            .iter()
-            .filter(|export| match (old_slices.get(*export), slices.get(*export)) {
-                (Some(old_slice), Some(slice)) => old_slice != slice,
-                _ => true,
-            })
-            .cloned()
-            .collect();
-        // the slice of all exports only covers the ones of `export * from`
-        if !changed.is_empty() && exports.contains(STAR_IMPORT) {
-            changed.insert(STAR_IMPORT.to_string());
-        }
-        ChangedExports::Names(changed)
+        ChangedExports::Names(
+            exports
+                .iter()
+                .filter(|export| match (old_slices.get(*export), slices.get(*export)) {
+                    (Some(old_slice), Some(slice)) => old_slice != slice,
+                    _ => true,
+                })
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Exports of `importer` that depend on the changed exports of `source`
@@ -396,7 +406,7 @@ mod tests {
     fn prune(code: &str, export: &str) -> (String, BTreeSet<String>) {
         let allocator = Allocator::default();
         let mut program = Parser::new(&allocator, code, SourceType::mjs()).parse().program;
-        let references = prune_slice(&mut program, export);
+        let references = prune_slice(&mut program, HashSet::from([export.to_string()]));
         (Codegen::new().build(&program).code, references.into_iter().collect())
     }
 

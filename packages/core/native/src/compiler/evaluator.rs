@@ -224,12 +224,21 @@ fn evaluate_dependencies<'alloc>(
                     .load_file(&remote_module_id, &program_filepath)
                     .await?;
 
+                // the source of the cached values, needed to find out which exports changed on HMR.
+                // Skipped evaluations don't evaluate values, the code they load can differ from the
+                // one the values get evaluated from.
+                let record_module_code = |filepath: &str, code: &str| {
+                    if !skip_css_eval {
+                        transformer.cache_registry.record_module_code(filepath, code);
+                    }
+                };
+
                 // modules with a query are separate modules generated from the file
                 let (code, query_source) = match remote_filepath.split_once('?') {
                     None => (code, None),
                     Some((source, "raw")) => {
                         // to find out whether the source changed, see `get_evaluated_dependencies`
-                        transformer.cache_registry.record_module_code(source, &code);
+                        record_module_code(source, &code);
                         (raw_module(&code), Some(source))
                     }
                     Some(_) => {
@@ -239,11 +248,8 @@ fn evaluate_dependencies<'alloc>(
                     }
                 };
 
-                // needed to find out which exports changed on HMR
                 if !code.is_empty() {
-                    transformer
-                        .cache_registry
-                        .record_module_code(&remote_filepath, &code);
+                    record_module_code(&remote_filepath, &code);
                     let tracker = transformer.cache_registry.dependency_tracker();
                     let tracker = tracker.borrow();
                     tracker.register_resolution(&program_filepath, &remote_module_id, &remote_filepath);
@@ -972,22 +978,13 @@ pub async fn evaluate_program<'alloc>(
 
     // the evaluations of entrypoints and of their exports for importers register imports under
     // the same file, the ones of files it no longer imports are outdated either way
-    if entrypoint {
-        let module_ids = program_imports(program, ast_builder)
-            .iter()
-            .map(|import| import.source.value.to_string())
-            .collect();
-        let unimported = transformer
-            .cache_registry
-            .dependency_tracker()
-            .borrow()
-            .retain_file_imports(&program_filepath, &module_ids);
-        // changes of files nothing imports aren't checked, their values would become outdated
-        for file in unimported {
-            transformer.cache_registry.clear_file(&file);
-            transformer.cache_registry.update_module_code(&file, None);
-        }
-    }
+    let module_ids = program_imports(program, ast_builder)
+        .iter()
+        .map(|import| import.source.value.to_string())
+        .collect();
+    transformer
+        .cache_registry
+        .retain_file_imports(&program_filepath, &module_ids);
 
     // Now check if we should return early (no CSS functions imported)
     // But we've already extracted exports, so dependency tracking will work

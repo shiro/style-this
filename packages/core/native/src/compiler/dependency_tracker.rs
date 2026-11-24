@@ -206,6 +206,9 @@ impl DependencyTracker {
             .collect();
         // still imported through another id
         sources.retain(|source_file| !resolved.values().any(|kept| kept == source_file));
+        if resolved.is_empty() {
+            resolved_imports.remove(importer_file);
+        }
         drop(resolved_imports);
 
         let mut imports = self.file_imports.borrow_mut();
@@ -243,14 +246,6 @@ impl DependencyTracker {
             }
         }
         unimported
-    }
-    
-    /// Clear all import registrations for a source file
-    ///
-    /// Call this when a file is deleted or no longer tracked.
-    pub fn clear_file_as_source(&self, source_file: &str) {
-        let mut importers = self.variable_importers.borrow_mut();
-        importers.remove(source_file);
     }
     
     /// Get all files that import from `source_file` (regardless of what they import)

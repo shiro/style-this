@@ -378,6 +378,20 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
     expect(await cssOf("u.tsx")).toContain("color: blue");
   });
 
+  test("namespaces used as a whole change with any of their exports", async () => {
+    // `u.tsx` uses the namespace of `brand.ts`, which uses the one of `ink.ts`
+    expect(await edit("brand.ts", (code) => `${code}export const extra = "x";\n`)).toEqual(
+      ["brand.ts", "star.ts", "u.tsx"],
+    );
+    expect(await edit("ink.ts", (code) => `// colors\n${code}`)).toEqual(["ink.ts"]);
+    // through `export * from`, `t.tsx` gets `ink` through the namespace of `ink.ts` too
+    await transform("u.tsx");
+    await cssOf("u.tsx");
+    expect(await edit("ink.ts", (code) => `${code}export const paper = "white";\n`)).toEqual(
+      ["brand.ts", "ink.ts", "star.ts", "t.tsx", "u.tsx"],
+    );
+  });
+
   test("syntax errors while editing invalidate conservatively", async () => {
     expect(await edit("a.ts", (code) => code.replace(`"red"`, `"red`))).toEqual(
       ["a.ts", "b.tsx", "c.tsx", "d.tsx", "e.tsx", "i.tsx"],
@@ -472,10 +486,21 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
     expect(await change("h.tsx", files["h.tsx"])).toEqual(["h.tsx"]);
     await transform("h.tsx");
     expect(await cssOf("h.tsx")).toContain("outline-width: 2px");
+
+    // also in files that are only evaluated as dependencies
+    await edit("pq.ts", (code) => code.replace(`import { style } from "./q";`, `const style = "dashed";`));
+    await transform("w.tsx");
+    expect(await cssOf("w.tsx")).toContain("border: 1px dashed");
+    expect(await edit("q.ts", (code) => code.replace("solid", "dotted"))).toEqual([]);
   });
 
   test("deleting a file invalidates all of its transitive importers", async () => {
     expect(await change("a.ts", undefined)).toEqual(["a.ts", "b.tsx", "c.tsx", "d.tsx", "e.tsx", "i.tsx"]);
+  });
+
+  test("deleted files don't depend on their imports anymore", async () => {
+    expect(await change("b.tsx", undefined)).toEqual(["b.tsx", "e.tsx", "f.tsx"]);
+    expect(await edit("a.ts", (code) => code.replace(`"red"`, `"blue"`))).toEqual(["a.ts", "c.tsx", "i.tsx"]);
   });
 
   test("CSS is up to date after re-transforming the invalidated files", async () => {
