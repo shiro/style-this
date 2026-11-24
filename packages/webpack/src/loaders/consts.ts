@@ -21,8 +21,8 @@ export const noopAtomicProgramFile = path.join(packageRoot, "style-this.atomic-p
 export const noopAtomicCssFile = (atomic: boolean) =>
   path.join(packageRoot, atomic ? "style-this.atomic-layers.css" : "style-this.atomic.css");
 
-/** Extensions of the files the transform loader runs on. */
-export const transformExtensions = ["tsx", "ts", "jsx", "js", "mjs"];
+/** Extensions of the files the transform loader runs on, the ones the compiler parses. */
+export const transformExtensions = ["tsx", "ts", "jsx", "js", "mjs", "cjs", "mts", "cts"];
 
 export const regexNoopCss = /[\\/]style-this\.css$/;
 export const regexNoopAtomicProgram = /[\\/]style-this\.atomic-program\.js$/;

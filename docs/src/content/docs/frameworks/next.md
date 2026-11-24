@@ -34,7 +34,7 @@ is still called and your `turbopack.rules` are kept.
 ## Usage
 
 Styles work in server and client components, with the app router and the pages router, in
-`.ts`, `.tsx`, `.js`, `.jsx` and `.mjs` files outside `node_modules`.
+`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts` and `.cts` files outside `node_modules`.
 
 ```tsx title="app/layout.tsx"
 import { css } from "@style-this/core";

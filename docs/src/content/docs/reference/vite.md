@@ -6,7 +6,7 @@ sidebar:
 ---
 
 ```ts
-import styleThis, { DefaultImport } from "@style-this/vite";
+import styleThis, { DefaultImport, type Options } from "@style-this/vite";
 
 styleThis(options?: Options): Plugin
 ```
@@ -21,7 +21,7 @@ The plugin is named `vite:style-this` and runs with `enforce: "pre"`.
 - Default: `[]` (every supported file)
 
 Files to transform. A file is transformed if **any** filter matches. Regardless of the filter, only
-JS/TS (`.js`, `.jsx`, `.ts`, `.tsx` and their `m`/`c` variants) and `.svelte` files outside
+JS/TS (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`) and `.svelte` files outside
 `node_modules` are considered.
 
 Narrowing the filter to the files that contain styles (e.g. `/\.tsx$/`) speeds up builds.
@@ -75,10 +75,6 @@ Makes the generated evaluation programs load dependencies with `require` instead
 
 Advanced. Supplies the cache instance holding evaluated CSS, to share it between several plugin
 instances.
-
-### `include` / `exclude`
-
-Reserved, currently not used. Use [`filter`](#filter).
 
 ## Config changes
 

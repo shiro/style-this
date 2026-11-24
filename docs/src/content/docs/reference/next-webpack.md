@@ -50,7 +50,7 @@ Setup guide: [Next.js](/frameworks/next/). Wraps a Next.js config with the loade
 
 - **webpack**: adds the same rules as `StyleThisPlugin`, and keeps Next's CSS modules from renaming
   style-this classes. A user supplied `webpack` function is called afterwards.
-- **Turbopack**: adds `turbopack.rules` for `*.{tsx,ts,jsx,js,mjs}` (excluding `node_modules`)
+- **Turbopack**: adds `turbopack.rules` for `*.{tsx,ts,jsx,js,mjs,cjs,mts,cts}` (excluding `node_modules`)
   and for the generated stylesheets and atomic class modules, and a `resolveAlias` for
   `@style-this/core/atomic`. A user rule for the same glob is kept and runs first.
 

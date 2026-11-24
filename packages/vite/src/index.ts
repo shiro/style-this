@@ -9,7 +9,7 @@ import {
 } from "@style-this/core/compiler";
 import { generateCssSourceMap } from "@style-this/core/cssSourceMap";
 import { createRequire } from "node:module";
-import { Filter, filterMatches, fromVirtualPath, isInNodeModules, normalizePath, timeoutPromise, TIMEOUT, toVirtualPath } from "./util";
+import { Filter, filterMatches, fromVirtualPath, isInNodeModules, normalizePath, splitQuery, timeoutPromise, TIMEOUT, toVirtualPath } from "./util";
 import { handleTransformError } from "./util";
 import { initializeSolidMocks } from "./solid";
 import {
@@ -52,11 +52,11 @@ const reloadVirtualModule = (environment: DevEnvironment, mod: EnvironmentModule
 };
 
 const TIMEOUT_DURATION = 5 * 60 * 1000; // 5 minutes
+/** The extensions the compiler parses (oxc's `SourceType::from_path`). */
+const transformExtensionRegex = /\.(?:[jt]sx?|[mc][jt]s)$/;
 export const DefaultImport = Symbol();
 
-interface Options {
-  include?: RegExp[];
-  exclude?: RegExp[];
+export interface Options {
   cssExtension?: string;
   filter?: Filter | Filter[];
   ignoredImports?: Record<string, true | (string | typeof DefaultImport)[]>;
@@ -279,21 +279,23 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
       cwd = process.cwd();
       const require = createRequire(cwd + "/package.json");
 
+      // like Node from the importer, monorepo packages can have their own dependencies, then from the project
+      // for files outside of it
+      const nodeResolve = (id: string, importer: string) =>
+        normalizePath(require.resolve(id, { paths: [dirname(importer), cwd] }));
+
       createLoadFile = (resolve: Resolve) => async (
         id: string,
         importer: string,
       ): Promise<[string, string]> => {
-        if (mocks.has(id)) {
-          const filepath = require.resolve(id);
-          return [filepath, mocks.get(id)!];
-        }
+        if (mocks.has(id)) return [nodeResolve(id, importer), mocks.get(id)!];
 
         let filepathWithQuery = await resolve(id, importer);
 
         if (filepathWithQuery == undefined)
           throw new Error(`vite failed to resolve import '${id}'`);
 
-        let [filepath, rawQuery] = filepathWithQuery.split("?", 2);
+        const [filepath, rawQuery] = splitQuery(filepathWithQuery);
         // `?v=` of optimized deps in dev only busts the browser cache, it's the same module
         const query = rawQuery?.split("&").filter((param) => !param.startsWith("v=")).join("&") || undefined;
 
@@ -320,11 +322,7 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
           } catch (err) { }
         }
 
-        // like Node from the importer, monorepo packages can have their own dependencies, then from the project
-        // for files outside of it
-        filepath = require.resolve(id, { paths: [dirname(importer), cwd] });
-
-        return [filepath, ""];
+        return [nodeResolve(id, importer), ""];
       };
 
       styleThis = new Transformer({
@@ -371,7 +369,7 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
     async load(fullId) {
       if (!fullId.startsWith(resolvedVirtualModulePrefix)) return;
 
-      const [id, _query] = fullId.split("?", 2);
+      const [id] = splitQuery(fullId);
 
       if (id === atomicEntrypointId) {
         if (atomic) {
@@ -574,10 +572,10 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
       if (
         !filepath ||
         filepath.startsWith("\0") ||
-        filepath.includes("/node_modules/") ||
+        isInNodeModules(filepath) ||
         filepath.includes("?") ||
         filepath.endsWith(".style-this.js") ||
-        (!/\.[mc]?[jt]sx?$/.test(filepath) && !isSvelteFile(filepath))
+        (!transformExtensionRegex.test(filepath) && !isSvelteFile(filepath))
       ) {
         return;
       }

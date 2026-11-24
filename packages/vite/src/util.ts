@@ -26,6 +26,12 @@ export const fromVirtualPath = (cwd: string, virtualPath: string) => normalizePa
  */
 export const isInNodeModules = (filepath: string) => /[\\/]node_modules[\\/]/.test(filepath);
 
+/** Splits on the first `?`, the query can contain more. */
+export const splitQuery = (id: string): [string, string | undefined] => {
+  const index = id.indexOf("?");
+  return index === -1 ? [id, undefined] : [id.slice(0, index), id.slice(index + 1)];
+};
+
 const TIMEOUT = Symbol("TIMEOUT");
 
 /**

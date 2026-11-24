@@ -20,6 +20,8 @@ const loadersOf = (request: string) => {
 describe("StyleThisPlugin", () => {
   it.each([
     ["/app/a.js", ["transformLoader.mjs"]],
+    ["/app/a.cts", ["transformLoader.mjs"]],
+    ["/app/a.mjsx", []],
     ["/app/a.js?raw", []],
     [`${noopAtomicProgramFile}?filepath=a.js`, ["atomicProgramLoader.mjs"]],
     ["/app/node_modules/lib/a.js", []],

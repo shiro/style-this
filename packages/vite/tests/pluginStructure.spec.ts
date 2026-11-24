@@ -1,11 +1,20 @@
 import vitePlugin from "../src/index";
 import { describe, test, expect } from "vitest";
+import { getResolver, setupPlugin } from "./util/testUtil";
 
 describe("vite simple", () => {
   test("name", async () => {
     const { name } = vitePlugin();
     expect(name).toEqual("vite:style-this");
   });
+});
+
+test("transforms the extensions the compiler parses", async () => {
+  const plugin = await setupPlugin(await getResolver());
+  const code = `import { css } from "@style-this/core";\nexport const a = css\`color: red;\`;\n`;
+  expect(await plugin.transform(code, "/app/a.cts")).toBeDefined();
+  // matched a looser regex before, failed with an unknown extension error
+  expect(await plugin.transform(code, "/app/a.mjsx")).toBeUndefined();
 });
 
 describe("ssr", () => {

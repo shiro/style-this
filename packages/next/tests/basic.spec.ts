@@ -4,7 +4,7 @@ import webpack, { type Configuration } from "webpack";
 import { withStyleThis } from "../src/index";
 import { loaderConfig } from "../src/loaders/consts";
 
-const transformGlob = "*.{tsx,ts,jsx,js,mjs}";
+const transformGlob = "*.{tsx,ts,jsx,js,mjs,cjs,mts,cts}";
 
 describe("withStyleThis", () => {
   it("adds its config to the user's config without mutating it", () => {

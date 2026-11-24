@@ -103,6 +103,13 @@ export const style = css\`
   background-image: url(\${url});
 \`;
 `,
+  "nested-query.tsx": `${cssImport}
+import tokens from "./tokens.ts?raw?url";
+
+export const style = css\`
+  --raw: \${tokens};
+\`;
+`,
   "working.tsx": `${cssImport}
 
 export const style = css\`
@@ -217,6 +224,8 @@ describe.each([false, true])("JSON and other non-JS dependencies (atomic: %s)", 
     await expect(cssOf("url.tsx")).rejects.toThrow(
       /failed to evaluate import '.*tokens\.ts\?url', '\?raw' is the only supported query/,
     );
+    // the query isn't cut off at a second `?`
+    await expect(cssOf("nested-query.tsx")).rejects.toThrow(/tokens\.ts\?raw\?url', '\?raw' is the only supported query/);
     expect(await cssOf("working.tsx")).toContain("color: purple");
   });
 

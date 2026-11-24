@@ -39,8 +39,8 @@ export default {
 };
 ```
 
-`StyleThisPlugin` transforms `.ts`, `.tsx`, `.js`, `.jsx` and `.mjs` files outside `node_modules`
-before the loaders of your own rules (e.g. `esbuild-loader` or `babel-loader`) see them.
+`StyleThisPlugin` transforms `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.mts` and `.cts` files outside
+`node_modules` before the loaders of your own rules (e.g. `esbuild-loader` or `babel-loader`) see them.
 
 The generated CSS is imported as `.css` files, so it goes through **your CSS rule**, e.g.
 `css-loader` with `mini-css-extract-plugin` as above.
