@@ -15,6 +15,7 @@ describe("correctness", () => {
     ["for", "for (let x = 0; x < 1; x++) css`margin: ${x}px;`;"],
     ["var loop", "function f() { for (var x of [1]); return css`margin: ${x}px;`; }"],
     ["catch", "try {} catch (x) { css`margin: ${x}px;`; }"],
+    ["rest parameter", "const f = (...[x]) => css`margin: ${x}px;`;"],
   ])("%s bindings are dynamic", async (_, code) => {
     const plugin = await setupPlugin(await getResolver());
     await expect(

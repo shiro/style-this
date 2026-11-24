@@ -7,13 +7,12 @@ use super::types::CssVariableIdentifier;
 use super::visitor::VisitorTransformer;
 use crate::compiler::atomic::{add_atomic, dedupe_atomic_declarations, rewrite_merge_styles_imports};
 use crate::error_mapping;
+use crate::library_references::{LibraryExport, LibraryReferences};
 use crate::react::react_prepass;
 use crate::solid_js::solid_js_prepass;
 use crate::styled_component_transformer::ClassDisplayNames;
 use crate::utils::{self, transpile_ts_to_js};
-use crate::{
-    LIBRARY_CORE_IMPORT_NAME, LIBRARY_REACT_IMPORT_NAME, LIBRARY_SOLID_JS_IMPORT_NAME, PREFIX,
-};
+use crate::LIBRARY_CORE_IMPORT_NAME;
 use indoc::formatdoc;
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::AstBuilder;
@@ -767,67 +766,9 @@ pub(crate) fn slice_program<'alloc>(
 ) -> Result<ProgramSlice<'alloc>, TransformError> {
     let store = value_store(transformer, program_filepath);
 
-    // find "css" import or quit early if entrypoint
-    let mut return_early = entrypoint;
-    let mut solid_styled_name = None;
-    let mut react_styled_name = None;
-    let mut style_function_name = None;
-    let mut css_function_name = None;
-    let mut extra_class_function_name = None;
-
-    for stmt in &program.body {
-        let Statement::ImportDeclaration(import_decl) = stmt else {
-            continue;
-        };
-
-        let Some(specifiers) = &import_decl.specifiers else {
-            continue;
-        };
-
-        for specifier in specifiers.iter() {
-            // TODO move loop 1 lvl up for perf
-            match import_decl.source.value.as_str() {
-                LIBRARY_CORE_IMPORT_NAME => {
-                    match specifier {
-                        oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec)
-                            if spec.imported.name() == "css" =>
-                        {
-                            css_function_name = Some(spec.local.name.to_string());
-                        }
-                        oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec)
-                            if spec.imported.name() == "style" =>
-                        {
-                            style_function_name = Some(spec.local.name.to_string());
-                        }
-                        oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec)
-                            if spec.imported.name() == "extraClass" =>
-                        {
-                            extra_class_function_name = Some(spec.local.name.to_string());
-                        }
-                        _ => {
-                            continue;
-                        }
-                    };
-                    return_early = false;
-                }
-                source @ (LIBRARY_SOLID_JS_IMPORT_NAME | LIBRARY_REACT_IMPORT_NAME) => {
-                    if let oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) =
-                        specifier
-                        && spec.imported.name() == "styled"
-                    {
-                        let styled_name = if source == LIBRARY_SOLID_JS_IMPORT_NAME {
-                            &mut solid_styled_name
-                        } else {
-                            &mut react_styled_name
-                        };
-                        *styled_name = Some(spec.local.name.to_string());
-                        return_early = false;
-                    }
-                }
-                _ => continue,
-            }
-        }
-    }
+    let library_references = LibraryReferences::new(program);
+    // quit early if the entrypoint doesn't use us
+    let return_early = entrypoint && !library_references.imported;
 
     let relative_program_filepath = program_filepath
         .strip_prefix(cwd)
@@ -836,10 +777,10 @@ pub(crate) fn slice_program<'alloc>(
 
     let mut class_display_names = ClassDisplayNames::new();
 
-    if let Some(styled_name) = &solid_styled_name {
+    if library_references.uses(LibraryExport::SolidStyled) {
         solid_js_prepass(
             ast_builder,
-            styled_name,
+            &library_references,
             relative_program_filepath.clone(),
             program,
             false,
@@ -847,10 +788,10 @@ pub(crate) fn slice_program<'alloc>(
         );
     }
 
-    if let Some(styled_name) = &react_styled_name {
+    if library_references.uses(LibraryExport::ReactStyled) {
         react_prepass(
             ast_builder,
-            styled_name,
+            &library_references,
             relative_program_filepath,
             program,
             false,
@@ -871,9 +812,7 @@ pub(crate) fn slice_program<'alloc>(
         program_filepath,
         program_code,
         value_cache,
-        css_function_name,
-        style_function_name,
-        extra_class_function_name,
+        &library_references,
         class_display_names,
         transformer.atomic,
     );

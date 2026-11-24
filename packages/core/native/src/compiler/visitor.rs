@@ -5,6 +5,7 @@ use super::types::{CssVariableIdentifier, VirtualProgramInsert};
 use crate::PREFIX;
 use crate::ast;
 use crate::error_mapping::get_pos_from_offset;
+use crate::library_references::{LibraryExport, LibraryReferences};
 use crate::styled_component_transformer::{CSS_TAG_LOCAL_NAME, ClassDisplayNames};
 use crate::utils::{
     self, binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
@@ -35,9 +36,7 @@ pub struct VisitorTransformer<'a, 'alloc> {
     /// top level values whose export is cached, local name -> exported name
     cached_locals: HashMap<String, String>,
 
-    style_function_name: Option<String>,
-    css_function_name: Option<String>,
-    extra_class_function_name: Option<String>,
+    library_references: &'a LibraryReferences,
     class_display_names: ClassDisplayNames,
 
     store: String,
@@ -95,9 +94,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         program_filepath: &'a str,
         program_code: &'a str,
         value_cache: &'a HashSet<String>,
-        css_function_name: Option<String>,
-        style_function_name: Option<String>,
-        extra_class_function_name: Option<String>,
+        library_references: &'a LibraryReferences,
         class_display_names: ClassDisplayNames,
         atomic: bool,
     ) -> Self {
@@ -110,9 +107,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             value_cache,
             cached_locals: Default::default(),
 
-            css_function_name,
-            style_function_name,
-            extra_class_function_name,
+            library_references,
             class_display_names,
 
             store: store.to_string(),
@@ -555,9 +550,28 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .map_or(binding_name, String::as_str)
     }
 
-    /// The user's `css` tag, or the tag of the templates generated for styled components.
-    fn is_css_tag(&self, tag: &str) -> bool {
-        tag == CSS_TAG_LOCAL_NAME || Some(tag) == self.css_function_name.as_deref()
+    /// `Css` or `Style` for our templates, including the ones generated for styled components.
+    fn template_export(&self, template: &TaggedTemplateExpression) -> Option<LibraryExport> {
+        if matches!(&template.tag, Expression::Identifier(tag) if tag.name == CSS_TAG_LOCAL_NAME) {
+            return Some(LibraryExport::Css);
+        }
+        self.library_references
+            .get(&template.tag)
+            .filter(|export| matches!(export, LibraryExport::Css | LibraryExport::Style))
+    }
+
+    fn extra_class_call<'b>(
+        &self,
+        expression: &'b Expression<'alloc>,
+    ) -> Option<&'b oxc_ast::ast::CallExpression<'alloc>> {
+        match expression {
+            Expression::CallExpression(call)
+                if self.library_references.get(&call.callee) == Some(LibraryExport::ExtraClass) =>
+            {
+                Some(call)
+            }
+            _ => None,
+        }
     }
 
     fn get_alias(&self, name: &str) -> Option<&str> {
@@ -798,7 +812,6 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let mut new_quasis = oxc_allocator::Vec::new_in(self.allocator);
         let mut new_expressions = oxc_allocator::Vec::new_in(self.allocator);
 
-        let extra_class_name = self.extra_class_function_name.as_deref();
         let mut quasi_iter = it.quasi.quasis.iter();
 
         // First quasi always exists
@@ -808,20 +821,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             let mut current_tail = first_quasi.tail;
 
             for expr in it.quasi.expressions.iter() {
-                let is_extra_class = if let Some(name) = extra_class_name {
-                    if let Expression::CallExpression(call) = expr {
-                        if let Expression::Identifier(ident) = &call.callee {
-                            ident.name.as_str() == name
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                };
-
+                let is_extra_class = self.extra_class_call(expr).is_some();
                 let next_quasi = quasi_iter.next().unwrap();
 
                 if is_extra_class {
@@ -961,21 +961,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     fn extract_extra_classes(&self, it: &TaggedTemplateExpression<'alloc>) -> BTreeSet<String> {
         let mut extra_classes = BTreeSet::new();
 
-        if let Some(extra_class_name) = &self.extra_class_function_name {
-            for expr in &it.quasi.expressions {
-                if let Expression::CallExpression(call) = expr {
-                    if let Expression::Identifier(ident) = &call.callee {
-                        if ident.name.as_str() == extra_class_name {
-                            // Extract string arguments
-                            for arg in &call.arguments {
-                                if let oxc_ast::ast::Argument::StringLiteral(str_lit) = arg {
-                                    // Split by whitespace and collect class names
-                                    for class in str_lit.value.split_whitespace() {
-                                        extra_classes.insert(class.to_string());
-                                    }
-                                }
-                            }
-                        }
+        for call in it.quasi.expressions.iter().filter_map(|expr| self.extra_class_call(expr)) {
+            for arg in &call.arguments {
+                if let oxc_ast::ast::Argument::StringLiteral(str_lit) = arg {
+                    // Split by whitespace and collect class names
+                    for class in str_lit.value.split_whitespace() {
+                        extra_classes.insert(class.to_string());
                     }
                 }
             }
@@ -1330,9 +1321,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             remote_referenced_idents.insert(STAR_IMPORT.to_string());
         }
         if let Expression::TaggedTemplateExpression(template) = it
-            && let Some(tag) = utils::tagged_template_get_tag(template)
-            && (self.is_css_tag(tag)
-                || Some(tag) == self.style_function_name.as_deref())
+            && let Some(export) = self.template_export(template)
         {
             oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
 
@@ -1355,8 +1344,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 .unwrap_or(variable_name)
                 .to_string();
 
-            match tag {
-                tag if self.is_css_tag(tag) => {
+            match export {
+                LibraryExport::Css => {
                     let class_name = self.create_virtual_css_template(variable_name);
                     let extra_classes = self.extract_extra_classes(template);
 
@@ -1380,7 +1369,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         &extra_classes,
                     );
                 }
-                tag if Some(tag) == self.style_function_name.as_deref() => {
+                LibraryExport::Style => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
                     utils::trim_newlines(self.ast_builder, &mut quasis);
                     utils::escape_raw_quasis(self.ast_builder, &mut quasis);
@@ -1471,14 +1460,12 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         };
 
         if let Expression::TaggedTemplateExpression(template) = init
-            && let Some(tag) = utils::tagged_template_get_tag(template)
-            && (self.is_css_tag(tag)
-                || Some(tag) == self.style_function_name.as_deref())
+            && let Some(export) = self.template_export(template)
         {
             let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
                 let (row, column) = get_pos_from_offset(self.program_code, it.span.start as usize);
                 self.error = Some(TransformError::DestructuredTemplateError {
-                    tag: tag.to_string(),
+                    tag: template.tag.span().source_text(self.program_code).to_string(),
                     filepath: self.program_filepath.to_string(),
                     row,
                     column,
@@ -1507,8 +1494,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 .unwrap_or(variable_name)
                 .to_string();
 
-            match tag {
-                tag if self.is_css_tag(tag) => {
+            match export {
+                LibraryExport::Css => {
                     let display_name = self.get_display_name(span, variable_name).to_string();
                     let class_name = self.create_virtual_css_template(&display_name);
                     let extra_classes = self.extract_extra_classes(template);
@@ -1533,7 +1520,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                         &extra_classes,
                     );
                 }
-                tag if Some(tag) == self.style_function_name.as_deref() => {
+                LibraryExport::Style => {
                     let mut quasis = template.quasi.quasis.clone_in(self.allocator);
                     utils::trim_newlines(self.ast_builder, &mut quasis);
                     utils::escape_raw_quasis(self.ast_builder, &mut quasis);
@@ -1785,11 +1772,18 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         it.declaration = Some(statement.into_declaration());
     }
 
-    fn visit_formal_parameter(&mut self, it: &mut oxc_ast::ast::FormalParameter<'alloc>) {
+    fn visit_formal_parameters(&mut self, it: &mut oxc_ast::ast::FormalParameters<'alloc>) {
         if self.error.is_some() {
             return;
         }
-        let idents = binding_pattern_kind_get_idents(&it.pattern.kind);
+        // the rest element isn't a `FormalParameter`
+        let rest = it.rest.iter().map(|rest| &rest.argument.kind);
+        let idents = it
+            .items
+            .iter()
+            .map(|param| &param.pattern.kind)
+            .chain(rest)
+            .flat_map(binding_pattern_kind_get_idents);
 
         self.dynamic_variable_names
             .last_mut()
@@ -1797,7 +1791,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             .extend(idents);
 
         // transforms the templates in default values
-        oxc_ast_visit::walk_mut::walk_formal_parameter(self, it);
+        oxc_ast_visit::walk_mut::walk_formal_parameters(self, it);
     }
 
     fn visit_catch_parameter(&mut self, it: &mut oxc_ast::ast::CatchParameter<'alloc>) {

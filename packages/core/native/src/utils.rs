@@ -364,18 +364,6 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
     }
 }
 
-pub fn tagged_template_get_tag<'alloc>(
-    tagged_template_expression: &mut oxc_allocator::Box<
-        'alloc,
-        oxc_ast::ast::TaggedTemplateExpression<'alloc>,
-    >,
-) -> Option<&'alloc str> {
-    let Expression::Identifier(identifier) = &mut tagged_template_expression.tag else {
-        return None;
-    };
-    Some(identifier.name.as_str())
-}
-
 pub fn statement_get_references<'a>(statement: &Statement<'a>) -> Vec<String> {
     let mut visitor = ExpressionCollectorVisitor {
         ..Default::default()

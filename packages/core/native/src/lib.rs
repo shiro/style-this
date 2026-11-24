@@ -33,6 +33,7 @@ use oxc_span::Span;
 mod ast;
 mod compiler;
 mod error_mapping;
+mod library_references;
 mod react;
 mod solid_js;
 mod styled_component_transformer;

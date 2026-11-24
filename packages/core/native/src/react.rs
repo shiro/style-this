@@ -1,4 +1,5 @@
 use crate::{styled_component_transformer::*, *};
+use crate::library_references::{LibraryExport, LibraryReferences};
 use oxc_ast::ast::JSXExpression;
 
 const FORWARD_REF_LOCAL_NAME: &str = "__styleThis__forwardRef";
@@ -11,12 +12,12 @@ struct ReactStyledComponentTransformer<'a, 'alloc> {
 impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
     fn new(
         ast_builder: &'a AstBuilder<'alloc>,
-        styled_name: &'a str,
+        references: &'a LibraryReferences,
         skip_jsx: bool,
         filepath: String,
     ) -> Self {
         Self {
-            base: StyledComponentTransformer::new(ast_builder, styled_name, skip_jsx, filepath, "className"),
+            base: StyledComponentTransformer::new(ast_builder, references, LibraryExport::ReactStyled, skip_jsx, filepath, "className"),
         }
     }
 
@@ -326,13 +327,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for ReactStyledComponentTransformer<'a, 'alloc
 
 pub fn react_prepass<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
-    styled_name: &str,
+    references: &LibraryReferences,
     filepath: String,
     program: &mut Program<'alloc>,
     skip_jsx: bool,
     class_display_names: &mut ClassDisplayNames,
 ) {
-    let mut transformer = ReactStyledComponentTransformer::new(ast_builder, styled_name, skip_jsx, filepath);
+    let mut transformer = ReactStyledComponentTransformer::new(ast_builder, references, skip_jsx, filepath);
     transformer.visit_program(program);
     class_display_names.extend(std::mem::take(&mut transformer.base.class_display_names));
 

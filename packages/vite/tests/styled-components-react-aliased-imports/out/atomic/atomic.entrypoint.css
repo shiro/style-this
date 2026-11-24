@@ -1,4 +1,5 @@
 @layer theme, base, components, utilities;
 @layer utilities {
 .bg-Kk7Cm { background: none }
+.c-EoseN { color: blue }
 }

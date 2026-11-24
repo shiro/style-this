@@ -1,4 +1,5 @@
 use crate::{styled_component_transformer::*, *};
+use crate::library_references::{LibraryExport, LibraryReferences};
 
 struct SolidStyledComponentTransformer<'a, 'alloc> {
     base: StyledComponentTransformer<'a, 'alloc>,
@@ -8,12 +9,12 @@ struct SolidStyledComponentTransformer<'a, 'alloc> {
 impl<'a, 'alloc> SolidStyledComponentTransformer<'a, 'alloc> {
     fn new(
         ast_builder: &'a AstBuilder<'alloc>,
-        styled_name: &'a str,
+        references: &'a LibraryReferences,
         skip_jsx: bool,
         filepath: String,
     ) -> Self {
         Self {
-            base: StyledComponentTransformer::new(ast_builder, styled_name, skip_jsx, filepath, "class"),
+            base: StyledComponentTransformer::new(ast_builder, references, LibraryExport::SolidStyled, skip_jsx, filepath, "class"),
             uses_merge_inline_styles: false,
         }
     }
@@ -280,13 +281,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for SolidStyledComponentTransformer<'a, 'alloc
 
 pub fn solid_js_prepass<'alloc>(
     ast_builder: &AstBuilder<'alloc>,
-    styled_name: &str,
+    references: &LibraryReferences,
     filepath: String,
     program: &mut Program<'alloc>,
     skip_jsx: bool,
     class_display_names: &mut ClassDisplayNames,
 ) {
-    let mut transformer = SolidStyledComponentTransformer::new(ast_builder, styled_name, skip_jsx, filepath);
+    let mut transformer = SolidStyledComponentTransformer::new(ast_builder, references, skip_jsx, filepath);
     transformer.visit_program(program);
     class_display_names.extend(std::mem::take(&mut transformer.base.class_display_names));
 

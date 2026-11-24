@@ -1,3 +1,4 @@
+use crate::library_references::{LibraryExport, LibraryReferences};
 use crate::{utils::SeededRandom, *};
 use oxc_ast::ast::{
     JSXAttributeItem, JSXElementName, JSXMemberExpression, JSXMemberExpressionObject,
@@ -96,8 +97,9 @@ pub struct ComponentTransformContext<'alloc> {
 
 pub struct StyledComponentTransformer<'a, 'alloc> {
     pub ast_builder: &'a AstBuilder<'alloc>,
-    /// local name of the `styled` import
-    styled_name: &'a str,
+    references: &'a LibraryReferences,
+    /// the `styled` export of the framework
+    styled: LibraryExport,
     pub skip_jsx: bool,
     pub variable_name: Option<String>,
     pub current_statement_index: usize,
@@ -111,14 +113,16 @@ pub struct StyledComponentTransformer<'a, 'alloc> {
 impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     pub fn new(
         ast_builder: &'a AstBuilder<'alloc>,
-        styled_name: &'a str,
+        references: &'a LibraryReferences,
+        styled: LibraryExport,
         skip_jsx: bool,
         filepath: String,
         class_prop_name: &'static str,
     ) -> Self {
         Self {
             ast_builder,
-            styled_name,
+            references,
+            styled,
             skip_jsx,
             filepath,
             variable_name: None,
@@ -431,13 +435,12 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         };
         match &template.tag {
             Expression::StaticMemberExpression(member)
-                if matches!(&member.object, Expression::Identifier(object) if object.name == self.styled_name) =>
+                if self.references.get(&member.object) == Some(self.styled) =>
             {
                 Some(element(member.property.name, false))
             }
             Expression::CallExpression(call)
-                if matches!(&call.callee, Expression::Identifier(callee) if callee.name == self.styled_name)
-                    && call.arguments.len() == 1 =>
+                if self.references.get(&call.callee) == Some(self.styled) && call.arguments.len() == 1 =>
             {
                 let base = call.arguments[0].as_expression()?.get_inner_expression();
                 let direct = match base {
