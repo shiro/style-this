@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { mkdirSync, writeFileSync } from "fs";
 import transformLoader from "../src/loaders/transformLoader";
 import cssLoader from "../src/loaders/cssLoader";
 import { loaderState, resolveRequest, runLoader, virtualImport } from "./util";
@@ -31,6 +32,24 @@ describe("transform loader errors", () => {
     const { err } = await runLoader(cssLoader, "", virtualImport(filepath, result!, "style-this.css"));
 
     expect(err?.cause).toBe(resolveError);
+  });
+
+  it("reports the location and code frame of evaluation errors, also in dependencies", async () => {
+    const dir = "/tmp/style-this-evaluation-error";
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(`${dir}/dep.js`, `export const color = (() => {\n  throw new Error("no color");\n})();\n`);
+    const filepath = `${dir}/entry.tsx`;
+    const { result } = await runLoader(transformLoader, `import { color } from "./dep.js";\n${styled("${color}")}`, filepath);
+    const { err } = await runLoader(cssLoader, "", virtualImport(filepath, result!, "style-this.css"));
+
+    expect(err?.message).toBe(`${dir}/dep.js:2:9: no color
+
+  1 | export const color = (() => {
+> 2 |   throw new Error("no color");
+              ^ no color
+  3 | })();
+  4 | 
+`);
   });
 
   it("evaluates the CSS once a syntax error is fixed", async () => {

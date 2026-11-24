@@ -59,11 +59,11 @@ describe("evaluation errors", () => {
       const resolver = await getResolver();
       const plugin = await setupPlugin(resolver, { atomic, debug: false });
 
-      // used to panic, which hung the evaluation. Without a location, the source file is reported instead of the
-      // virtual id
+      // used to panic, which hung the evaluation. Without a location, the evaluated file is reported instead of the
+      // virtual id or the importer
       await expect(loadCss(plugin, `${testDir}/entry-default-super.tsx`)).rejects.toMatchObject({
         message: "'super' keyword unexpected here",
-        id: `${testDir}/entry-default-super.tsx`,
+        id: `${testDir}/default-super.tsx`,
       });
     });
   }

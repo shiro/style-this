@@ -26,6 +26,11 @@
       "import": "./dist/cssSourceMap.mjs",
       "default": "./dist/cssSourceMap.mjs"
     },
+    "./transformError": {
+      "types": "./dist/transformError.d.mts",
+      "import": "./dist/transformError.mjs",
+      "default": "./dist/transformError.mjs"
+    },
     "./atomic": {
       "types": "./dist/atomic.d.mts",
       "import": "./dist/atomic.mjs",

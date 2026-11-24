@@ -64,8 +64,19 @@ impl From<&TransformError> for JsValue {
 
         // set cause property for variants that have one
         match from {
-            TransformError::EvaluationFailed { cause, .. }
-            | TransformError::ReadFileError { cause, .. }
+            TransformError::EvaluationFailed {
+                filepath, cause, ..
+            } => {
+                js_sys::Reflect::set(&err, &JsValue::from_str("cause"), cause).unwrap();
+                // errors of the evaluated code without a location are located in the evaluated file
+                js_sys::Reflect::set(
+                    &err,
+                    &JsValue::from_str("filepath"),
+                    &JsValue::from_str(filepath),
+                )
+                .unwrap();
+            }
+            TransformError::ReadFileError { cause, .. }
             | TransformError::ResolveVirtualImportFailed { cause, .. } => {
                 js_sys::Reflect::set(&err, &JsValue::from_str("cause"), cause).unwrap();
             }

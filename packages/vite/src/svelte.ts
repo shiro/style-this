@@ -1,3 +1,5 @@
+import type { ErrorLocation } from "@style-this/core/transformError";
+
 export function isSvelteFile(filepath: string): boolean {
   return filepath.endsWith(".svelte");
 }
@@ -127,6 +129,13 @@ export function remapSvelteSourcemap(sourcemap: string, original: SvelteSources,
   map.mappings = encodeMappings(Array.from(lines, (segments = []) => segments.sort((a, b) => a[0] - b[0])));
   if (map.sourcesContent) map.sourcesContent = [original.file];
   return JSON.stringify(map);
+}
+
+/** Maps an error location in the program of a Svelte file to the file's `code`, other files' are kept. */
+export function svelteFileLocation(loc: ErrorLocation, code: string): ErrorLocation {
+  const sources = isSvelteFile(loc.file) ? svelteSources(code) : null;
+  const position = sources && positionMapper(sources)(loc.line - 1, loc.column - 1);
+  return position ? { ...loc, line: position[0] + 1, column: position[1] + 1 } : loc;
 }
 
 /** Maps line and column positions in the program to ones in the file, `undefined` if outside the scripts. */

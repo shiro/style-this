@@ -5,6 +5,7 @@ import {
   type CssCachEntry,
   type VirtualImportKind,
 } from "@style-this/core/compiler";
+import { locateTransformError } from "@style-this/core/transformError";
 import { readFile } from "fs/promises";
 import { createRequire } from "node:module";
 import { noopFileImportFilepath } from "./consts";
@@ -129,6 +130,18 @@ const refreshDependencies = async (ctx: LoaderCtx, state: State, filepath: strin
   );
 };
 
+/**
+ * The error the transform of `filepath` from `code` failed with, located like vite's. Webpack and Next show the
+ * message of loader errors, it includes the location and code frame, the stack is in the error details.
+ */
+const transformError = (err: unknown, filepath: string, code: string) => {
+  if (!(err instanceof Error)) return err;
+  const { error, file, loc, frame } = locateTransformError(err, filepath, code);
+  const location = loc ? `${file}:${loc.line}:${loc.column}` : file;
+  const message = `${location}: ${error.message}${frame ? `\n\n${frame}` : ""}`;
+  return Object.assign(new Error(message, { cause: error }), { stack: error.stack, hideStack: true });
+};
+
 /** Transforms `code`, its virtual modules are stored in the config's `State` for their loaders. */
 const transformFile = async (ctx: LoaderCtx, config: LoaderConfig, code: string, filepath: string) => {
   const state = getState(config);
@@ -154,7 +167,7 @@ const transformFile = async (ctx: LoaderCtx, config: LoaderConfig, code: string,
     // the compiler resolves the stored entries with the error, drop them or later transforms would
     // skip CSS evaluation and keep serving the error
     deleteVirtualModules(state, filepath);
-    throw err;
+    throw transformError(err, filepath, code);
   }
 };
 
@@ -215,8 +228,9 @@ const loadVirtualModule = async (
     if (!(await transformFile(ctx, config, code, filepath))) return "";
   }
 
-  const module = await state[store].get(key);
-  if (module instanceof Error) throw module;
+  const entry = state[store].get(key);
+  const module = await entry;
+  if (module instanceof Error) throw transformError(module, filepath, entry!.code);
 
   // the transform loader is done before its evaluation resolves (and adds) the dependencies
   const dependencies = (await state.transformer).get_evaluated_dependencies(filepath) as string[];

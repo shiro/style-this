@@ -97,4 +97,21 @@ const shared = css\`margin: 1px;\`;</script>
       expect.arrayContaining([positionOf(source, "css`color"), positionOf(source, "css`margin")]),
     );
   });
+
+  test("error locations and code frames are of the Svelte file", async () => {
+    const plugin = await setupPlugin(await getResolver(), { debug: false });
+    const code = `<h1>title</h1>
+<script>
+  import { css } from "@style-this/core";
+  const color = () => { throw new Error("no color"); };
+  const local = css\`color: \${color()};\`;
+</script>
+`;
+    await plugin.transform(code, filepath);
+
+    await expect(plugin.load(plugin.resolveId(`virtual:style-this:${filepath}.css`, filepath)!)).rejects.toMatchObject({
+      loc: { file: filepath, line: 4, column: 31 },
+      frame: expect.stringContaining(`> 4 |   const color = () => { throw new Error("no color"); };\n${" ".repeat(36)}^ no color`),
+    });
+  });
 });

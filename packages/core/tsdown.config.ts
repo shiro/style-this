@@ -6,7 +6,7 @@ export default defineConfig([
     dts: { sourcemap: true },
     target: "esnext",
     format: "es",
-    entry: ["src/index.ts", "src/cssSourceMap.ts", "src/atomic.ts"],
+    entry: ["src/index.ts", "src/cssSourceMap.ts", "src/atomic.ts", "src/transformError.ts"],
     plugins: [wasm({ maxFileSize: 10000000 })],
   },
   {

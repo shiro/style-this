@@ -84,7 +84,11 @@ fn eval_frame_position(frame: &str) -> Option<(usize, usize)> {
 
     // the eval site's location is `<path>:<row>:<col>`
     let eval_site_path = eval_site.rsplitn(3, ':').nth(2)?;
-    if !eval_site.contains("eval at ") || !eval_site_path.ends_with("compiler.cjs") {
+    if !eval_site.contains("eval at ")
+        || !eval_site_path
+            .replace('\\', "/")
+            .ends_with("/core/dist/compiler.cjs")
+    {
         return None;
     }
 
@@ -251,6 +255,12 @@ mod tests {
         assert_eq!(
             eval_frame_position(
                 "    at fn (eval at run (/app/node_modules/lib/index.js:1:1), <anonymous>:3:5)"
+            ),
+            None
+        );
+        assert_eq!(
+            eval_frame_position(
+                "    at fn (eval at run (/app/node_modules/lib/my-compiler.cjs:1:1), <anonymous>:3:5)"
             ),
             None
         );
