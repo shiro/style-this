@@ -120,7 +120,7 @@ var clientViteManifest = {
 		"name": "web"
 	},
 	"src/entry-client.tsx": {
-		"file": "_build/assets/entry-client-DQE04zWQ.js",
+		"file": "_build/assets/entry-client-DSQrxw25.js",
 		"name": "entry-client",
 		"src": "src/entry-client.tsx",
 		"isEntry": true,
@@ -155,7 +155,7 @@ var clientViteManifest = {
 		"imports": ["_web-lT-EAg3V.js", "_dist-CPkBsN0R.js"]
 	},
 	"src/routes/index.tsx?pick=default&pick=$css&lang.tsx": {
-		"file": "_build/assets/index-BwMhVWpr.js",
+		"file": "_build/assets/index-CxBDE7JW.js",
 		"name": "index",
 		"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
 		"isEntry": true,
@@ -1009,8 +1009,8 @@ var solid_start_routes_default = [
 		"page": true,
 		"$component": {
 			"src": "src/routes/index.tsx?pick=default&pick=$css&lang.tsx",
-			"build": () => import("./index-BTxSVfxe.mjs"),
-			"import": () => import("./index-BTxSVfxe.mjs")
+			"build": () => import("./index-DWgigvPe.mjs"),
+			"import": () => import("./index-DWgigvPe.mjs")
 		},
 		"path": "/"
 	}

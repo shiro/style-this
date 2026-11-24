@@ -1,8 +1,8 @@
 import { css, mergeStyles } from "@style-this/core";
 import "@style-this/core/atomic";
 
-// duplicate properties and longhands followed by their shorthand: the last declaration wins in
-// atomic mode too. Properties without a prefix aren't atomized, they keep their source order.
+// duplicate properties are joined into a single class, longhands followed by their shorthand are
+// dropped. Properties without a prefix aren't atomized, they keep their source order.
 const duplicates = css`
   --accent: red;
   padding: 16px;
@@ -11,6 +11,7 @@ const duplicates = css`
   padding: 8px;
   -webkit-line-clamp: 2;
   --accent: blue;
+  border-start-start-radius: 4px;
 `;
 
 // shorthands must be emitted before longhands
@@ -21,6 +22,7 @@ const shorthands = css`
   background-color: blue;
   border: 0;
   border-top: 1px solid red;
+  border-radius: 0;
 `;
 
 // same declaration => same class as in `shorthands`
@@ -36,14 +38,16 @@ const important = css`
   }
 `;
 
-// consecutive declarations of a property are fallbacks, they're kept in order in a single class.
+// declarations of a property (or its aliases) may be fallbacks, they're kept in order in a single class.
 // Declarations without a value are dropped, except for custom properties.
 const fallbacks = css`
   color: blue;
   display: -webkit-box;
-  display: flex;
   width: 100%;
   width: -webkit-fill-available;
+  display: flex;
+  font-stretch: 75%;
+  font-width: 75%;
   color: ${""};
   --empty: ;
 `;

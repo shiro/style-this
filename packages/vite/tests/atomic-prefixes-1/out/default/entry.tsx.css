@@ -6,6 +6,7 @@
   padding: 8px;
   -webkit-line-clamp: 2;
   --accent: blue;
+  border-start-start-radius: 4px;
 }
 .shorthands-ijw9ev {
 margin: 8px;
@@ -14,6 +15,7 @@ margin: 8px;
   background-color: blue;
   border: 0;
   border-top: 1px solid red;
+  border-radius: 0;
 }
 .sameDeclaration-bcdq7s {
 margin: 8px;
@@ -27,9 +29,11 @@ color: red !important;
 .fallbacks-v4pm30 {
 color: blue;
   display: -webkit-box;
-  display: flex;
   width: 100%;
   width: -webkit-fill-available;
+  display: flex;
+  font-stretch: 75%;
+  font-width: 75%;
   color: ;
   --empty: ;
 }

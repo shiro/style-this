@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { joinStyles, mergeInlineStyles, mergeStyles } from '../src/index';
 import atomicPrefixes from '../src/atomicPrefixes.json';
 
-const prefixes = Object.values(atomicPrefixes);
+const prefixes = [...new Set(Object.values(atomicPrefixes))];
 
 describe('atomicPrefixes', () => {
-  it('has unique prefixes', () => {
-    expect(new Set(prefixes).size).toBe(prefixes.length);
+  it('has unique prefixes, except for aliases', () => {
+    const aliases = ['font-width'];
+    const unaliased = Object.entries(atomicPrefixes).filter(([property]) => !aliases.includes(property));
+    expect(new Set(unaliased.map(([, prefix]) => prefix)).size).toBe(unaliased.length);
+    expect(atomicPrefixes['font-width']).toBe(atomicPrefixes['font-stretch']);
   });
 
   it('has unique, lowercase properties', () => {
@@ -81,6 +84,7 @@ describe('mergeStyles', () => {
       expect(mergeStyles('mt-Aaaaa ms-Aaaaa p-Aaaaa', 'r-Bbbbb', 'm-Ccccc mb-Ccccc', 'b-Ddddd')).toBe(
         'p-Aaaaa r-Bbbbb m-Ccccc mb-Ccccc b-Ddddd'
       );
+      expect(mergeStyles('rss-Aaaaa rtl-Aaaaa', 'r-Bbbbb')).toBe('r-Bbbbb');
     });
 
     it('prefixes sharing a start are kept', () => {

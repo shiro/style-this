@@ -83,11 +83,11 @@ fn strip_leading_lines(text: &str) -> &str {
 /// Newlines are kept so line numbers stay the same, unterminated comments run to the end.
 fn strip_comments(css: &str) -> String {
     let mut output = String::with_capacity(css.len());
-    let mut chars = css.chars().peekable();
+    let mut chars = css.char_indices().peekable();
     let mut string_char: Option<char> = None;
     let mut escaped = false;
 
-    while let Some(ch) = chars.next() {
+    while let Some((idx, ch)) = chars.next() {
         if let Some(quote) = string_char {
             if ch == quote && !escaped {
                 string_char = None;
@@ -99,11 +99,11 @@ fn strip_comments(css: &str) -> String {
 
         match ch {
             '\'' | '"' if !escaped => string_char = Some(ch),
-            '/' if !escaped && chars.peek() == Some(&'*') => {
+            '/' if !escaped && chars.peek().is_some_and(|(_, ch)| *ch == '*') => {
                 chars.next();
                 output.push_str("  ");
                 let mut prev = ' ';
-                for ch in chars.by_ref() {
+                for (_, ch) in chars.by_ref() {
                     output.push(if ch == '\n' { '\n' } else { ' ' });
                     if prev == '*' && ch == '/' {
                         break;
@@ -113,23 +113,13 @@ fn strip_comments(css: &str) -> String {
                 escaped = false;
                 continue;
             }
-            // an unquoted url is a single token, `/*` in it is part of the url, e.g. `url(//a/*.png)`
-            '(' if !escaped && ends_with_url_function_name(&output) => {
-                output.push(ch);
-                while let Some(ch) = chars.next_if(|ch| ch.is_whitespace()) {
-                    output.push(ch);
+            // `/*` in an unquoted url is part of the url, e.g. `url(//a/*.png)`
+            '(' if !escaped => {
+                if let Some(url_end) = unquoted_url_end(css, idx) {
+                    output.push_str(&css[idx..url_end]);
+                    while chars.next_if(|(idx, _)| *idx < url_end).is_some() {}
+                    continue;
                 }
-                if !matches!(chars.peek(), Some('\'' | '"')) {
-                    let mut url_escaped = false;
-                    for ch in chars.by_ref() {
-                        output.push(ch);
-                        if ch == ')' && !url_escaped {
-                            break;
-                        }
-                        url_escaped = ch == '\\' && !url_escaped;
-                    }
-                }
-                continue;
             }
             _ => {}
         }
@@ -139,6 +129,23 @@ fn strip_comments(css: &str) -> String {
     }
 
     output
+}
+
+/// If the `(` at `paren_idx` starts an unquoted url, e.g. `url(a/*.png)`, the end of the url (after
+/// its `)`). An unquoted url is a single token, quotes and `/*` in it don't start strings/comments.
+fn unquoted_url_end(css: &str, paren_idx: usize) -> Option<usize> {
+    let args = &css[paren_idx + 1..];
+    if !ends_with_url_function_name(&css[..paren_idx]) || args.trim_start().starts_with(['\'', '"']) {
+        return None;
+    }
+    let mut escaped = false;
+    for (idx, ch) in args.char_indices() {
+        if ch == ')' && !escaped {
+            return Some(paren_idx + 1 + idx + 1);
+        }
+        escaped = ch == '\\' && !escaped;
+    }
+    Some(css.len())
 }
 
 fn ends_with_url_function_name(css: &str) -> bool {
@@ -160,8 +167,9 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
     let mut paren_depth = 0usize;
     let mut string_char: Option<char> = None;
     let mut escaped = false;
+    let mut chars = css.char_indices().peekable();
 
-    for (idx, ch) in css.char_indices() {
+    while let Some((idx, ch)) = chars.next() {
         let was_escaped = escaped;
         escaped = ch == '\\' && !escaped;
 
@@ -174,7 +182,11 @@ fn split_top_level_segments(css: &str) -> Vec<TopLevelSegment<'_>> {
 
         match ch {
             '\'' | '"' if !was_escaped => string_char = Some(ch),
-            '(' if !was_escaped => paren_depth += 1,
+            // quotes in an unquoted url don't start strings, e.g. `url(a'b)`
+            '(' if !was_escaped => match unquoted_url_end(css, idx) {
+                Some(url_end) => while chars.next_if(|(idx, _)| *idx < url_end).is_some() {},
+                None => paren_depth += 1,
+            },
             ')' if !was_escaped => paren_depth = paren_depth.saturating_sub(1),
             '{' if paren_depth == 0 => brace_depth += 1,
             '}' if paren_depth == 0 => {
@@ -523,6 +535,7 @@ mod tests {
             &:hover {
               background-image: url(data:image/png;base64,AAAA);
             }
+            background: url(a'b);
             color: red;
         "};
         let result = parse_css(input);
@@ -543,6 +556,7 @@ mod tests {
                 &:hover {
                   background-image: url(data:image/png;base64,AAAA);
                 }
+                background: url(a'b);
             "})
         );
     }

@@ -9,14 +9,6 @@ use oxc_ast::ast::{
 };
 use once_cell::sync::Lazy;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use wasm_bindgen::prelude::*;
-
-/// Represents a single CSS declaration (property: value)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct CssDeclaration {
-    pub property: String,
-    pub value: String,
-}
 
 /// Entries of a JSON table shared with the TS runtime (`mergeStyles`). The JSON is a flat object
 /// of strings without escapes, so every quoted string is either a key or a value.
@@ -116,34 +108,32 @@ pub fn generate_atomic_class_name(statement: &str) -> Option<String> {
         .map(|prefix| format!("{prefix}-{}", generate_atomic_hash(statement)))
 }
 
-/// Keep only the last declaration of each property and drop longhands followed by their shorthand
-/// (`margin-top` before `margin`), mirroring `mergeStyles` semantics. Longhands always win against
-/// shorthands in the atomic CSS (see `property_rank`), so they can't be kept.
-/// Consecutive declarations of a property are fallbacks (`display: -webkit-box; display: flex`),
-/// they're joined into a single declaration (and class), so they keep their order.
+/// Join the declarations of each property into a single declaration (and class), so fallbacks
+/// (`display: -webkit-box; ...; display: flex`) keep their order, and drop longhands followed by
+/// their shorthand (`margin-top` before `margin`), mirroring `mergeStyles` semantics. Longhands
+/// always win against shorthands in the atomic CSS (see `property_rank`), so they can't be kept.
+/// Properties are matched by prefix, which aliases (`font-stretch`, `font-width`) share.
 pub fn dedupe_atomic_declarations(declarations: Vec<String>) -> Vec<String> {
-    // properties set by a later declaration
+    // prefixes set by a later declaration
     let mut overridden = HashSet::new();
-    // property of the following declaration, if it was kept
-    let mut kept_property = None;
+    // prefix -> index in `result` of the declarations earlier ones are joined with
+    let mut joinable = HashMap::new();
     let mut result: Vec<String> = Vec::new();
     for declaration in declarations.into_iter().rev() {
         let property = declaration_property(&declaration).to_ascii_lowercase();
-        if kept_property.as_ref() == Some(&property)
-            && let Some(fallbacks) = result.last_mut()
-        {
-            *fallbacks = format!("{declaration}; {fallbacks}");
-            continue;
+        let prefix = atomic_prefix(&property).unwrap_or(&property).to_string();
+        if let Some(&index) = joinable.get(&prefix) {
+            result[index] = format!("{declaration}; {}", result[index]);
+        } else if overridden.insert(prefix.clone()) {
+            joinable.insert(prefix, result.len());
+            result.push(declaration);
         }
-        if !overridden.insert(property.clone()) {
-            kept_property = None;
-            continue;
+        // a shorthand resets its longhands, earlier ones can't be fallbacks of later ones
+        for longhand in ATOMIC_SHORTHANDS.get(property.as_str()).into_iter().flatten() {
+            let longhand = atomic_prefix(longhand).unwrap_or(longhand);
+            joinable.remove(longhand);
+            overridden.insert(longhand.to_string());
         }
-        if let Some(longhands) = ATOMIC_SHORTHANDS.get(property.as_str()) {
-            overridden.extend(longhands.iter().map(|longhand| longhand.to_string()));
-        }
-        result.push(declaration);
-        kept_property = Some(property);
     }
     result.reverse();
     result
@@ -175,140 +165,6 @@ pub fn generate_atomic_hash(statement: &str) -> String {
     }
 
     result
-}
-
-/// Parse CSS string into individual declarations
-/// Handles nested braces, media queries, at-rules, and nested selectors
-pub fn parse_css_declarations(css: &str) -> Vec<CssDeclaration> {
-    let mut declarations = Vec::new();
-    let css = css.trim();
-
-    parse_css_recursive(css, &mut declarations);
-
-    declarations
-}
-
-/// Recursively parse CSS, extracting declarations at all nesting levels
-fn parse_css_recursive(css: &str, declarations: &mut Vec<CssDeclaration>) {
-    let mut current_prop = String::new();
-    let mut current_value = String::new();
-    let mut in_property = true;
-    let mut brace_depth = 0;
-    let mut paren_depth = 0;
-    let mut current_block = String::new();
-
-    let chars: Vec<char> = css.chars().collect();
-    let mut i = 0;
-
-    while i < chars.len() {
-        let ch = chars[i];
-
-        match ch {
-            '{' => {
-                if brace_depth == 0 {
-                    // We're entering a new block (media query, selector, etc.)
-                    // Save current declaration if we were building one
-                    let prop = current_prop.trim().to_string();
-                    let val = current_value.trim().to_string();
-                    if !prop.is_empty() && !val.is_empty() {
-                        declarations.push(CssDeclaration {
-                            property: prop,
-                            value: val,
-                        });
-                    }
-                    current_prop.clear();
-                    current_value.clear();
-                    in_property = true;
-                }
-                brace_depth += 1;
-                current_block.push(ch);
-            }
-            '}' => {
-                brace_depth -= 1;
-                current_block.push(ch);
-
-                if brace_depth == 0 {
-                    // End of a nested block - recursively parse it
-                    let block_content = current_block.trim();
-                    if !block_content.is_empty() {
-                        // Find the content inside braces
-                        if let Some(start) = block_content.find('{') {
-                            if let Some(end) = block_content.rfind('}') {
-                                let inner = &block_content[start + 1..end];
-                                parse_css_recursive(inner, declarations);
-                            }
-                        }
-                    }
-                    current_block.clear();
-                }
-            }
-            '(' => {
-                paren_depth += 1;
-                if brace_depth == 0 {
-                    if !in_property {
-                        current_value.push(ch);
-                    }
-                } else {
-                    current_block.push(ch);
-                }
-            }
-            ')' => {
-                paren_depth -= 1;
-                if brace_depth == 0 {
-                    if !in_property {
-                        current_value.push(ch);
-                    }
-                } else {
-                    current_block.push(ch);
-                }
-            }
-            ':' if brace_depth == 0 && paren_depth == 0 && in_property => {
-                in_property = false;
-            }
-            ';' if brace_depth == 0 && paren_depth == 0 => {
-                // End of declaration at top level
-                let prop = current_prop.trim().to_string();
-                let val = current_value.trim().to_string();
-
-                if !prop.is_empty() && !val.is_empty() {
-                    declarations.push(CssDeclaration {
-                        property: prop,
-                        value: val,
-                    });
-                }
-
-                current_prop.clear();
-                current_value.clear();
-                in_property = true;
-            }
-            _ => {
-                if brace_depth == 0 {
-                    if in_property {
-                        current_prop.push(ch);
-                    } else {
-                        current_value.push(ch);
-                    }
-                } else {
-                    current_block.push(ch);
-                }
-            }
-        }
-
-        i += 1;
-    }
-
-    // Handle last declaration if no trailing semicolon at top level
-    if brace_depth == 0 {
-        let prop = current_prop.trim().to_string();
-        let val = current_value.trim().to_string();
-
-        if !prop.is_empty() && !val.is_empty() {
-            declarations.push(CssDeclaration {
-                property: prop,
-                value: val,
-            });
-        }
-    }
 }
 
 /// Create atomic class for a CSS declaration
@@ -421,10 +277,13 @@ mod tests {
 
     #[test]
     fn prefixes_are_unique() {
+        // aliases of the same property share a prefix
+        const ALIASES: &[&str] = &["font-width"];
         let mut seen = HashSet::new();
-        for prefix in ATOMIC_PREFIXES.values() {
+        for (_, prefix) in ATOMIC_PREFIXES.iter().filter(|(property, _)| !ALIASES.contains(property)) {
             assert!(seen.insert(*prefix), "duplicate atomic prefix '{prefix}'");
         }
+        assert_eq!(atomic_prefix("font-width"), atomic_prefix("font-stretch"));
         assert!(ATOMIC_PREFIXES.len() > 100);
     }
 
@@ -471,27 +330,21 @@ mod tests {
     }
 
     #[test]
-    fn dedupe_keeps_last_declaration_per_property() {
-        let result = dedupe_atomic_declarations(
-            ["padding: 16px", "margin: 1px", "color: red", "padding: 8px", "Color: blue"]
-                .map(String::from)
-                .to_vec(),
-        );
-        assert_eq!(result, vec!["margin: 1px", "padding: 8px", "Color: blue"]);
-    }
-
-    #[test]
-    fn dedupe_joins_consecutive_fallbacks() {
+    fn dedupe_joins_fallbacks() {
         let result = dedupe_atomic_declarations(
             [
                 "display: -webkit-box",
-                "display: flex",
                 "Width: 100%",
                 "width: -webkit-fill-available",
                 "color: red",
+                "display: flex",
                 "margin-top: 1px",
                 "margin-top: 2px",
                 "margin: 0",
+                "margin-left: 1px",
+                "margin: 2px",
+                "font-stretch: 50%",
+                "font-width: 50%",
                 "color: blue",
             ]
             .map(String::from)
@@ -500,12 +353,22 @@ mod tests {
         assert_eq!(
             result,
             vec![
-                "display: -webkit-box; display: flex",
                 "Width: 100%; width: -webkit-fill-available",
-                "margin: 0",
-                "color: blue",
+                "display: -webkit-box; display: flex",
+                "margin: 0; margin: 2px",
+                "font-stretch: 50%; font-width: 50%",
+                "color: red; color: blue",
             ]
         );
+    }
+
+    #[test]
+    fn dedupe_doesnt_join_fallbacks_reset_by_a_shorthand() {
+        // `margin` resets `margin-left: 1px`, so it's no fallback of `margin-left: 2px`
+        let result = dedupe_atomic_declarations(
+            ["margin-left: 1px", "margin: 0", "margin-left: 2px"].map(String::from).to_vec(),
+        );
+        assert_eq!(result, vec!["margin: 0", "margin-left: 2px"]);
     }
 
     #[test]
@@ -549,8 +412,13 @@ mod tests {
     }
 
     /// Longhands reset by shorthands that lightningcss doesn't know about, per the specs (if a
-    /// browser implements them).
+    /// browser implements them), and logical longhands sharing their value with reset physical ones.
     const SPEC_LONGHANDS: &[(&str, &str)] = &[
+        (
+            "border-radius",
+            "border-start-start-radius border-start-end-radius border-end-start-radius border-end-end-radius",
+        ),
+        ("overflow", "overflow-inline overflow-block"),
         (
             "font",
             "font-width font-variant-ligatures font-variant-alternates font-variant-numeric \
