@@ -11,7 +11,8 @@ import styleThis, { DefaultImport, type Options } from "@style-this/vite";
 styleThis(options?: Options): Plugin
 ```
 
-The plugin is named `vite:style-this` and runs with `enforce: "pre"`.
+The plugin is named `vite:style-this` and runs with `enforce: "pre"`. Its transform has `order: "pre"`, so
+it runs before framework compilers (React, Solid, Svelte) wherever the plugin is listed.
 
 ## Options
 

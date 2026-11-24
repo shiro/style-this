@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import remapping from "@ampproject/remapping";
+import { build, type Plugin, type Rollup } from "vite";
+import vitePlugin from "../src/index";
 import { getResolver, setupPlugin } from "./util/testUtil";
 
 const filepath = `${__dirname}/Card.svelte`;
@@ -96,6 +98,27 @@ const shared = css\`margin: 1px;\`;</script>
     expect(cssMappings.map((segment) => segment.slice(2, 4))).toEqual(
       expect.arrayContaining([positionOf(source, "css`color"), positionOf(source, "css`margin")]),
     );
+  });
+
+  test("components are transformed before an `enforce: \"pre\"` compiler listed first", async () => {
+    // like vite-plugin-svelte 5, compiles in a plain transform of an `enforce: "pre"` plugin
+    const svelteCompiler: Plugin = {
+      name: "svelte-compiler",
+      enforce: "pre",
+      transform(code, id) {
+        if (id.endsWith(".svelte")) return code.match(/<script>([\s\S]*?)<\/script>/)![1];
+      },
+    };
+    const output = (await build({
+      root: `${__dirname}/svelte-plugin-order`,
+      configFile: false,
+      logLevel: "silent",
+      plugins: [svelteCompiler, vitePlugin({ useRequire: true })],
+      build: { write: false, minify: false, cssMinify: false, lib: { entry: "main.js", formats: ["es"] } },
+    })) as Rollup.RollupOutput[];
+
+    const css = output[0].output.find((file) => file.fileName.endsWith(".css"));
+    expect(css?.type === "asset" && css.source).toContain("color: rebeccapurple");
   });
 
   test("error locations and code frames are of the Svelte file", async () => {

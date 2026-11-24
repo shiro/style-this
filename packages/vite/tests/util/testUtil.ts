@@ -295,11 +295,6 @@ export const setupPlugin = async (
   const config = plugin.config.bind(ctx);
   try {
     await config({});
-
-    // Call buildStart to initialize atomic mode globals
-    if (plugin.buildStart) {
-      await plugin.buildStart.call(ctx, {});
-    }
   } finally {
     cwdSpy.mockRestore();
   }
@@ -307,7 +302,7 @@ export const setupPlugin = async (
   return {
     cssExtension: "css",
     config,
-    transform: plugin.transform.bind(ctx),
+    transform: plugin.transform.handler.bind(ctx),
     resolveId: plugin.resolveId.bind(ctx),
     load: plugin.load.bind(ctx),
     __getDebugVirtualModules: plugin.__getDebugVirtualModules.bind(ctx),

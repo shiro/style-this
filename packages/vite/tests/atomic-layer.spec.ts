@@ -96,6 +96,16 @@ describe("atomic CSS layer", () => {
     });
   });
 
+  test("build: a plugin configured again (reused for another build) keeps the atomic CSS", async () => {
+    await withStyledFile({ atomic: true }, async (plugin) => {
+      await plugin.config({});
+      const bundle: Record<string, any> = {};
+      await plugin.generateBundle({}, bundle);
+
+      expect(bundle["assets/atomic.css"].source).toContain("color: red");
+    });
+  });
+
   test("non-atomic mode: no layers", async () => {
     await withStyledFile({ atomic: false }, async (plugin, file) => {
       expect(await loadCode(plugin, ATOMIC_ENTRYPOINT_ID)).not.toContain("@layer");

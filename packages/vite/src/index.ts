@@ -274,6 +274,10 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
         };
       }
 
+      // a plugin instance can be configured several times (e.g. reused for another build), a new transformer
+      // would lose the evaluation state (atomic CSS, dependencies) of the CSS that's cached already
+      if (styleThis) return;
+
       await initializeStyleThis();
 
       cwd = process.cwd();
@@ -338,10 +342,6 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
         atomic,
         onDebugVirtualModule,
       });
-
-      if (atomic) {
-        global.__styleThis_getAtomicCss = () => styleThis.get_atomic_css();
-      }
     },
 
     resolveId(id, importer) {
@@ -568,90 +568,95 @@ const vitePlugin = (options: Options = {}): Plugin & ExtraFields => {
       return [...result];
     },
 
-    async transform(code, filepath) {
-      if (
-        !filepath ||
-        filepath.startsWith("\0") ||
-        isInNodeModules(filepath) ||
-        filepath.includes("?") ||
-        filepath.endsWith(".style-this.js") ||
-        (!transformExtensionRegex.test(filepath) && !isSvelteFile(filepath))
-      ) {
-        return;
-      }
-
-      if (!filterMatches(filter, filepath)) {
-        return;
-      }
-
-      let codeToTransform = code;
-      let svelte: SvelteSources | undefined;
-      let mapOffset: ((offset: number) => number) | undefined;
-
-      if (isSvelteFile(filepath)) {
-        svelte = svelteSources(code) ?? undefined;
-        // without a script it's only transformed (as empty) if it was before, which drops its imports
-        if (!svelte && !watchedFiles.has(filepath)) return;
-        codeToTransform = svelte?.program ?? "";
-        mapOffset = svelte && svelteByteOffsetMapper(svelte);
-      }
-
-      const cssFilepath = `${filepath}.${cssExtension}`;
-      const atomicProgramFilepath = `${filepath}.style-this.js`;
-
-      const skipCssEval = cacheRegistry.hasCssModule(cssFilepath) && (!atomic || cacheRegistry.hasAtomicModule(atomicProgramFilepath));
-
-      try {
-        const startTime = performance.now();
-
-        if (atomic && !cacheRegistry.hasAtomicModule(atomicProgramFilepath)) {
-          cacheRegistry.setAtomicModule(atomicProgramFilepath, createCachePromise(code, mapOffset));
-        }
-
-        if (!cacheRegistry.hasCssModule(cssFilepath)) {
-          cacheRegistry.setCssModule(cssFilepath, createCachePromise(code, mapOffset));
-        }
-
-        const transformedResult = await styleThis.transform(
-          codeToTransform,
-          filepath,
-          skipCssEval,
-          // resolve within this transform's own environment/context, other contexts may resolve
-          // differently or be disposed already
-          createLoadFile(async (id, importer) => id ? (await this.resolve(id, importer))?.id : undefined),
-        );
-        if (!transformedResult) {
-          watchedFiles.delete(filepath);
-          // the compiler resolves these as empty, they would be taken as cached CSS once the file gains styles
-          cacheRegistry.invalidateModule(filepath, cssExtension);
+    transform: {
+      // before the transforms of other `enforce: "pre"` plugins wherever it's listed, framework compilers
+      // (e.g. Svelte's) output code the styles can't be extracted from
+      order: "pre",
+      async handler(code, filepath) {
+        if (
+          !filepath ||
+          filepath.startsWith("\0") ||
+          isInNodeModules(filepath) ||
+          filepath.includes("?") ||
+          filepath.endsWith(".style-this.js") ||
+          (!transformExtensionRegex.test(filepath) && !isSvelteFile(filepath))
+        ) {
           return;
         }
-        debugLog(`transformed ${filepath} in ${(performance.now() - startTime).toFixed(1)}ms`);
-        watchedFiles.add(filepath);
 
-        if (server && !skipCssEval) {
-          for (const environment of Object.values(server.environments)) {
-            if (environment.config.consumer !== "client") continue;
-            const cssModule = environment.moduleGraph.getModuleById(toVirtualId(cssFilepath));
-            if (cssModule?.importers.size) reloadVirtualModule(environment, cssModule);
+        if (!filterMatches(filter, filepath)) {
+          return;
+        }
+
+        let codeToTransform = code;
+        let svelte: SvelteSources | undefined;
+        let mapOffset: ((offset: number) => number) | undefined;
+
+        if (isSvelteFile(filepath)) {
+          svelte = svelteSources(code) ?? undefined;
+          // without a script it's only transformed (as empty) if it was before, which drops its imports
+          if (!svelte && !watchedFiles.has(filepath)) return;
+          codeToTransform = svelte?.program ?? "";
+          mapOffset = svelte && svelteByteOffsetMapper(svelte);
+        }
+
+        const cssFilepath = `${filepath}.${cssExtension}`;
+        const atomicProgramFilepath = `${filepath}.style-this.js`;
+
+        const skipCssEval = cacheRegistry.hasCssModule(cssFilepath) && (!atomic || cacheRegistry.hasAtomicModule(atomicProgramFilepath));
+
+        try {
+          const startTime = performance.now();
+
+          if (atomic && !cacheRegistry.hasAtomicModule(atomicProgramFilepath)) {
+            cacheRegistry.setAtomicModule(atomicProgramFilepath, createCachePromise(code, mapOffset));
           }
 
-          if (atomic) cacheRegistry.getAtomicModule(atomicProgramFilepath)?.then(scheduleAtomicCssUpdate);
-        }
+          if (!cacheRegistry.hasCssModule(cssFilepath)) {
+            cacheRegistry.setCssModule(cssFilepath, createCachePromise(code, mapOffset));
+          }
 
-        if (svelte) {
-          const rewrapped = rewrapSvelteScript(code, transformedResult.code);
-          return { code: rewrapped.file, map: remapSvelteSourcemap(transformedResult.sourcemap, svelte, rewrapped) };
-        }
+          const transformedResult = await styleThis.transform(
+            codeToTransform,
+            filepath,
+            skipCssEval,
+            // resolve within this transform's own environment/context, other contexts may resolve
+            // differently or be disposed already
+            createLoadFile(async (id, importer) => id ? (await this.resolve(id, importer))?.id : undefined),
+          );
+          if (!transformedResult) {
+            watchedFiles.delete(filepath);
+            // the compiler resolves these as empty, they would be taken as cached CSS once the file gains styles
+            cacheRegistry.invalidateModule(filepath, cssExtension);
+            return;
+          }
+          debugLog(`transformed ${filepath} in ${(performance.now() - startTime).toFixed(1)}ms`);
+          watchedFiles.add(filepath);
 
-        return {
-          code: transformedResult.code,
-          map: transformedResult.sourcemap,
-        };
-      } catch (err) {
-        watchedFiles.add(filepath);
-        handleTransformError(filepath, code, err);
-      }
+          if (server && !skipCssEval) {
+            for (const environment of Object.values(server.environments)) {
+              if (environment.config.consumer !== "client") continue;
+              const cssModule = environment.moduleGraph.getModuleById(toVirtualId(cssFilepath));
+              if (cssModule?.importers.size) reloadVirtualModule(environment, cssModule);
+            }
+
+            if (atomic) cacheRegistry.getAtomicModule(atomicProgramFilepath)?.then(scheduleAtomicCssUpdate);
+          }
+
+          if (svelte) {
+            const rewrapped = rewrapSvelteScript(code, transformedResult.code);
+            return { code: rewrapped.file, map: remapSvelteSourcemap(transformedResult.sourcemap, svelte, rewrapped) };
+          }
+
+          return {
+            code: transformedResult.code,
+            map: transformedResult.sourcemap,
+          };
+        } catch (err) {
+          watchedFiles.add(filepath);
+          handleTransformError(filepath, code, err);
+        }
+      },
     },
   };
 };

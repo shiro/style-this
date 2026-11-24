@@ -29,7 +29,7 @@ export default defineConfig({
 });
 ```
 
-The plugin runs with `enforce: "pre"`, its position relative to `react()` doesn't matter.
+The plugin's position relative to `react()` doesn't matter, its transform runs first.
 
 ## Usage
 
