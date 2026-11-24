@@ -110,7 +110,9 @@ This works across files and with [styled components](/guides/styled-components/#
 
 ## Composing styles
 
-Every style exposes its CSS body as `.css`. Interpolate it to inline one style into another.
+Every style exposes its CSS body as `.css`. Interpolate it to inline one style into another. It only
+exists during build-time evaluation, at runtime a style is just its class name and `.css` is
+`undefined`.
 
 ```ts
 const base = css`

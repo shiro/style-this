@@ -8,6 +8,10 @@ test("style functions get the style props, and the component's props in `props`"
       expectTypeOf(styleProps.props.disabled).toEqualTypeOf<boolean | undefined>();
       // @ts-expect-error the component's props are only in `props`
       void styleProps.disabled;
+      // @ts-expect-error React doesn't pass these in the props
+      void styleProps.props.ref;
+      // @ts-expect-error
+      void styleProps.props.key;
       return styleProps.size;
     }}px;
   `;

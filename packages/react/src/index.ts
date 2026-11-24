@@ -26,7 +26,8 @@ type StyledTemplateFn<
     TemplateExpression<
       StyleProps &
         (PropsOf<BaseComponent> extends { styleProps: infer BaseStyleProps } ? BaseStyleProps : {}) & {
-          props: Omit<PropsOf<BaseComponent>, "styleProps">;
+          // forwardRef passes `ref` separately, React never passes `key`
+          props: Omit<PropsOf<BaseComponent>, "styleProps" | "key" | "ref">;
         }
     >
   >
