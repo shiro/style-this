@@ -1,6 +1,6 @@
 use crate::{utils::SeededRandom, *};
 use oxc_ast::ast::{
-    Argument, JSXAttributeItem, JSXElementName, JSXMemberExpression, JSXMemberExpressionObject,
+    JSXAttributeItem, JSXElementName, JSXMemberExpression, JSXMemberExpressionObject,
     StaticMemberExpression,
 };
 
@@ -14,6 +14,7 @@ pub const PROPS_LOCAL_NAME: &str = "__styleThis__props";
 pub const REST_PROPS_LOCAL_NAME: &str = "__styleThis__rest";
 // the class name is derived from the display name instead, see `ClassDisplayNames`
 pub const CLASS_LOCAL_NAME: &str = "__styleThis__class";
+const BASE_LOCAL_NAME: &str = "__styleThis__Base";
 /// Tag of the generated `css` templates, independent of the user's `css` import (or another
 /// library's `css`).
 pub const CSS_TAG_LOCAL_NAME: &str = "__styleThis__css";
@@ -80,6 +81,13 @@ pub struct CapturedExpression<'alloc> {
     pub var_name: String,
 }
 
+pub struct StyledElement<'alloc> {
+    pub name: JSXElementName<'alloc>,
+    pub is_component: bool,
+    /// `const __styleThis__Base = <base>`, declared before the component when the base is aliased
+    pub base_declaration: Option<Statement<'alloc>>,
+}
+
 pub struct ComponentTransformContext<'alloc> {
     pub class_variable_name: String,
     pub captured_expressions: Vec<CapturedExpression<'alloc>>,
@@ -130,7 +138,9 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         })
     }
 
-    pub fn extract_and_replace_arrow_functions(
+    /// Replaces function expressions (also parenthesized or TS-wrapped) with CSS variables, to be
+    /// evaluated at runtime with the style props.
+    pub fn extract_and_replace_style_functions(
         &self,
         simple_tagged_template_expression: &mut oxc_allocator::Box<'alloc, TaggedTemplateExpression<'alloc>>,
     ) -> Vec<CapturedExpression<'alloc>> {
@@ -139,7 +149,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         let mut random = SeededRandom::new();
 
         for expression in simple_tagged_template_expression.quasi.expressions.iter_mut() {
-            if let Expression::ArrowFunctionExpression(_) = expression {
+            if expression.get_inner_expression().is_function() {
                 let random_suffix = random.random_string(
                     6,
                     &format!("{}_{}_{var_counter}", self.filepath, self.component_counter),
@@ -157,7 +167,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                 );
 
                 captured_expressions.push(CapturedExpression {
-                    expression: prev_expression,
+                    expression: prev_expression.into_inner_expression(),
                     var_name,
                 });
                 var_counter += 1;
@@ -409,39 +419,72 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         )
     }
 
-    /// The element of a styled template, and whether it's a component: `styled.div`, `styled("div")`,
-    /// `styled(Component)` or `styled(ui.Component)`.
-    pub fn styled_element(
-        &self,
-        template: &TaggedTemplateExpression<'alloc>,
-    ) -> Option<(JSXElementName<'alloc>, bool)> {
+    /// The element of a styled template: `styled.div`, `styled("div")`, `styled(Component)`,
+    /// `styled(ui.Component)`, or any other base (e.g. `styled(card)`, `styled(ui["Card"])`) aliased
+    /// to a capitalized local, since JSX would treat it as an HTML element or can't reference it.
+    pub fn styled_element(&self, template: &TaggedTemplateExpression<'alloc>) -> Option<StyledElement<'alloc>> {
         let span = template.span;
+        let element = |name, is_component| StyledElement {
+            name: self.ast_builder.jsx_element_name_identifier(span, name),
+            is_component,
+            base_declaration: None,
+        };
         match &template.tag {
             Expression::StaticMemberExpression(member)
                 if matches!(&member.object, Expression::Identifier(object) if object.name == self.styled_name) =>
             {
-                Some((self.ast_builder.jsx_element_name_identifier(span, member.property.name), false))
+                Some(element(member.property.name, false))
             }
             Expression::CallExpression(call)
                 if matches!(&call.callee, Expression::Identifier(callee) if callee.name == self.styled_name)
                     && call.arguments.len() == 1 =>
             {
-                match &call.arguments[0] {
-                    Argument::StringLiteral(element) => {
-                        Some((self.ast_builder.jsx_element_name_identifier(span, element.value), false))
+                let base = call.arguments[0].as_expression()?.get_inner_expression();
+                let direct = match base {
+                    Expression::StringLiteral(name) => Some(element(name.value, false)),
+                    Expression::TemplateLiteral(template) => template.single_quasi().map(|name| element(name, false)),
+                    // JSX treats lowercase names as HTML elements
+                    Expression::Identifier(component) if !component.name.starts_with(|c: char| c.is_ascii_lowercase()) => {
+                        Some(element(component.name, true))
                     }
-                    Argument::Identifier(component) => {
-                        Some((self.ast_builder.jsx_element_name_identifier(span, component.name), true))
+                    Expression::StaticMemberExpression(member) => {
+                        self.jsx_member_expression(span, member).map(|member| StyledElement {
+                            name: JSXElementName::MemberExpression(member),
+                            is_component: true,
+                            base_declaration: None,
+                        })
                     }
-                    Argument::StaticMemberExpression(member) => Some((
-                        JSXElementName::MemberExpression(self.jsx_member_expression(span, member)?),
-                        true,
-                    )),
                     _ => None,
-                }
+                };
+                Some(direct.unwrap_or_else(|| StyledElement {
+                    base_declaration: Some(self.build_base_declaration(span, base)),
+                    ..element(self.ast_builder.atom(BASE_LOCAL_NAME), true)
+                }))
             }
             _ => None,
         }
+    }
+
+    fn build_base_declaration(&self, span: oxc_span::Span, base: &Expression<'alloc>) -> Statement<'alloc> {
+        Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+            span,
+            VariableDeclarationKind::Const,
+            self.ast_builder.vec1(self.ast_builder.variable_declarator(
+                span,
+                VariableDeclarationKind::Const,
+                self.ast_builder.binding_pattern(
+                    BindingPatternKind::BindingIdentifier(
+                        self.ast_builder
+                            .alloc_binding_identifier(span, self.ast_builder.atom(BASE_LOCAL_NAME)),
+                    ),
+                    None as Option<oxc_allocator::Box<_>>,
+                    false,
+                ),
+                Some(base.clone_in(self.ast_builder.allocator)),
+                false,
+            )),
+            false,
+        ))
     }
 
     /// `ui.Component` as a JSX element name, `None` for other member expressions (e.g. `this.x`).

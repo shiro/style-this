@@ -1,23 +1,38 @@
-.FancyButton-dq3g1a {
+.FancyButton-4lizkh {
 background: none;
   border: 1px solid blue;
   border-radius: 2px;
   padding: var(--var1-4lyfgx)px;
   gap: var(--var2-ngdi74)px;
 }
-.ui-di3she {
+.ui-nklaj4 {
 color: var(--var1-52r4dq);
   
 }
-.component_0-6j4xij {
+.component_0-lyr0tq {
 color: var(--var1-9a7oly);
 }
-.unrelated-2r0luv {
+.unrelated-azcdyb {
 background: none;
 }
-.Link-b05mnk {
+.Link-dq3g1a {
 font-size: var(--var1-o5uvsl)px;
 }
-.Panel-hqnklm {
+.Panel-di3she {
 border-color: var(--var1-wh6b89);
+}
+.LowercaseBase-6j4xij {
+color: red;
+}
+.ComputedBase-2r0luv {
+color: var(--var1-rwtif4);
+}
+.TemplateTag-b05mnk {
+color: blue;
+}
+.StyleFunctions-hqnklm {
+width: var(--var1-092f0p)px;
+  height: var(--var2-f8pmv0)px;
+  margin: var(--var3-8xy3w9)px;
+  padding: var(--var4-enwhqr)px;
 }

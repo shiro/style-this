@@ -2,10 +2,17 @@
 @layer utilities {
 .b-ZeplZ { border: 1px solid blue }
 .bg-Kk7Cm { background: none }
+.c-Br467 { color: var(--var1-rwtif4) }
+.c-EoseN { color: blue }
 .c-FBNIe { color: var(--var1-9a7oly) }
 .c-PMAUV { color: var(--var1-52r4dq) }
+.c-TwPQN { color: red }
 .gap-FPd2_ { gap: var(--var2-ngdi74)px }
+.h-W_UZT { height: var(--var2-f8pmv0)px }
+.m-N7Z3X { margin: var(--var3-8xy3w9)px }
 .p-NM_En { padding: var(--var1-4lyfgx)px }
+.p-Nxyfx { padding: var(--var4-enwhqr)px }
+.w-J2svH { width: var(--var1-092f0p)px }
 .bc-MIxId { border-color: var(--var1-wh6b89) }
 .fs-RJsVb { font-size: var(--var1-o5uvsl)px }
 .r-TbAuj { border-radius: 2px }

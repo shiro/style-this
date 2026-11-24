@@ -7,7 +7,7 @@ import "virtual:style-this:/entry.tsx.css";
 // must not be shadowed by the generated wrapper's props
 const props = { gap: 4 };
 export const FancyButton = (() => {
-	let __styleThis__class = "FancyButton-dq3g1a";
+	let __styleThis__class = "FancyButton-4lizkh";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
 		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
 		return <button {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
@@ -29,7 +29,7 @@ export const FancyButton = (() => {
 const ui = {
 	accent: "red",
 	Card: (() => {
-		let __styleThis__class = "ui-di3she";
+		let __styleThis__class = "ui-nklaj4";
 		let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
 			const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
 			return <div {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
@@ -45,7 +45,7 @@ const ui = {
 	})()
 };
 export default (() => {
-	let __styleThis__class = "component_0-6j4xij";
+	let __styleThis__class = "component_0-lyr0tq";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
 		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
 		return <div {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
@@ -59,9 +59,9 @@ export default (() => {
 	__styleThis__comp.toString = () => __styleThis__class;
 	return __styleThis__comp;
 })();
-const unrelated = "unrelated-2r0luv";
+const unrelated = "unrelated-azcdyb";
 export const Link = (() => {
-	let __styleThis__class = "Link-b05mnk";
+	let __styleThis__class = "Link-dq3g1a";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
 		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
 		return <a {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
@@ -76,7 +76,7 @@ export const Link = (() => {
 	return __styleThis__comp;
 })();
 export const Panel = (() => {
-	let __styleThis__class = "Panel-hqnklm";
+	let __styleThis__class = "Panel-di3she";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <ui.Card {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.className)} style={{
 		"--var1-wh6b89": (() => ui.accent)({
 			...__styleThis__props.styleProps,
@@ -84,6 +84,69 @@ export const Panel = (() => {
 		}),
 		...__styleThis__props.style ?? {}
 	}} />);
+	__styleThis__comp.toString = () => __styleThis__class;
+	return __styleThis__comp;
+})();
+// lowercase and computed bases are components, not HTML elements
+const card = (p: {
+	className?: string;
+}) => <div className={p.className} />;
+const components = { Card: card };
+export const LowercaseBase = (() => {
+	const __styleThis__Base = card;
+	let __styleThis__class = "LowercaseBase-6j4xij";
+	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <__styleThis__Base {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.className)} />);
+	__styleThis__comp.css = __styleThis__class.css;
+	__styleThis__comp.toString = () => __styleThis__class;
+	return __styleThis__comp;
+})();
+export const ComputedBase = (() => {
+	const __styleThis__Base = components["Card"];
+	let __styleThis__class = "ComputedBase-2r0luv";
+	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <__styleThis__Base {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.className)} style={{
+		"--var1-rwtif4": (() => ui.accent)({
+			...__styleThis__props.styleProps,
+			"props": __styleThis__props
+		}),
+		...__styleThis__props.style ?? {}
+	}} />);
+	__styleThis__comp.toString = () => __styleThis__class;
+	return __styleThis__comp;
+})();
+export const TemplateTag = (() => {
+	let __styleThis__class = "TemplateTag-b05mnk";
+	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => <span {...__styleThis__props} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__props.className)} />);
+	__styleThis__comp.css = __styleThis__class.css;
+	__styleThis__comp.toString = () => __styleThis__class;
+	return __styleThis__comp;
+})();
+// wrapped and non-arrow functions are runtime style functions too
+export const StyleFunctions = (() => {
+	let __styleThis__class = "StyleFunctions-hqnklm";
+	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
+		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
+		return <div {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
+			"--var1-092f0p": function({ size }) {
+				return size;
+			}({
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
+			}),
+			"--var2-f8pmv0": (({ size }) => size)({
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
+			}),
+			"--var3-8xy3w9": (({ size }) => size)({
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
+			}),
+			"--var4-enwhqr": (({ size }) => size)({
+				...__styleThis__props.styleProps,
+				"props": __styleThis__props
+			}),
+			...__styleThis__props.style ?? {}
+		}} />;
+	});
 	__styleThis__comp.toString = () => __styleThis__class;
 	return __styleThis__comp;
 })();

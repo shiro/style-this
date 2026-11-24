@@ -35,3 +35,29 @@ export const Link = styled("a")<{ size: number }>`
 export const Panel = styled(ui.Card)`
   border-color: ${() => ui.accent};
 `;
+
+// lowercase and computed bases are components, not HTML elements
+const card = (p: { className?: string }) => <div className={p.className} />;
+const components = { Card: card };
+
+export const LowercaseBase = styled(card)`
+  color: red;
+`;
+
+export const ComputedBase = styled(components["Card"])`
+  color: ${() => ui.accent};
+`;
+
+export const TemplateTag = styled(`span`)`
+  color: blue;
+`;
+
+// wrapped and non-arrow functions are runtime style functions too
+export const StyleFunctions = styled.div<{ size: number }>`
+  width: ${function ({ size }) {
+    return size;
+  }}px;
+  height: ${(({ size }) => size) as (p: { size: number }) => number}px;
+  margin: ${(({ size }) => size) satisfies (p: { size: number }) => number}px;
+  padding: ${(({ size }) => size)!}px;
+`;

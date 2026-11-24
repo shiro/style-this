@@ -1,5 +1,5 @@
 use crate::{styled_component_transformer::*, *};
-use oxc_ast::ast::{JSXElementName, JSXExpression};
+use oxc_ast::ast::JSXExpression;
 
 const FORWARD_REF_LOCAL_NAME: &str = "__styleThis__forwardRef";
 const REF_LOCAL_NAME: &str = "__styleThis__ref";
@@ -23,8 +23,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
     fn transform_styled_component(
         &mut self,
         expression: &mut Expression<'alloc>,
-        element: JSXElementName<'alloc>,
-        is_extending_custom_component: bool,
+        StyledElement { name, is_component: is_extending_custom_component, base_declaration }: StyledElement<'alloc>,
     ) {
         self.base.component_counter += 1;
         let class_display_name = self.base.get_class_display_name();
@@ -43,7 +42,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         );
 
         let captured_expressions =
-            self.base.extract_and_replace_arrow_functions(&mut simple_tagged_template_expression);
+            self.base.extract_and_replace_style_functions(&mut simple_tagged_template_expression);
 
         if self.base.skip_jsx {
             *tagged_template_expression =
@@ -180,7 +179,7 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
             attributes.push(style_attr);
         }
 
-        let jsx_element_expression = self.base.build_jsx_element(span, element, attributes);
+        let jsx_element_expression = self.base.build_jsx_element(span, name, attributes);
 
         // For React, the component has a block body when filtering props
         let component_body_statements = if should_filter_props {
@@ -279,7 +278,8 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
             ),
         );
 
-        let mut function_body_statements = vec![css_declaration, define_jsx_element_statement];
+        let mut function_body_statements = Vec::from_iter(base_declaration);
+        function_body_statements.extend([css_declaration, define_jsx_element_statement]);
 
         if captured_expressions.is_empty() {
             function_body_statements.push(self.base.build_assign_css_statement(span));
@@ -302,9 +302,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for ReactStyledComponentTransformer<'a, 'alloc
 
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
         if let Expression::TaggedTemplateExpression(template) = it
-            && let Some((element, is_component)) = self.base.styled_element(template)
+            && let Some(element) = self.base.styled_element(template)
         {
-            self.transform_styled_component(it, element, is_component);
+            self.transform_styled_component(it, element);
             return;
         }
 

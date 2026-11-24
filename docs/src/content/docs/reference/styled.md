@@ -32,6 +32,10 @@ styled("button")<StyleProps>`...`
 Extends a component or intrinsic element. The component must accept `className` and `style`
 (React) or `class` and `style` (Solid).
 
+Any expression is accepted as the base (e.g. `styled(card)`, `styled(ui["Card"])`), it's evaluated
+once when the component is defined. Intrinsic elements must be string literals in Solid,
+`styled(tag)` with a string variable isn't supported.
+
 ## `StyleProps`
 
 Optional type argument describing the dynamic inputs. Must be an object type and can't contain a
