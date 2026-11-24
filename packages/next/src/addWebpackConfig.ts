@@ -52,8 +52,11 @@ function modifyCssLoaderConfig(rules: Webpack.RuleSetRule[]) {
 
 export type LinariaConfig = NextConfig;
 
-export function addWebpackConfig({ ...nextConfig }: LinariaConfig, atomic: boolean) {
-  const loaderOptions: LoaderOptions = { bundler: "webpack", atomic };
+export function addWebpackConfig(
+  { ...nextConfig }: LinariaConfig,
+  { atomic, pageExtensions }: Omit<LoaderOptions, "bundler">,
+) {
+  const loaderOptions: LoaderOptions = { bundler: "webpack", atomic, pageExtensions };
 
   const webpack = (
     config: Webpack.Configuration,
@@ -84,13 +87,17 @@ export function addWebpackConfig({ ...nextConfig }: LinariaConfig, atomic: boole
 
       config.module.rules.push({
         ...transformRuleConditions,
-        // Next's own queries, e.g. the pages of the edge runtime are imported with `?__next_edge_ssr_entry__`
-        resourceQuery: [transformRuleConditions.resourceQuery, /^\?__next_\w+__$/],
+        // Next's own queries, e.g. the pages of the edge runtime are imported with `?__next_edge_ssr_entry__`,
+        // except `?__next_metadata__`, `next-metadata-image-loader` discards the source of those imports
+        resourceQuery: [transformRuleConditions.resourceQuery, /^\?__next_(?!metadata__)\w+__$/],
         loader: path.resolve(__dirname, "./loaders/transformLoader.mjs"),
         options: loaderOptions,
       });
 
-      config.plugins.push({ apply: (compiler) => dropRemovedFiles(compiler, loaderConfig(loaderOptions)) });
+      // the compiler's context is the loaders' `rootContext`
+      config.plugins.push({
+        apply: (compiler) => dropRemovedFiles(compiler, loaderConfig(loaderOptions, compiler.context)),
+      });
     }
 
     if (typeof nextConfig.webpack === "function") {

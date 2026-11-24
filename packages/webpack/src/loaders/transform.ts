@@ -24,8 +24,8 @@ export type LoaderConfig = {
   useRequire?: boolean;
 };
 
-/** The config of a loader, from its options. */
-type GetConfig<Options> = (options: Options) => LoaderConfig;
+/** The config of a loader, from its options and the project directory (`rootContext`). */
+type GetConfig<Options> = (options: Options, rootContext: string) => LoaderConfig;
 
 export const cssExtension = "css";
 export const atomicProgramExtension = "style-this.js";
@@ -177,7 +177,7 @@ export const createTransformLoader =
   function (code, inputSourceMap) {
     const callback = this.async();
 
-    transformFile(this, getConfig(this.getOptions()), code.toString(), this.resourcePath).then(
+    transformFile(this, getConfig(this.getOptions(), this.rootContext), code.toString(), this.resourcePath).then(
       (result) =>
         result
           ? callback(null, result.code, chainSourceMap(result.sourcemap, inputSourceMap))
@@ -198,7 +198,7 @@ const virtualModuleLoader =
     // the loader rules only match imports with `?filepath=`
     const filepath = noopFileImportFilepath(this.resourcePath, this.resourceQuery);
 
-    load(this, getConfig(this.getOptions()), filepath).then(
+    load(this, getConfig(this.getOptions(), this.rootContext), filepath).then(
       (code) => callback(null, code),
       (err) => callback(err),
     );

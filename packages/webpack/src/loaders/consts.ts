@@ -43,13 +43,21 @@ export const transformRuleConditions = {
  */
 export const noopFileImport = (noopFile: string, filepath: string) => {
   // absolute if they're on different drives on Windows
-  let noopFilepath = path.relative(path.dirname(filepath), noopFile).replaceAll(path.sep, "/");
+  let noopFilepath = path
+    .relative(path.dirname(filepath), noopFile)
+    .replaceAll(path.sep, "/")
+    // webpack would read the rest as a query or fragment
+    .replace(/[?#]/g, "\0$&");
   if (!path.isAbsolute(noopFilepath) && !noopFilepath.startsWith("../")) noopFilepath = `./${noopFilepath}`;
   const query = path.relative(path.dirname(noopFile), filepath).replaceAll(path.sep, "/");
   return `${noopFilepath}?filepath=${encodeURIComponent(query)}`;
 };
 
-/** The `filepath` of a `noopFileImport` request, from the loader context of its noop file. */
+/**
+ * The `filepath` of a `noopFileImport` request, from the loader context of its noop file. The noop files
+ * are real paths (Node resolves symlinks), so they're resolved to the same path with and without
+ * `resolve.symlinks`.
+ */
 export const noopFileImportFilepath = (resourcePath: string, resourceQuery: string) =>
   path.resolve(path.dirname(resourcePath), new URLSearchParams(resourceQuery).get("filepath")!);
 

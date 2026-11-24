@@ -73,9 +73,8 @@ export const makeLoadFile = (ctx: LoaderCtx) => {
       } catch (err) {}
     }
 
-    // for anything inside node_modules, use Node's dependency resolution instead, as vite might give us the
-    // bundled one (that might not yet exist on disk)
-    // also do not load the contents, the transformer should require(...) it as-is
+    // dependencies aren't loaded, the transformer requires them as-is, so they're resolved like Node does,
+    // webpack can resolve to an entry Node can't load (e.g. of the `browser` field)
     // like Node from the importer, monorepo packages can have their own dependencies, then from the project
     // for files outside of it
     // this also covers imports webpack failed to resolve (e.g. Node builtins for web targets), if Node can't

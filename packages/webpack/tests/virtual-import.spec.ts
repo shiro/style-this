@@ -17,4 +17,10 @@ describe("noopFileImport", () => {
 
     expect(request).toBe("./.yarn/@style-this/webpack/style-this.css?filepath=..%2F..%2F..%2FApp.tsx");
   });
+
+  it("escapes `?` and `#` in the path", () => {
+    const request = noopFileImport("/a/#lib?/webpack/style-this.css", "/a/src/App.tsx");
+
+    expect(request).toBe("../\0#lib\0?/webpack/style-this.css?filepath=..%2F..%2Fsrc%2FApp.tsx");
+  });
 });

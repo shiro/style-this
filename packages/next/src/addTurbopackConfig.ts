@@ -25,8 +25,11 @@ const appendRule = (
 ): TurbopackRuleConfigCollection =>
   userRule ? [...(Array.isArray(userRule) ? userRule : [userRule]), rule] : rule;
 
-export function addTurbopackConfig(config: WithLinariaConfig, atomic: boolean): WithLinariaConfig {
-  const options: LoaderOptions = { bundler: "turbopack", atomic };
+export function addTurbopackConfig(
+  config: WithLinariaConfig,
+  { atomic, pageExtensions }: Omit<LoaderOptions, "bundler">,
+): WithLinariaConfig {
+  const options: LoaderOptions = { bundler: "turbopack", atomic, pageExtensions };
   const userRules = config.turbopack?.rules;
 
   const transformRule: TurbopackRuleConfigItem = {
