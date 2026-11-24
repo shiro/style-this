@@ -9,14 +9,15 @@ use crate::library_references::{LibraryExport, LibraryReferences};
 use crate::styled_component_transformer::{CSS_TAG_LOCAL_NAME, ClassDisplayNames};
 use crate::utils::{
     self, binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
-    replace_in_class_using_identifiers, replace_in_expression_using_identifiers,
+    replace_in_class_using_identifiers, replace_in_declaration_using_identifiers,
+    replace_in_declaration_using_spans, replace_in_expression_using_identifiers,
     replace_in_expression_using_spans, replace_in_function_using_identifiers,
-    replace_in_function_using_spans,
+    replace_in_function_using_spans, declared_values, program_declared_values,
 };
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
-    BindingPatternKind, ChainElement, Declaration, ExportDefaultDeclaration,
+    BindingPatternKind, ChainElement, ExportDefaultDeclaration,
     ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, LogicalOperator, Program,
     ForStatementInit, ForStatementLeft, Statement, TaggedTemplateExpression, VariableDeclaration,
     VariableDeclarationKind, VariableDeclarator,
@@ -35,6 +36,8 @@ pub struct VisitorTransformer<'a, 'alloc> {
     value_cache: &'a HashSet<String>,
     /// top level values whose export is cached, local name -> exported name
     cached_locals: HashMap<String, String>,
+    /// top level names declared more than once, e.g. a function merged with a namespace
+    redeclared_locals: HashSet<String>,
 
     library_references: &'a LibraryReferences,
     class_display_names: ClassDisplayNames,
@@ -106,6 +109,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             program_code,
             value_cache,
             cached_locals: Default::default(),
+            redeclared_locals: Default::default(),
 
             library_references,
             class_display_names,
@@ -199,6 +203,22 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         self.include_or_defer_declaration(
             VirtualProgramInsert::ClassDeclaration(it.clone_in(self.allocator)),
+            right_references,
+            pos,
+        );
+    }
+
+    /// Namespaces and enums, see `VirtualProgramInsert::TSDeclaration`.
+    fn visit_ts_declaration(&mut self, it: &mut Statement<'alloc>) {
+        let pos = self.tmp_program_statement_buffer.last().unwrap().len();
+        // before the walk rewrites the CSS inside
+        let right_references = utils::statement_get_references(it);
+
+        oxc_ast_visit::walk_mut::walk_statement(self, it);
+
+        let declaration = it.as_declaration().unwrap().clone_in(self.allocator);
+        self.include_or_defer_declaration(
+            VirtualProgramInsert::TSDeclaration(declaration),
             right_references,
             pos,
         );
@@ -459,6 +479,29 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
                 VirtualProgramInsert::ClassDeclaration(class)
             }
+            VirtualProgramInsert::TSDeclaration(mut declaration) => {
+                if self.check_dynamic_variable_access(&right_references, declaration.span().start)
+                {
+                    return;
+                }
+
+                for ident in right_references {
+                    self.reference_variable(ident);
+                }
+
+                replace_in_declaration_using_spans(
+                    self.ast_builder,
+                    &mut declaration,
+                    &self.replacement_points,
+                );
+                replace_in_declaration_using_identifiers(
+                    self.ast_builder,
+                    &mut declaration,
+                    &|name| self.get_alias(name).map(|v| v.to_string()),
+                );
+
+                VirtualProgramInsert::TSDeclaration(declaration)
+            }
             VirtualProgramInsert::VariableDeclarator(declarator) => {
                 let VariableDeclarator {
                     span,
@@ -711,6 +754,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .collect::<Option<Vec<_>>>()
         {
             for (variable_name, exported) in cached {
+                // each declaration of a merged one reads it from the cache
+                let kind = if self.redeclared_locals.contains(variable_name) {
+                    VariableDeclarationKind::Var
+                } else {
+                    kind
+                };
                 let variable_declaration = ast::build_variable_declaration_ident(
                     self.ast_builder,
                     span,
@@ -803,6 +852,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             VirtualProgramInsert::ClassDeclaration(class) => (
                 class.name().unwrap().to_string(),
                 Statement::ClassDeclaration(self.ast_builder.alloc(class)),
+            ),
+            VirtualProgramInsert::TSDeclaration(declaration) => (
+                utils::ts_declaration_id(&declaration).unwrap().name.to_string(),
+                Statement::from(declaration),
             ),
         };
 
@@ -1242,6 +1295,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         self.scan_pass = false;
         if self.scope_depth == 1 {
             self.cached_locals = cached_locals(it, self.value_cache);
+            self.redeclared_locals = redeclared_locals(it);
             self.reference_export_specifiers(it);
         }
         self.pending_declarations
@@ -1597,10 +1651,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
 
         if self.scan_pass {
-            let id = match it {
+            let id = match &*it {
                 Statement::FunctionDeclaration(function) => function.id.as_ref(),
                 Statement::ClassDeclaration(class) => class.id.as_ref(),
-                _ => None,
+                it => it.as_declaration().and_then(utils::ts_declaration_id),
             };
             if let Some(id) = id
                 && self.current_depth() == self.scan_depth
@@ -1619,6 +1673,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 }
                 Statement::ClassDeclaration(class) => {
                     self.visit_class_declaration(class);
+                    return;
+                }
+                it if it.as_declaration().and_then(utils::ts_declaration_id).is_some() => {
+                    self.visit_ts_declaration(it);
                     return;
                 }
                 _ => {}
@@ -1726,60 +1784,20 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
 
-        // TODO handle correctly
-        if self.scan_pass {
-            return;
-        }
-
         // specifiers are handled by `reference_export_specifiers`
-        let Some(declaration) = &mut it.declaration else {
+        let Some(declaration) = &it.declaration else {
             return;
         };
 
-        match declaration {
-            Declaration::VariableDeclaration(variable_declaration) => {
-                // TODO
-                //                 if !self.referenced_idents.contains(global_sentinel) {
-                //                     return;
-                // }
-
-                for decl in &variable_declaration.declarations {
-                    let idents = binding_pattern_kind_get_idents(&decl.id.kind);
-                    self.exported_idents.extend(
-                        idents
-                            .into_iter()
-                            .filter(|ident| self.referenced_idents.first().unwrap().contains(ident))
-                            .map(|ident| (ident.clone(), ident)),
-                    );
-                }
-            }
-            Declaration::FunctionDeclaration(function) => {
-                let name = function
-                    .id
-                    .as_ref()
-                    .expect("named exported functions always have a name")
-                    .name
-                    .as_str();
-
-                if self.referenced_idents.first().unwrap().contains(name) {
-                    self.exported_idents
-                        .insert(name.to_string(), name.to_string());
-                }
-            }
-            Declaration::ClassDeclaration(class) => {
-                let name = class
-                    .id
-                    .as_ref()
-                    .expect("named exported classes always have a name")
-                    .name
-                    .as_str();
-
-                if self.referenced_idents.first().unwrap().contains(name) {
-                    self.exported_idents
-                        .insert(name.to_string(), name.to_string());
-                }
-            }
-            _ => return,
+        // exports inside namespaces are members of the namespace, not of the program
+        if !self.scan_pass && self.scope_depth == 1 {
+            let requested = self.referenced_idents.first().unwrap();
+            self.exported_idents.extend(
+                declared_values(declaration)
+                    .into_iter()
+                    .filter(|name| requested.contains(name))
+                    .map(|name| (name.clone(), name)),
+            );
         }
 
         // visit the declaration in place as a statement, so the rewrites end up in the output
@@ -1859,51 +1877,6 @@ fn statement_dependencies(statements: &[Statement], dependents: &[Statement]) ->
     dependencies
 }
 
-/// Names of the top level values of a program that exist at runtime.
-fn program_declared_values(statements: &[Statement]) -> HashSet<String> {
-    let mut names = HashSet::new();
-
-    for stmt in statements {
-        let declaration = match stmt {
-            Statement::ImportDeclaration(import) => {
-                if import.import_kind.is_type() {
-                    continue;
-                }
-                let specifiers = import.specifiers.iter().flatten();
-                names.extend(
-                    specifiers
-                        .filter(|specifier| {
-                            !matches!(specifier, ImportDeclarationSpecifier::ImportSpecifier(spec) if spec.import_kind.is_type())
-                        })
-                        .map(|specifier| specifier.name().to_string()),
-                );
-                continue;
-            }
-            Statement::ExportNamedDeclaration(export) => export.declaration.as_ref(),
-            stmt => stmt.as_declaration(),
-        };
-
-        match declaration {
-            Some(Declaration::VariableDeclaration(declaration)) if !declaration.declare => {
-                names.extend(
-                    declaration.declarations.iter().flat_map(|declarator| {
-                        binding_pattern_kind_get_idents(&declarator.id.kind)
-                    }),
-                );
-            }
-            Some(Declaration::FunctionDeclaration(function)) if !function.declare => {
-                names.extend(function.id.as_ref().map(|id| id.name.to_string()));
-            }
-            Some(Declaration::ClassDeclaration(class)) if !class.declare => {
-                names.extend(class.id.as_ref().map(|id| id.name.to_string()));
-            }
-            _ => {}
-        }
-    }
-
-    names
-}
-
 /// Top level values whose export is cached, local name -> exported name. The value cache and the
 /// store are keyed by exported name, e.g. `const a = 1; export { a as b };` caches `b`.
 fn cached_locals(statements: &[Statement], value_cache: &HashSet<String>) -> HashMap<String, String> {
@@ -1937,6 +1910,15 @@ fn cached_locals(statements: &[Statement], value_cache: &HashSet<String>) -> Has
     }
 
     locals
+}
+
+fn redeclared_locals(statements: &[Statement]) -> HashSet<String> {
+    let mut declared = HashSet::new();
+    statements
+        .iter()
+        .flat_map(|stmt| program_declared_values(std::slice::from_ref(stmt)))
+        .filter(|name| !declared.insert(name.clone()))
+        .collect()
 }
 
 /// Names the program exports itself, i.e. not through `export * from`.

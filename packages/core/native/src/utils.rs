@@ -328,6 +328,7 @@ impl ExpressionCollectorVisitor {
     }
 }
 
+use oxc_ast::ast::{Declaration, TSModuleDeclarationName};
 use oxc_ast_visit::walk;
 use oxc_syntax::scope::{ScopeFlags, ScopeId};
 
@@ -364,6 +365,20 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
             walk::walk_class(this, it)
         });
     }
+    fn visit_ts_module_declaration(&mut self, it: &oxc_ast::ast::TSModuleDeclaration<'a>) {
+        let id = match &it.id {
+            TSModuleDeclarationName::Identifier(id) => Some(id),
+            TSModuleDeclarationName::StringLiteral(_) => None,
+        };
+        self.visit_named(id, true, |this| walk::walk_ts_module_declaration(this, it));
+    }
+    fn visit_ts_enum_declaration(&mut self, it: &oxc_ast::ast::TSEnumDeclaration<'a>) {
+        self.visit_named(Some(&it.id), true, |this| walk::walk_ts_enum_declaration(this, it));
+    }
+    fn visit_ts_enum_body(&mut self, it: &oxc_ast::ast::TSEnumBody<'a>) {
+        self.declare(enum_member_names(it), false);
+        walk::walk_ts_enum_body(self, it);
+    }
     fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
         self.declare(binding_pattern_kind_get_idents(&it.pattern.kind), false);
         walk::walk_formal_parameter(self, it);
@@ -379,6 +394,83 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
             None => self.references.push(name),
         }
     }
+}
+
+/// The name of a namespace or enum declaration that exists at runtime, i.e. isn't `declare`d.
+pub fn ts_declaration_id<'b, 'a>(
+    declaration: &'b Declaration<'a>,
+) -> Option<&'b oxc_ast::ast::BindingIdentifier<'a>> {
+    match declaration {
+        Declaration::TSEnumDeclaration(declaration) if !declaration.declare => Some(&declaration.id),
+        Declaration::TSModuleDeclaration(declaration)
+            if !declaration.declare && !declaration.kind.is_global() =>
+        {
+            match &declaration.id {
+                TSModuleDeclarationName::Identifier(id) => Some(id),
+                TSModuleDeclarationName::StringLiteral(_) => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Names of the top level values of a program that exist at runtime.
+pub fn program_declared_values(statements: &[Statement]) -> HashSet<String> {
+    let mut names = HashSet::new();
+
+    for stmt in statements {
+        let declaration = match stmt {
+            Statement::ImportDeclaration(import) => {
+                if import.import_kind.is_type() {
+                    continue;
+                }
+                let specifiers = import.specifiers.iter().flatten();
+                names.extend(
+                    specifiers
+                        .filter(|specifier| {
+                            !matches!(specifier, oxc_ast::ast::ImportDeclarationSpecifier::ImportSpecifier(spec) if spec.import_kind.is_type())
+                        })
+                        .map(|specifier| specifier.name().to_string()),
+                );
+                continue;
+            }
+            Statement::ExportNamedDeclaration(export) => export.declaration.as_ref(),
+            stmt => stmt.as_declaration(),
+        };
+
+        names.extend(declaration.into_iter().flat_map(declared_values));
+    }
+
+    names
+}
+
+/// Names of the values a declaration declares, e.g. not `declare`d ones.
+pub fn declared_values(declaration: &Declaration) -> Vec<String> {
+    match declaration {
+        Declaration::VariableDeclaration(declaration) if !declaration.declare => declaration
+            .declarations
+            .iter()
+            .flat_map(|declarator| binding_pattern_kind_get_idents(&declarator.id.kind))
+            .collect(),
+        Declaration::FunctionDeclaration(function) if !function.declare => {
+            function.id.iter().map(|id| id.name.to_string()).collect()
+        }
+        Declaration::ClassDeclaration(class) if !class.declare => {
+            class.id.iter().map(|id| id.name.to_string()).collect()
+        }
+        declaration => ts_declaration_id(declaration)
+            .map(|id| id.name.to_string())
+            .into_iter()
+            .collect(),
+    }
+}
+
+/// Enum members can reference each other by name, e.g. `enum E { A = 1, B = A }`.
+fn enum_member_names(body: &oxc_ast::ast::TSEnumBody) -> HashSet<String> {
+    body.members
+        .iter()
+        .map(|member| member.id.static_name().to_string())
+        .collect()
 }
 
 pub fn statement_get_references<'a>(statement: &Statement<'a>) -> Vec<String> {
@@ -630,6 +722,22 @@ pub fn replace_in_class_body_using_spans<'alloc>(
     .visit_class_body(class_body);
 }
 
+pub fn replace_in_declaration_using_spans<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    declaration: &mut Declaration<'alloc>,
+    replacement_points: &HashMap<Span, Expression<'alloc>>,
+) {
+    if replacement_points.is_empty() {
+        return;
+    }
+
+    SpanReplacer {
+        ast_builder,
+        replacement_points,
+    }
+    .visit_declaration(declaration);
+}
+
 impl<'a, 'alloc> VisitMut<'alloc> for SpanReplacer<'a, 'alloc> {
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
         if let Some(replacement) = self.replacement_points.get(&it.span()) {
@@ -647,6 +755,9 @@ where
 {
     ast_builder: &'a AstBuilder<'alloc>,
     get_replacement: &'a F,
+    /// names declared by the namespaces and enums being visited, their members are observable by
+    /// name, e.g. `export const gap` inside a namespace is `N.gap`
+    shadowed: Vec<HashSet<String>>,
 }
 
 pub fn replace_in_expression_using_identifiers<'alloc, F>(
@@ -659,6 +770,7 @@ pub fn replace_in_expression_using_identifiers<'alloc, F>(
     IdentifierReplacer {
         ast_builder,
         get_replacement,
+        shadowed: vec![],
     }
     .visit_expression(expression);
 }
@@ -673,6 +785,7 @@ pub fn replace_in_function_using_identifiers<'alloc, F>(
     IdentifierReplacer {
         ast_builder,
         get_replacement,
+        shadowed: vec![],
     }
     .visit_function(function, ScopeFlags::Function);
 }
@@ -687,8 +800,24 @@ pub fn replace_in_class_using_identifiers<'alloc, F>(
     IdentifierReplacer {
         ast_builder,
         get_replacement,
+        shadowed: vec![],
     }
     .visit_class(class);
+}
+
+pub fn replace_in_declaration_using_identifiers<'alloc, F>(
+    ast_builder: &AstBuilder<'alloc>,
+    declaration: &mut Declaration<'alloc>,
+    get_replacement: &F,
+) where
+    F: Fn(&str) -> Option<String>,
+{
+    IdentifierReplacer {
+        ast_builder,
+        get_replacement,
+        shadowed: vec![],
+    }
+    .visit_declaration(declaration);
 }
 
 impl<'a, 'alloc, F> VisitMut<'alloc> for IdentifierReplacer<'a, 'alloc, F>
@@ -696,14 +825,38 @@ where
     F: Fn(&str) -> Option<String>,
 {
     fn visit_identifier_reference(&mut self, it: &mut oxc_ast::ast::IdentifierReference<'alloc>) {
-        if let Some(replacement) = (self.get_replacement)(&it.name) {
+        if let Some(replacement) = self.replacement(&it.name) {
             it.name = self.ast_builder.atom(&replacement);
         }
     }
 
     fn visit_binding_identifier(&mut self, it: &mut oxc_ast::ast::BindingIdentifier<'alloc>) {
-        if let Some(replacement) = (self.get_replacement)(&it.name) {
+        if let Some(replacement) = self.replacement(&it.name) {
             it.name = self.ast_builder.atom(&replacement);
         }
+    }
+
+    fn visit_ts_module_block(&mut self, it: &mut oxc_ast::ast::TSModuleBlock<'alloc>) {
+        self.shadowed.push(program_declared_values(&it.body));
+        oxc_ast_visit::walk_mut::walk_ts_module_block(self, it);
+        self.shadowed.pop();
+    }
+
+    fn visit_ts_enum_body(&mut self, it: &mut oxc_ast::ast::TSEnumBody<'alloc>) {
+        self.shadowed.push(enum_member_names(it));
+        oxc_ast_visit::walk_mut::walk_ts_enum_body(self, it);
+        self.shadowed.pop();
+    }
+}
+
+impl<'a, 'alloc, F> IdentifierReplacer<'a, 'alloc, F>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    fn replacement(&self, name: &str) -> Option<String> {
+        if self.shadowed.iter().any(|names| names.contains(name)) {
+            return None;
+        }
+        (self.get_replacement)(name)
     }
 }

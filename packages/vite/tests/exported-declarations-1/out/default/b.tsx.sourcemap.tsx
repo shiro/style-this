@@ -5,10 +5,10 @@
 //     "/packages/vite/tests/exported-declarations-1/b.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { css } from \"@style-this/core\";\n\nexport function getLink() {\n  return css`\n    text-decoration: ${underline(false)};\n    border-bottom: ${border};\n    ${focus().css}\n  `;\n}\n\n// declared below their uses\nfunction underline(enabled: boolean) {\n  return enabled ? \"underline\" : decoration;\n}\n\n// its CSS moves up with it\nfunction focus() {\n  return css`outline: none;`;\n}\n\nconst accent = \"blue\",\n  outline = accent;\n\nexport class Theme {\n  static accent = css`\n    color: ${accent};\n    outline-color: ${outline};\n    text-decoration: ${underline(true)};\n  `;\n}\n\nconst decoration = \"none\";\n// `accent` and `borderStyle` move up with it\nconst border = `1px ${borderStyle} ${accent}`;\nconst borderStyle = \"solid\";\n// destructured into a temporary when the importer evaluates it, which doesn't change the class\n// names above\nexport const { weight } = { weight: \"bold\" };\n\n// references itself under its local name\nexport default class Palette {\n  static primary = \"teal\";\n  static accent = css`\n    color: ${Palette.primary};\n  `;\n}\n"
+//     "import { css } from \"@style-this/core\";\n\nexport function getLink() {\n  return css`\n    text-decoration: ${underline(false)};\n    border-bottom: ${border};\n    ${focus().css}\n  `;\n}\n\n// declared below their uses\nfunction underline(enabled: boolean) {\n  return enabled ? \"underline\" : decoration;\n}\n\n// its CSS moves up with it\nfunction focus() {\n  return css`outline: none;`;\n}\n\nconst accent = \"blue\",\n  outline = accent;\n\nexport class Theme {\n  static accent = css`\n    color: ${accent};\n    outline-color: ${outline};\n    text-decoration: ${underline(true)};\n  `;\n}\n\nconst decoration = \"none\";\n// `accent` and `borderStyle` move up with it\nconst border = `1px ${borderStyle} ${accent}`;\nconst borderStyle = \"solid\";\n// destructured into a temporary when the importer evaluates it, which doesn't change the class\n// names above\nexport const { weight } = { weight: \"bold\" };\n\n// compiled to JS with the rest\nexport namespace Sizes {\n  export const gap = \"2px\";\n  // members keep their name, even if the outer one is renamed\n  export namespace Inner {\n    export const gap = \"3px\";\n  }\n  export const card = css`\n    gap: ${gap};\n    padding: ${Inner.gap};\n  `;\n}\n\nexport enum Weight {\n  Bold = \"bold\",\n}\n\n// merged, each declaration reads it from the value cache\nexport function Badge() {\n  return \"badge\";\n}\nexport namespace Badge {\n  export const color = \"olive\";\n}\n\nconst grid = css`\n  gap: ${Sizes.gap};\n  font-weight: ${Weight.Bold};\n  color: ${Badge.color};\n`;\n\n// references itself under its local name\nexport default class Palette {\n  static primary = \"teal\";\n  static accent = css`\n    color: ${Palette.primary};\n  `;\n}\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAGS;;;;;;AAcA;;;AAOS;;;;;;AAkBA"
+//   "mappings": "AAGS;;;;;;AAcA;;;AAOS;;;;;;AAsBI;;;;;AAkBT;;;;;AASK"
 // }
 
 import { css } from "@style-this/core";
@@ -49,6 +49,37 @@ const borderStyle = "solid";
 // destructured into a temporary when the importer evaluates it, which doesn't change the class
 // names above
 export const { weight } = { weight: "bold" };
+
+// compiled to JS with the rest
+export namespace Sizes {
+  export const gap = "2px";
+  // members keep their name, even if the outer one is renamed
+  export namespace Inner {
+    export const gap = "3px";
+  }
+  export const card = css`
+    gap: ${gap};
+    padding: ${Inner.gap};
+  `;
+}
+
+export enum Weight {
+  Bold = "bold",
+}
+
+// merged, each declaration reads it from the value cache
+export function Badge() {
+  return "badge";
+}
+export namespace Badge {
+  export const color = "olive";
+}
+
+const grid = css`
+  gap: ${Sizes.gap};
+  font-weight: ${Weight.Bold};
+  color: ${Badge.color};
+`;
 
 // references itself under its local name
 export default class Palette {

@@ -9,6 +9,7 @@ use super::evaluator::{program_imports, slice_program};
 use super::transformer::Transformer;
 use crate::utils::{
     binding_pattern_kind_get_idents, statement_get_references, transformed_source_type,
+    ts_declaration_id,
 };
 use js_sys::Array;
 use oxc_allocator::{Allocator, CloneIn};
@@ -237,7 +238,10 @@ fn statement_declared_names(stmt: &Statement) -> Option<HashSet<String>> {
             };
             Some(HashSet::from([object.name.to_string()]))
         }
-        _ => None,
+        stmt => stmt
+            .as_declaration()
+            .and_then(ts_declaration_id)
+            .map(|id| HashSet::from([id.name.to_string()])),
     }
 }
 

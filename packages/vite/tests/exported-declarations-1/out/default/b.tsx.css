@@ -1,17 +1,27 @@
-.__styleThis_4-fkp63g {
+.__styleThis_4-in0x67 {
 text-decoration: none;
     border-bottom: 1px solid blue;
     outline: none;
   
 }
-.__styleThis_3-7styr4 {
+.__styleThis_3-lq7gp6 {
 outline: none;
 }
-.__styleThis_2-9erkd2 {
+.__styleThis_2-fkp63g {
 color: blue;
     outline-color: blue;
     text-decoration: underline;
   
+}
+.card-7styr4 {
+gap: 2px;
+    padding: 3px;
+  
+}
+.grid-9erkd2 {
+gap: 2px;
+  font-weight: bold;
+  color: olive;
 }
 .__styleThis_1-hi3g5a {
 color: teal;

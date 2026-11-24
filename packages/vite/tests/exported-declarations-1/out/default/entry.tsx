@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { css } from "@style-this/core";
-import Palette, { getLink, Theme, weight } from "./b";
+import Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from "./b";
 import rounded from "./c";
 import "virtual:style-this:/entry.tsx.css";
 const color = "red";

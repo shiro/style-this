@@ -1,5 +1,5 @@
 import { css } from "@style-this/core";
-import Palette, { getLink, Theme, weight } from "./b";
+import Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from "./b";
 import rounded from "./c";
 
 const color = "red";
@@ -11,8 +11,10 @@ const nav = css`
 `;
 
 const page = css`
-  .${Page()} > .${Palette.accent}, .${rounded()} {
-    gap: 4px;
+  .${Page()} > .${Palette.accent}, .${rounded()}, .${Sizes.card} {
+    gap: ${Sizes.gap};
+    font-weight: ${Weight.Bold};
+    color: ${Badge.color};
   }
 `;
 

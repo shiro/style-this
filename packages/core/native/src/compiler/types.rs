@@ -1,12 +1,14 @@
-use crate::utils::binding_pattern_kind_get_idents;
-use oxc_ast::ast::{Class, Function, VariableDeclarator};
-use oxc_span::Span;
+use crate::utils::{binding_pattern_kind_get_idents, ts_declaration_id};
+use oxc_ast::ast::{Class, Declaration, Function, VariableDeclarator};
+use oxc_span::{GetSpan, Span};
 use std::collections::{BTreeSet, HashSet};
 
 pub(crate) enum VirtualProgramInsert<'alloc> {
     VariableDeclarator(VariableDeclarator<'alloc>),
     FunctionDeclaration(Function<'alloc>),
     ClassDeclaration(Class<'alloc>),
+    /// namespaces and enums, compiled to JS with the rest of the virtual program
+    TSDeclaration(Declaration<'alloc>),
 }
 
 impl<'alloc> VirtualProgramInsert<'alloc> {
@@ -30,6 +32,8 @@ impl<'alloc> VirtualProgramInsert<'alloc> {
                 ret.insert(id.name.as_str().to_string());
                 ret
             }),
+            VirtualProgramInsert::TSDeclaration(declaration) => ts_declaration_id(declaration)
+                .map(|id| HashSet::from([id.name.to_string()])),
         }
     }
 
@@ -38,6 +42,7 @@ impl<'alloc> VirtualProgramInsert<'alloc> {
             VirtualProgramInsert::VariableDeclarator(declarator) => declarator.span,
             VirtualProgramInsert::FunctionDeclaration(function) => function.span,
             VirtualProgramInsert::ClassDeclaration(class) => class.span,
+            VirtualProgramInsert::TSDeclaration(declaration) => declaration.span(),
         }
     }
 }
