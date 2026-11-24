@@ -274,50 +274,93 @@ impl SeededRandom {
     }
 }
 
+/// Collects the references to names not declared inside the visited node. The names the node
+/// itself declares (e.g. a visited function declaration's name) count as references.
 #[derive(Default)]
 struct ExpressionCollectorVisitor {
     pub references: Vec<String>,
-    pub scopes_references: Vec<HashSet<String>>,
+    scopes: Vec<CollectorScope>,
 }
 
-use oxc_ast_visit::walk::walk_formal_parameter;
-use oxc_ast_visit::walk::walk_identifier_reference;
-use oxc_ast_visit::walk::walk_variable_declarator;
+#[derive(Default)]
+struct CollectorScope {
+    is_var: bool,
+    declared: HashSet<String>,
+    /// resolved when leaving the scope, declarations below a reference still apply to it
+    references: Vec<String>,
+}
+
+impl ExpressionCollectorVisitor {
+    /// `var`s belong to the function, the outermost scope if the node is inside one.
+    fn declare(&mut self, names: impl IntoIterator<Item = String>, var: bool) {
+        let Some(last) = self.scopes.len().checked_sub(1) else {
+            return;
+        };
+        let idx = if var {
+            self.scopes.iter().rposition(|scope| scope.is_var).unwrap_or(0)
+        } else {
+            last
+        };
+        self.scopes[idx].declared.extend(names);
+    }
+}
+
+use oxc_ast_visit::walk;
 use oxc_syntax::scope::{ScopeFlags, ScopeId};
 
 impl<'a> Visit<'a> for ExpressionCollectorVisitor {
-    fn enter_scope(&mut self, _flags: ScopeFlags, _scope_id: &std::cell::Cell<Option<ScopeId>>) {
-        self.scopes_references.push(HashSet::new());
+    fn enter_scope(&mut self, flags: ScopeFlags, _scope_id: &std::cell::Cell<Option<ScopeId>>) {
+        self.scopes.push(CollectorScope {
+            is_var: flags.is_var(),
+            ..Default::default()
+        });
     }
     fn leave_scope(&mut self) {
-        self.scopes_references.pop();
+        let scope = self.scopes.pop().unwrap();
+        let references = scope
+            .references
+            .into_iter()
+            .filter(|name| !scope.declared.contains(name));
+        match self.scopes.last_mut() {
+            Some(parent) => parent.references.extend(references),
+            None => self.references.extend(references),
+        }
     }
 
     fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
-        if let Some(scope) = self.scopes_references.last_mut() {
-            scope.extend(binding_pattern_kind_get_idents(&it.id.kind));
+        self.declare(binding_pattern_kind_get_idents(&it.id.kind), it.kind.is_var());
+        walk::walk_variable_declarator(self, it);
+    }
+    fn visit_function(&mut self, it: &oxc_ast::ast::Function<'a>, flags: ScopeFlags) {
+        if it.is_declaration()
+            && let Some(id) = &it.id
+        {
+            self.declare([id.name.to_string()], false);
         }
-
-        walk_variable_declarator(self, it);
+        walk::walk_function(self, it, flags);
+    }
+    fn visit_class(&mut self, it: &oxc_ast::ast::Class<'a>) {
+        if it.is_declaration()
+            && let Some(id) = &it.id
+        {
+            self.declare([id.name.to_string()], false);
+        }
+        walk::walk_class(self, it);
     }
     fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
-        let Some(scope) = self.scopes_references.last_mut() else {
-            return;
-        };
-        scope.extend(binding_pattern_kind_get_idents(&it.pattern.kind));
-
-        walk_formal_parameter(self, it);
+        self.declare(binding_pattern_kind_get_idents(&it.pattern.kind), false);
+        walk::walk_formal_parameter(self, it);
+    }
+    fn visit_catch_parameter(&mut self, it: &oxc_ast::ast::CatchParameter<'a>) {
+        self.declare(binding_pattern_kind_get_idents(&it.pattern.kind), false);
+        walk::walk_catch_parameter(self, it);
     }
     fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
-        let variable_name = &it.name;
-        for scope in self.scopes_references.iter() {
-            if scope.contains(variable_name.as_str()) {
-                return;
-            }
+        let name = it.name.to_string();
+        match self.scopes.last_mut() {
+            Some(scope) => scope.references.push(name),
+            None => self.references.push(name),
         }
-        self.references.push(variable_name.to_string());
-
-        walk_identifier_reference(self, it);
     }
 }
 

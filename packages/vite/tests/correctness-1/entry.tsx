@@ -1,6 +1,55 @@
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
 
+// `var`s belong to the function, also the ones in nested blocks
+function spaced() {
+  if (true) {
+    var gap = 2;
+  }
+  return css`padding: ${gap}px;`;
+}
+
+function margined() {
+  const margin = () => css`margin: ${gap}px;`;
+  if (true) {
+    var gap = 4;
+  }
+  return margin();
+}
+
+// the CSS in the closure is evaluated where it's called, below `gap`
+function gapped() {
+  const margin = () => css`margin: ${gap}px;`;
+  const gap = 3;
+  return css`${margin().css} gap: ${gap}px;`;
+}
+
+const spacedOut = css`
+  ${spaced().css}
+  ${margined().css}
+  ${gapped().css}
+`;
+
+// the locals shadow the parameters, also when declared below their use or inside an expression
+function Spacer(size, Unit, error) {
+  function styles() {
+    const double = () => size * 2;
+    const size = 4;
+    const unit = (() => {
+      class Unit {
+        static px = "px";
+      }
+      try {
+        throw Unit.px;
+      } catch (error) {
+        return error;
+      }
+    })();
+    return css`margin: ${double()}${unit};`;
+  }
+  return styles();
+}
+
 // locals shadowing the top level names used below
 const Button = ({ variant }) => {
   const color = variant === "primary" ? "blue" : "gray";

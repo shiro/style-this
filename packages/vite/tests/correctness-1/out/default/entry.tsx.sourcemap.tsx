@@ -5,14 +5,63 @@
 //     "/packages/vite/tests/correctness-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { css, style } from \"@style-this/core\";\nimport mib, * as a from \"./a\";\n\n// locals shadowing the top level names used below\nconst Button = ({ variant }) => {\n  const color = variant === \"primary\" ? \"blue\" : \"gray\";\n  function mutate() {\n    return variant;\n  }\n  function gap() {\n    return 4;\n  }\n  return [mutate() ?? color, css`gap: ${gap()}px;`];\n};\n\nconst mutate = (v) => v;\n\nconst a1 = () => {\n  const a2 = () => {\n    const a3 = () => {\n      return css`background: black;`;\n    };\n    return a3();\n  };\n  const wi = a2();\n  const m = css`\n    ${wi}\n  `;\n  return wi;\n};\n\nconst b = css`\n  ${a1()}\n`;\n\nconst comp = () => {\n  (\"foob\");\n\n  const b = () => {\n    const c = () => css`\n      background: blue;\n    `;\n\n    const s1 = css`\n      ${c().css}\n    `;\n  };\n\n  mutate(b);\n\n  return css`\n    @media (max-width: 500px) {\n      background: blue;\n    }\n  `;\n};\n\nconst { color } = { color: \"blue\" };\n\nconst st = style`\n  color: ${color};\n  ${mib.foo().css}\n`;\n\nconst s2 = css`\n  ${st}\n  ${comp().css}\n`;\n\n// read themselves, the locals hoisted out of them go below them\nclass Size {\n  static base = 2;\n  static gap() {\n    const gap = Size.base * 2;\n    return css`gap: ${gap}px;`;\n  }\n}\n\nconst spacing = {\n  base: 3,\n  margin() {\n    const margin = spacing.base * 2;\n    return css`margin: ${margin}px;`;\n  },\n};\n\nconst sized = css`\n  ${Size.gap().css}\n  ${spacing.margin().css}\n`;\n\nfunction accent() {\n  return css`color: blue;`;\n}\n\n// the nested `accent` is included on its own and as part of `theme`, both need its CSS, the\n// hoisted one is renamed so it doesn't clash with the top level `accent` and uses `enabled`\nfunction theme() {\n  const enabled = true;\n  function accent() {\n    return enabled ? css`color: red;` : undefined;\n  }\n  const link = css`${accent().css}`;\n  return accent();\n}\n\nconst themed = css`\n  ${theme().css}\n  ${accent().css}\n`;\n\n// parameter defaults are transformed like the rest of the function\nfunction card({ padding = css`padding: 2px;` } = {}) {\n  return padding;\n}\n\nconst carded = css`\n  ${card().css}\n`;\n\nconst unrelated = css`\n  background: none;\n  ${a.foo.css}\n`;\n"
+//     "import { css, style } from \"@style-this/core\";\nimport mib, * as a from \"./a\";\n\n// `var`s belong to the function, also the ones in nested blocks\nfunction spaced() {\n  if (true) {\n    var gap = 2;\n  }\n  return css`padding: ${gap}px;`;\n}\n\nfunction margined() {\n  const margin = () => css`margin: ${gap}px;`;\n  if (true) {\n    var gap = 4;\n  }\n  return margin();\n}\n\n// the CSS in the closure is evaluated where it's called, below `gap`\nfunction gapped() {\n  const margin = () => css`margin: ${gap}px;`;\n  const gap = 3;\n  return css`${margin().css} gap: ${gap}px;`;\n}\n\nconst spacedOut = css`\n  ${spaced().css}\n  ${margined().css}\n  ${gapped().css}\n`;\n\n// the locals shadow the parameters, also when declared below their use or inside an expression\nfunction Spacer(size, Unit, error) {\n  function styles() {\n    const double = () => size * 2;\n    const size = 4;\n    const unit = (() => {\n      class Unit {\n        static px = \"px\";\n      }\n      try {\n        throw Unit.px;\n      } catch (error) {\n        return error;\n      }\n    })();\n    return css`margin: ${double()}${unit};`;\n  }\n  return styles();\n}\n\n// locals shadowing the top level names used below\nconst Button = ({ variant }) => {\n  const color = variant === \"primary\" ? \"blue\" : \"gray\";\n  function mutate() {\n    return variant;\n  }\n  function gap() {\n    return 4;\n  }\n  return [mutate() ?? color, css`gap: ${gap()}px;`];\n};\n\nconst mutate = (v) => v;\n\nconst a1 = () => {\n  const a2 = () => {\n    const a3 = () => {\n      return css`background: black;`;\n    };\n    return a3();\n  };\n  const wi = a2();\n  const m = css`\n    ${wi}\n  `;\n  return wi;\n};\n\nconst b = css`\n  ${a1()}\n`;\n\nconst comp = () => {\n  (\"foob\");\n\n  const b = () => {\n    const c = () => css`\n      background: blue;\n    `;\n\n    const s1 = css`\n      ${c().css}\n    `;\n  };\n\n  mutate(b);\n\n  return css`\n    @media (max-width: 500px) {\n      background: blue;\n    }\n  `;\n};\n\nconst { color } = { color: \"blue\" };\n\nconst st = style`\n  color: ${color};\n  ${mib.foo().css}\n`;\n\nconst s2 = css`\n  ${st}\n  ${comp().css}\n`;\n\n// read themselves, the locals hoisted out of them go below them\nclass Size {\n  static base = 2;\n  static gap() {\n    const gap = Size.base * 2;\n    return css`gap: ${gap}px;`;\n  }\n}\n\nconst spacing = {\n  base: 3,\n  margin() {\n    const margin = spacing.base * 2;\n    return css`margin: ${margin}px;`;\n  },\n};\n\nconst sized = css`\n  ${Size.gap().css}\n  ${spacing.margin().css}\n`;\n\nfunction accent() {\n  return css`color: blue;`;\n}\n\n// the nested `accent` is included on its own and as part of `theme`, both need its CSS, the\n// hoisted one is renamed so it doesn't clash with the top level `accent` and uses `enabled`\nfunction theme() {\n  const enabled = true;\n  function accent() {\n    return enabled ? css`color: red;` : undefined;\n  }\n  const link = css`${accent().css}`;\n  return accent();\n}\n\nconst themed = css`\n  ${theme().css}\n  ${accent().css}\n`;\n\n// parameter defaults are transformed like the rest of the function\nfunction card({ padding = css`padding: 2px;` } = {}) {\n  return padding;\n}\n\nconst carded = css`\n  ${card().css}\n`;\n\nconst unrelated = css`\n  background: none;\n  ${a.foo.css}\n`;\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAY6B;;;AAQhB;;;AAKD;;;;AAMF;;;AAQU;;;;AAIL;;;;;AAON;;;;;;AAcE;;;;;;;;;AAUA;;;AAQA;;;AAIG;;;;AAML;;;AAQY;;;AAEN;;;AAIA;;;;AAMW;;;AAIX;;;AAIG"
+//   "mappings": "AAQS;;;AAIc;;;AASA;;;AAEd;;;AAGS;;;;;AAqBP;;;AAckB;;;AAQhB;;;AAKD;;;;AAMF;;;AAQU;;;;AAIL;;;;;AAON;;;;;;AAcE;;;;;;;;;AAUA;;;AAQA;;;AAIG;;;;AAML;;;AAQY;;;AAEN;;;AAIA;;;;AAMW;;;AAIX;;;AAIG"
 // }
 
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
+
+// `var`s belong to the function, also the ones in nested blocks
+function spaced() {
+  if (true) {
+    var gap = 2;
+  }
+  return css`padding: ${gap}px;`;
+}
+
+function margined() {
+  const margin = () => css`margin: ${gap}px;`;
+  if (true) {
+    var gap = 4;
+  }
+  return margin();
+}
+
+// the CSS in the closure is evaluated where it's called, below `gap`
+function gapped() {
+  const margin = () => css`margin: ${gap}px;`;
+  const gap = 3;
+  return css`${margin().css} gap: ${gap}px;`;
+}
+
+const spacedOut = css`
+  ${spaced().css}
+  ${margined().css}
+  ${gapped().css}
+`;
+
+// the locals shadow the parameters, also when declared below their use or inside an expression
+function Spacer(size, Unit, error) {
+  function styles() {
+    const double = () => size * 2;
+    const size = 4;
+    const unit = (() => {
+      class Unit {
+        static px = "px";
+      }
+      try {
+        throw Unit.px;
+      } catch (error) {
+        return error;
+      }
+    })();
+    return css`margin: ${double()}${unit};`;
+  }
+  return styles();
+}
 
 // locals shadowing the top level names used below
 const Button = ({ variant }) => {

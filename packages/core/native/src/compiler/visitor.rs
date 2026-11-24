@@ -17,7 +17,8 @@ use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
     BindingPatternKind, ChainElement, Declaration, ExportDefaultDeclaration,
     ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, LogicalOperator, Program,
-    Statement, TaggedTemplateExpression, VariableDeclarationKind, VariableDeclarator,
+    ForStatementInit, ForStatementLeft, Statement, TaggedTemplateExpression, VariableDeclaration,
+    VariableDeclarationKind, VariableDeclarator,
 };
 use oxc_ast_visit::VisitMut;
 use oxc_semantic::ScopeFlags;
@@ -44,8 +45,11 @@ pub struct VisitorTransformer<'a, 'alloc> {
     /// exported name -> local name
     exported_idents: HashMap<String, String>,
     scope_depth: u32,
+    scope_flags: Vec<ScopeFlags>,
 
     scan_pass: bool,
+    /// depth of the scope whose statements are being scanned
+    scan_depth: usize,
     aliases: Vec<HashMap<String, Option<String>>>,
     dynamic_variable_names: Vec<HashSet<String>>,
     namespace_imports: HashMap<String, (String, HashSet<String>)>,
@@ -60,8 +64,8 @@ pub struct VisitorTransformer<'a, 'alloc> {
     random: utils::SeededRandom,
     tmp_program: Program<'alloc>,
     tmp_program_statement_buffer: Vec<Vec<Statement<'alloc>>>,
-    /// per statement list being visited
-    pending_declarations: Vec<Vec<PendingDeclaration<'alloc>>>,
+    /// per statement list being visited, with the depth of its scope
+    pending_declarations: Vec<(usize, Vec<PendingDeclaration<'alloc>>)>,
 
     atomic: bool,
 
@@ -114,10 +118,12 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             style_variable_identifiers: Default::default(),
             exported_idents: Default::default(),
             scope_depth: 0,
+            scope_flags: Default::default(),
 
             replacement_points: Default::default(),
 
             scan_pass: false,
+            scan_depth: 0,
             aliases: Default::default(),
             dynamic_variable_names: Default::default(),
             namespace_imports: Default::default(),
@@ -225,9 +231,21 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             return;
         };
 
+        // a `var` in a nested block can be referenced anywhere in the function
+        let depth = match &declaration {
+            VirtualProgramInsert::VariableDeclarator(declarator) => {
+                self.declaration_depth(declarator.kind)
+            }
+            _ => self.current_depth(),
+        };
+
         if names.iter().any(|name| self.is_variable_referenced(name)) {
             self.include_declaration(declaration, right_references, pos);
-        } else if let Some(pending) = self.pending_declarations.last_mut() {
+        } else if let Some((_, pending)) = self
+            .pending_declarations
+            .iter_mut()
+            .rfind(|(pending_depth, _)| *pending_depth == depth)
+        {
             pending.push(PendingDeclaration {
                 declaration,
                 right_references,
@@ -251,7 +269,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     /// declared below `f`. The ones only used by exports or other pending declarations go to the
     /// bottom, the latter pull them up once included.
     fn include_pending_declarations(&mut self) {
-        let mut pending = self.pending_declarations.pop().unwrap();
+        let (_, mut pending) = self.pending_declarations.pop().unwrap();
         let mut included = vec![];
         while let Some(idx) = pending.iter().position(|declaration| {
             declaration
@@ -283,7 +301,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             let buffer = self.tmp_program_statement_buffer.last_mut().unwrap();
             let len = buffer.len();
             buffer.extend(inner);
-            self.include_declaration(declaration, right_references, len);
+            let len = self.include_declaration(declaration, right_references, len);
             if self.error.is_some() {
                 return;
             }
@@ -331,13 +349,14 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
     /// The statements hoisted out of the declaration while walking it are above `pos`, the ones
     /// using the declaration go below it instead, e.g. `class A { static f() { const y = A.x;
-    /// return css\`${y}\`; } }`.
+    /// return css\`${y}\`; } }`. The ones using statements below move those up with them, e.g.
+    /// `const m = () => css\`${gap}\`; const gap = 2;`. Returns the new `pos`.
     fn include_declaration(
         &mut self,
         declaration: VirtualProgramInsert<'alloc>,
         right_references: Vec<String>,
         pos: usize,
-    ) {
+    ) -> usize {
         let inner: Vec<_> = self
             .tmp_program_statement_buffer
             .last_mut()
@@ -363,7 +382,33 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .zip(dependent)
             .partition(|(_, dependent)| *dependent);
         buffer.splice(pos..pos, dependents.into_iter().map(|(statement, _)| statement));
-        buffer.extend(independents.into_iter().map(|(statement, _)| statement));
+        let independents: Vec<_> = independents
+            .into_iter()
+            .map(|(statement, _)| statement)
+            .collect();
+        if independents.is_empty() {
+            return pos;
+        }
+
+        // function declarations are hoisted
+        let dependencies: HashSet<_> = statement_dependencies(&buffer[..pos], &independents)
+            .into_iter()
+            .filter(|&idx| !matches!(buffer[idx], Statement::FunctionDeclaration(_)))
+            .collect();
+        if dependencies.is_empty() {
+            buffer.extend(independents);
+            return pos;
+        }
+        let (dependencies, below): (Vec<_>, Vec<_>) = buffer
+            .drain(..pos)
+            .enumerate()
+            .partition(|(idx, _)| dependencies.contains(idx));
+        let pos = below.len();
+        buffer.splice(0..0, below.into_iter().map(|(_, statement)| statement));
+        // the buffer is bottom-up
+        buffer.extend(independents);
+        buffer.extend(dependencies.into_iter().map(|(_, statement)| statement));
+        pos
     }
 
     fn insert_declaration(
@@ -521,6 +566,26 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         None
     }
 
+    fn current_depth(&self) -> usize {
+        self.aliases.len() - 1
+    }
+
+    /// Depth of the scope the `var`s of the current scope belong to, i.e. the function's.
+    fn var_scope_depth(&self) -> usize {
+        self.scope_flags
+            .iter()
+            .rposition(|flags| flags.is_var())
+            .unwrap_or(0)
+    }
+
+    fn declaration_depth(&self, kind: VariableDeclarationKind) -> usize {
+        if kind.is_var() {
+            self.var_scope_depth()
+        } else {
+            self.current_depth()
+        }
+    }
+
     /// Depth of the innermost scope declaring the name, the global scope for unknown names.
     fn declaring_depth(&self, name: &str) -> usize {
         self.aliases
@@ -555,11 +620,30 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .map(|(_, remote_referenced_idents)| remote_referenced_idents)
     }
 
+    /// Whether the innermost declaration of the name is dynamic, e.g. a parameter.
     fn get_dynamic_variable(&self, name: &str) -> bool {
         self.dynamic_variable_names
             .iter()
+            .zip(&self.aliases)
             .rev()
-            .any(|vars| vars.contains(name))
+            .find_map(|(dynamic, aliases)| {
+                if dynamic.contains(name) {
+                    Some(true)
+                } else {
+                    aliases.contains_key(name).then_some(false)
+                }
+            })
+            .unwrap_or(false)
+    }
+
+    /// Loop bindings change with each iteration, so they're dynamic.
+    fn visit_loop_declaration(&mut self, it: &mut VariableDeclaration<'alloc>) {
+        let depth = self.declaration_depth(it.kind);
+        for declarator in it.declarations.iter_mut() {
+            self.dynamic_variable_names[depth]
+                .extend(binding_pattern_kind_get_idents(&declarator.id.kind));
+            oxc_ast_visit::walk_mut::walk_variable_declarator(self, declarator);
+        }
     }
 
     /// Checks if any references are dynamic variables and sets error if found
@@ -1129,11 +1213,18 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
 
         if self.scan_pass {
+            // the `var`s in nested blocks belong to the scanned function
+            if self.var_scope_depth() == self.scan_depth {
+                for el in it.iter_mut().rev() {
+                    self.visit_statement(el);
+                }
+            }
             return;
         }
 
         let scan_pass = self.scan_pass;
         self.scan_pass = true;
+        self.scan_depth = self.current_depth();
         for el in it.iter_mut().rev() {
             self.visit_statement(el);
         }
@@ -1141,7 +1232,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if self.scope_depth == 1 {
             self.reference_export_specifiers(it);
         }
-        self.pending_declarations.push(Default::default());
+        self.pending_declarations
+            .push((self.current_depth(), Default::default()));
         for el in it.iter_mut().rev() {
             self.visit_statement(el);
         }
@@ -1151,10 +1243,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
     fn enter_scope(
         &mut self,
-        _flags: oxc_semantic::ScopeFlags,
+        flags: oxc_semantic::ScopeFlags,
         _scope_id: &std::cell::Cell<Option<oxc_semantic::ScopeId>>,
     ) {
         self.scope_depth += 1;
+        self.scope_flags.push(flags);
         self.aliases.push(Default::default());
         self.dynamic_variable_names.push(Default::default());
         self.tmp_program_statement_buffer.push(Default::default());
@@ -1164,6 +1257,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     }
 
     fn leave_scope(&mut self) {
+        self.scope_flags.pop();
         self.aliases.pop();
         self.dynamic_variable_names.pop();
 
@@ -1342,9 +1436,15 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
         if self.scan_pass {
-            let idents = binding_pattern_kind_get_idents(&it.id.kind);
+            let depth = self.declaration_depth(it.kind);
+            // nested blocks are only scanned for `var`s, the rest is scanned with the block
+            let idents = if depth == self.scan_depth {
+                binding_pattern_kind_get_idents(&it.id.kind)
+            } else {
+                Default::default()
+            };
             for ident in idents {
-                let alias = if self.scope_depth == 1 {
+                let alias = if depth == 0 {
                     None
                 } else {
                     let display_name = it
@@ -1355,7 +1455,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                     Some(format!("{PREFIX}_var_{display_name}_{}", self.unique_number()))
                 };
 
-                self.aliases.last_mut().unwrap().insert(ident, alias);
+                self.aliases[depth].insert(ident, alias);
             }
             oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
             return;
@@ -1494,7 +1594,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 Statement::ClassDeclaration(class) => class.id.as_ref(),
                 _ => None,
             };
-            if let Some(id) = id {
+            if let Some(id) = id
+                && self.current_depth() == self.scan_depth
+            {
                 let name = id.name.to_string();
                 let alias = (self.scope_depth != 1)
                     .then(|| format!("{PREFIX}_var_{name}_{}", self.unique_number()));
@@ -1691,6 +1793,32 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
         // transforms the templates in default values
         oxc_ast_visit::walk_mut::walk_formal_parameter(self, it);
+    }
+
+    fn visit_catch_parameter(&mut self, it: &mut oxc_ast::ast::CatchParameter<'alloc>) {
+        self.dynamic_variable_names
+            .last_mut()
+            .unwrap()
+            .extend(binding_pattern_kind_get_idents(&it.pattern.kind));
+        oxc_ast_visit::walk_mut::walk_catch_parameter(self, it);
+    }
+
+    fn visit_for_statement_init(&mut self, it: &mut ForStatementInit<'alloc>) {
+        match it {
+            ForStatementInit::VariableDeclaration(declaration) => {
+                self.visit_loop_declaration(declaration)
+            }
+            _ => oxc_ast_visit::walk_mut::walk_for_statement_init(self, it),
+        }
+    }
+
+    fn visit_for_statement_left(&mut self, it: &mut ForStatementLeft<'alloc>) {
+        match it {
+            ForStatementLeft::VariableDeclaration(declaration) => {
+                self.visit_loop_declaration(declaration)
+            }
+            _ => oxc_ast_visit::walk_mut::walk_for_statement_left(self, it),
+        }
     }
 }
 

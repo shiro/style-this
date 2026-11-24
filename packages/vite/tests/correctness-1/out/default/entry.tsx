@@ -2,6 +2,46 @@
 import { css, style } from "@style-this/core";
 import mib, * as a from "./a";
 import "virtual:style-this:/entry.tsx.css";
+// `var`s belong to the function, also the ones in nested blocks
+function spaced() {
+	if (true) {
+		var gap = 2;
+	}
+	return "__styleThis_14-xq3wdq";
+}
+function margined() {
+	const margin = () => "__styleThis_13-o5mnsl";
+	if (true) {
+		var gap = 4;
+	}
+	return margin();
+}
+// the CSS in the closure is evaluated where it's called, below `gap`
+function gapped() {
+	const margin = () => "__styleThis_12-qnolav";
+	const gap = 3;
+	return "__styleThis_11-o96r4h";
+}
+const spacedOut = "spacedOut-zkhm3g";
+// the locals shadow the parameters, also when declared below their use or inside an expression
+function Spacer(size, Unit, error) {
+	function styles() {
+		const double = () => size * 2;
+		const size = 4;
+		const unit = (() => {
+			class Unit {
+				static px = "px";
+			}
+			try {
+				throw Unit.px;
+			} catch (error) {
+				return error;
+			}
+		})();
+		return "__styleThis_10-a381mv";
+	}
+	return styles();
+}
 // locals shadowing the top level names used below
 const Button = ({ variant }) => {
 	const color = variant === "primary" ? "blue" : "gray";
