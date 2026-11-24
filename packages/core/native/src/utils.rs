@@ -65,10 +65,25 @@ pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> Has
     idents
 }
 
-/// Name a re-exported value (`export { x } from "./b"`, `export * from "./b"`) is bound to during
-/// evaluation, `span` is the span of the specifier or `export *` declaration.
-pub fn reexport_local_name(span: Span) -> String {
-    format!("{PREFIX}_reexport_{}", span.start)
+/// Name a re-exported value (`export { x as y } from "./b"`, `export * as y from "./b"`) is bound
+/// to during evaluation. It's derived from the exported name rather than the position so slices
+/// stay the same when other code moves, non-identifier characters are escaped as `$<hex>$`.
+pub fn reexport_local_name(exported: &str) -> String {
+    let mut local = format!("{PREFIX}_reexport_");
+    for char in exported.chars() {
+        if char.is_ascii_alphanumeric() || char == '_' {
+            local.push(char);
+        } else {
+            local.push_str(&format!("${:x}$", char as u32));
+        }
+    }
+    local
+}
+
+/// Name the namespace of an `export * from "./b"` is bound to during evaluation, `idx` is its
+/// index among the `export * from` declarations of the program.
+pub fn star_reexport_namespace_name(idx: usize) -> String {
+    format!("{PREFIX}_star_namespace_{idx}")
 }
 
 pub fn export_default_declaration_to_expression<'alloc>(
@@ -858,5 +873,24 @@ where
             return None;
         }
         (self.get_replacement)(name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reexport_local_names_are_unique_identifiers() {
+        let names = ["a_b", "a-b", "a$2d$b", "default"].map(reexport_local_name);
+        assert_eq!(
+            names,
+            [
+                format!("{PREFIX}_reexport_a_b"),
+                format!("{PREFIX}_reexport_a$2d$b"),
+                format!("{PREFIX}_reexport_a$24$2d$24$b"),
+                format!("{PREFIX}_reexport_default"),
+            ]
+        );
     }
 }

@@ -576,11 +576,13 @@ fn evaluate_dependencies<'alloc>(
 }
 
 /// Imports of `program`, re-exports (`export { x as y } from "./b"`, `export * from "./b"`) are
-/// included as imports bound to their `utils::reexport_local_name`s.
+/// included as imports bound to their `utils::reexport_local_name`s and
+/// `utils::star_reexport_namespace_name`s.
 pub(crate) fn program_imports<'a, 'alloc>(
     program: &'a Program<'alloc>,
     ast_builder: &'a AstBuilder<'alloc>,
 ) -> Vec<&'a ImportDeclaration<'alloc>> {
+    let mut star_reexport_idx = 0;
     program
         .body
         .iter()
@@ -593,7 +595,8 @@ pub(crate) fn program_imports<'a, 'alloc>(
                         let span = specifier.span;
                         let local = ast_builder.binding_identifier(
                             span,
-                            ast_builder.atom(&utils::reexport_local_name(specifier.span)),
+                            ast_builder
+                                .atom(&utils::reexport_local_name(&specifier.exported.name())),
                         );
                         if specifier.local.name() == "default" {
                             ast_builder
@@ -618,10 +621,15 @@ pub(crate) fn program_imports<'a, 'alloc>(
                 Some(&*ast_builder.allocator.alloc(import))
             }
             Statement::ExportAllDeclaration(export) => {
-                let local = ast_builder.binding_identifier(
-                    export.span,
-                    ast_builder.atom(&utils::reexport_local_name(export.span)),
-                );
+                let local = match &export.exported {
+                    Some(exported) => utils::reexport_local_name(&exported.name()),
+                    None => {
+                        let name = utils::star_reexport_namespace_name(star_reexport_idx);
+                        star_reexport_idx += 1;
+                        name
+                    }
+                };
+                let local = ast_builder.binding_identifier(export.span, ast_builder.atom(&local));
                 let import = ast_builder.import_declaration(
                     export.span,
                     Some(ast_builder.vec1(

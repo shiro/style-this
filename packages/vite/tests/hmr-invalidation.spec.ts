@@ -363,6 +363,13 @@ describe.each([false, true])("HMR invalidation (atomic: %s)", (atomic) => {
     for (const name of ["r.tsx", "s.tsx"]) await transform(name);
     expect(await cssOf("r.tsx")).toContain("color: blue");
     expect(await cssOf("s.tsx")).toContain("border-radius: 4px");
+
+    // moving re-exports doesn't change them
+    expect(await edit("barrel.ts", (code) => `// tokens\n${code}`)).toEqual(["barrel.ts"]);
+    expect(await edit("barrel.ts", (code) => code.replace("{ accent", "{ rounded as other, accent"))).toEqual(
+      ["barrel.ts"],
+    );
+    expect(await edit("star.ts", (code) => `export const other = 1;\n${code}`)).toEqual(["star.ts"]);
   });
 
   test("star re-exports invalidate importers of the changed exports", async () => {

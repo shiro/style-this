@@ -1101,13 +1101,19 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             .cloned()
             .collect();
 
+        // counts type-only ones too, like `program_imports`
+        let mut star_reexport_idx = 0;
         for stmt in statements {
-            if let Statement::ExportAllDeclaration(export) = stmt
-                && !export.export_kind.is_type()
-            {
-                let local = utils::reexport_local_name(export.span);
+            if let Statement::ExportAllDeclaration(export) = stmt {
+                if export.exported.is_none() {
+                    star_reexport_idx += 1;
+                }
+                if export.export_kind.is_type() {
+                    continue;
+                }
                 match &export.exported {
                     Some(exported) => {
+                        let local = utils::reexport_local_name(&exported.name());
                         let exported = match exported.name().as_str() {
                             "default" => DEFAULT_EXPORT.to_string(),
                             name => name.to_string(),
@@ -1127,7 +1133,10 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                             self.exported_idents.insert(exported, local);
                         }
                     }
-                    None => star_reexports.push((local, export.source.value.to_string())),
+                    None => star_reexports.push((
+                        utils::star_reexport_namespace_name(star_reexport_idx - 1),
+                        export.source.value.to_string(),
+                    )),
                 }
                 continue;
             }
@@ -1151,7 +1160,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 }
 
                 let local = if export.source.is_some() {
-                    utils::reexport_local_name(specifier.span)
+                    utils::reexport_local_name(&specifier.exported.name())
                 } else {
                     let local = specifier.local.name();
                     // e.g. types, which don't exist at runtime

@@ -1,14 +1,14 @@
-// /packages/vite/tests/reexports-2/b.ts (/packages/vite/tests/reexports-2/entry.tsx): {"__styleThis_reexport_32", "__styleThis_reexport_53", "__styleThis_reexport_74", "__styleThis_star_reexport_0", "__styleThis_star_reexport_1", "own", "palette", "primary", "secondary", "tokens"}
+// /packages/vite/tests/reexports-2/b.ts (/packages/vite/tests/reexports-2/entry.tsx): {"__styleThis_reexport_palette", "__styleThis_star_namespace_0", "__styleThis_star_namespace_1", "__styleThis_star_reexport_0", "__styleThis_star_reexport_1", "own", "palette", "primary", "secondary", "tokens"}
 "use strict";
-const __styleThis_reexport_74 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/palette.ts"];
-const __styleThis_reexport_53 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"];
-const __styleThis_reexport_32 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/c.ts"];
+const __styleThis_reexport_palette = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/palette.ts"];
+const __styleThis_star_namespace_1 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"];
+const __styleThis_star_namespace_0 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/c.ts"];
 const tokens = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"];
 let own = "white";
-const __styleThis_star_reexport_1 = __styleThis_reexport_32?.["secondary"] ?? __styleThis_reexport_53?.["secondary"];
-const __styleThis_star_reexport_0 = __styleThis_reexport_32?.["primary"] ?? __styleThis_reexport_53?.["primary"];
+const __styleThis_star_reexport_1 = __styleThis_star_namespace_0?.["secondary"] ?? __styleThis_star_namespace_1?.["secondary"];
+const __styleThis_star_reexport_0 = __styleThis_star_namespace_0?.["primary"] ?? __styleThis_star_namespace_1?.["primary"];
 
-global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"] ?? {}), "palette": __styleThis_reexport_74,"primary": __styleThis_star_reexport_0,"secondary": __styleThis_star_reexport_1,own,tokens};
+global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/b.ts"] ?? {}), "palette": __styleThis_reexport_palette,"primary": __styleThis_star_reexport_0,"secondary": __styleThis_star_reexport_1,own,tokens};
 
 // /packages/vite/tests/reexports-2/c.ts (/packages/vite/tests/reexports-2/b.ts): {"base", "primary", "secondary"}
 "use strict";
@@ -60,11 +60,11 @@ return {
 };
 
 
-// /packages/vite/tests/reexports-2/palette.ts (/packages/vite/tests/reexports-2/b.ts): {"__star__", "__styleThis_reexport_0", "__styleThis_star_reexport_0", "secondary"}
+// /packages/vite/tests/reexports-2/palette.ts (/packages/vite/tests/reexports-2/b.ts): {"__star__", "__styleThis_star_namespace_0", "__styleThis_star_reexport_0", "secondary"}
 "use strict";
-const __styleThis_reexport_0 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"];
+const __styleThis_star_namespace_0 = __styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/d.ts"];
 let secondary = "navy";
-const __styleThis_star_reexport_0 = { ...__styleThis_reexport_0 };
+const __styleThis_star_reexport_0 = { ...__styleThis_star_namespace_0 };
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/palette.ts"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/reexports-2/palette.ts"] ?? {}), ...__styleThis_star_reexport_0,secondary};
 
