@@ -1,7 +1,5 @@
 import { beforeEach, vi } from "vitest";
 import { afterEach } from "vitest";
-import type { OutputOptions } from "rollup";
-import type { BundleObject } from "rollup";
 import vitePlugin from "../../src/index";
 import { readFile, stat } from "fs/promises";
 import { dirname, isAbsolute, join, resolve } from "path";
@@ -39,19 +37,6 @@ const handleAtomicProgram = async (
   if (typeof atomicProgram !== "object") throw new Error("expected object");
 
   await expect(atomicProgram.code).toMatchFileSnapshot(`${outDir}/${entry}.compile.style-this.js`);
-};
-
-const getAtomicEntrypointCss = async (
-  plugin: Awaited<ReturnType<typeof setupPlugin>>,
-): Promise<string> => {
-  // Call generateBundle to generate the atomic CSS entrypoint
-  const bundle: Record<string, BundleObject> = {};
-  await plugin.generateBundle({} as OutputOptions, bundle);
-
-  const atomicEntrypointRaw = bundle["assets/atomic.css"].source;
-  if (typeof atomicEntrypointRaw !== "string") throw new Error("Failed to get atomic css entrypoint");
-
-  return atomicEntrypointRaw;
 };
 
 const snapshotAtomicEntrypoint = async (
@@ -169,7 +154,7 @@ export const evaluateProgramBothModes = async (
   // For single-file test, snapshot atomic entrypoint after transformation
   const outDir = `${testDir}/out/atomic`;
   await handleAtomicProgram(testDir, entry, atomicPlugin, outDir);
-  const atomicCss = await getAtomicEntrypointCss(atomicPlugin);
+  const atomicCss = await atomicPlugin.renderAtomicCss();
   await snapshotAtomicEntrypoint(outDir, atomicCss);
 };
 
@@ -201,7 +186,7 @@ export const evaluateProgramBothModesMultiFile = async (
   }
 
   // Only snapshot the final atomic entrypoint CSS once at the end
-  const atomicCss = await getAtomicEntrypointCss(atomicPlugin);
+  const atomicCss = await atomicPlugin.renderAtomicCss();
   await snapshotAtomicEntrypoint(outDir, atomicCss);
 };
 
@@ -304,18 +289,18 @@ export const setupPlugin = async (
     resolveId: plugin.resolveId.bind(ctx),
     load: plugin.load.bind(ctx),
     __getDebugVirtualModules: plugin.__getDebugVirtualModules.bind(ctx),
-    // emitted assets are written into the passed bundle
-    generateBundle: (outputOptions: any, bundle: Record<string, any>) =>
-      plugin.generateBundle.handler.call(
-        {
-          ...ctx,
-          emitFile: (file: { fileName: string }) => {
-            bundle[file.fileName] = { type: "asset", ...file };
-          },
-        } as any,
-        outputOptions,
-        bundle,
-      ),
+    /** Renders a build chunk containing the atomic entrypoint, returns the CSS it passes to vite's CSS plugin. */
+    renderAtomicCss: async () => {
+      let css: string | undefined;
+      const cssPostPlugin = { name: "vite:css-post", transform: { handler: (code: string) => void (css = code) } };
+      await (plugin.renderChunk as Function).call(
+        { ...ctx, environment: { mode: "build", plugins: [cssPostPlugin] } },
+        "",
+        { modules: { "\0virtual:style-this:__style_this_atomic_entrypoint.css": {} } },
+      );
+      if (css === undefined) throw new Error("no atomic CSS was rendered");
+      return css;
+    },
     getTransitiveImporters: plugin.getTransitiveImporters?.bind(plugin),
     hotUpdate: plugin.hotUpdate,
     configureServer: plugin.configureServer,

@@ -131,8 +131,7 @@ const vitePlugin = (options: StyleThisViteOptions = {}): Plugin & ExtraFields =>
   const atomicEntrypointId = resolvedVirtualModulePrefix + "__style_this_atomic_entrypoint.css";
   /**
    * Atomic CSS goes into the `utilities` layer, after a default Tailwind-like layer order. Users can override the
-   * order by declaring their own `@layer` statement before the atomic entrypoint is imported. The order statement is
-   * repeated before the appended atomic CSS in builds, it's a no-op once the layers are declared.
+   * order by declaring their own `@layer` statement before the atomic entrypoint is imported.
    */
   const atomicLayerOrder = "@layer theme, base, components, utilities;";
   const wrapAtomicCss = (css: string) => `${atomicLayerOrder}\n@layer utilities {\n${css}\n}`;
@@ -376,8 +375,7 @@ const vitePlugin = (options: StyleThisViteOptions = {}): Plugin & ExtraFields =>
 
       if (id === atomicEntrypointId) {
         if (atomic) {
-          // the atomic CSS is appended in `generateBundle`, the order statement fixes the layer order at the
-          // import position like in dev
+          // the atomic CSS is only complete once all modules are transformed, it's set in `renderChunk`
           if (!server) {
             return { code: atomicLayerOrder };
           }
@@ -502,46 +500,31 @@ const vitePlugin = (options: StyleThisViteOptions = {}): Plugin & ExtraFields =>
       }
     },
 
-    generateBundle: {
-      // after vite's CSS plugin, which emits the single stylesheet of builds without CSS code splitting (e.g. library
-      // mode) here
-      order: "post",
-      async handler(_outputOptions, bundle) {
-        // vite drops the assets of environments that don't emit them (SSR by default)
-        if (!atomic || this.environment?.config.build.emitAssets === false) return;
+    buildEnd(error) {
+      if (!atomic || error || devServer(this.environment) || this.getModuleInfo(atomicEntrypointId)) return;
+      if (styleThis.get_atomic_css()) {
+        this.warn(`atomic CSS is dropped, '@style-this/core/atomic' isn't imported`);
+      }
+    },
 
-        const finalAtomicCss = wrapAtomicCss(styleThis.get_atomic_css());
+    /**
+     * Sets the atomic CSS of the entrypoint before vite's CSS plugin collects the chunk's stylesheet (this plugin's
+     * hooks run first), so it's minified and hashed like any other CSS.
+     */
+    async renderChunk(_code, chunk) {
+      if (!atomic || devServer(this.environment) || !(atomicEntrypointId in chunk.modules)) return null;
 
-        const chunks = Object.values(bundle).filter((output) => output.type === 'chunk');
-        const getImportedCss = (chunk: (typeof chunks)[number]): string[] =>
-          [...((chunk as any).viteMetadata?.importedCss ?? [])].filter((fileName: string) => fileName.endsWith('.css'));
+      // the build CSS is recorded by the plugin's `transform`, it doesn't use the plugin context
+      const transform = this.environment.plugins.find((plugin) => plugin.name === "vite:css-post")?.transform;
+      const handler = typeof transform === "function" ? transform : transform?.handler;
+      if (!handler) this.error("vite's 'vite:css-post' plugin wasn't found, the atomic CSS can't be emitted");
 
-        // the atomic CSS belongs to the stylesheet of the chunk importing `@style-this/core/atomic`,
-        // falling back to the entry chunks' stylesheets, then to any stylesheet
-        const containsAtomicEntrypoint = (chunk: (typeof chunks)[number]) =>
-          [...(chunk.moduleIds ?? []), ...Object.keys(chunk.modules ?? {})].some(
-            (id) => id.split('?', 1)[0] === atomicEntrypointId,
-          );
-        const candidates = [
-          ...chunks.filter(containsAtomicEntrypoint).flatMap(getImportedCss),
-          ...chunks.filter((chunk) => chunk.isEntry).flatMap(getImportedCss),
-          ...Object.keys(bundle).filter((fileName) => fileName.endsWith('.css')),
-        ];
+      await handler.call(this as any, wrapAtomicCss(styleThis.get_atomic_css()), atomicEntrypointId);
+      return null;
+    },
 
-        const cssFileName = candidates.find((fileName) => bundle[fileName]?.type === 'asset');
-        const cssAsset = cssFileName ? bundle[cssFileName] : undefined;
-
-        if (cssAsset?.type === 'asset') {
-          const existingCss = typeof cssAsset.source === 'string' ? cssAsset.source : cssAsset.source.toString();
-          cssAsset.source = `${existingCss}\n${finalAtomicCss}`;
-        } else {
-          this.emitFile({
-            type: 'asset',
-            fileName: 'assets/atomic.css',
-            source: finalAtomicCss,
-          });
-        }
-      },
+    closeBundle() {
+      if (devServer(this.environment)) clearTimeout(atomicCssUpdateTimer);
     },
 
     async hotUpdate({ file, type, timestamp, modules, read }) {

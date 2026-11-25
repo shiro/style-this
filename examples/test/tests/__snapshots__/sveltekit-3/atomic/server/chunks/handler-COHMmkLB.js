@@ -10,7 +10,7 @@ import { Readable } from 'node:stream';
 import { S as SvelteKitError } from './chunks/shared.js-2hwF8sWJ.js';
 import './chunks/utils.js-BPhhn28M.js';
 import { S as Server } from './index.js-C_jgA0kN.js';
-import { m as manifest } from './manifest.js-CCRSTK5d.js';
+import { m as manifest } from './manifest.js-U9ObeCii.js';
 import { env, dir, env_prefix } from '../../env.js';
 import { format } from 'node:url';
 
@@ -1732,4 +1732,4 @@ const handler = sequence(
 );
 
 export { format_listening_address as f, handler as h, polka as p };
-//# sourceMappingURL=handler-Dy5DO672.js.map
+//# sourceMappingURL=handler-COHMmkLB.js.map

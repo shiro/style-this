@@ -93,7 +93,7 @@ The plugin adjusts your Vite config:
 | `virtual:style-this:<file>.style-this.js` | class name exports (atomic mode) |
 | `@style-this/core/atomic` | atomic stylesheet (layer order and `@layer utilities`) |
 
-In atomic builds the atomic CSS is appended to the stylesheet of the chunk importing
-`@style-this/core/atomic`, falling back to an entry chunk's stylesheet. Without CSS code splitting (the
-default in library mode) that's the single bundled stylesheet. If there's no stylesheet at all, it's emitted as
-`assets/atomic.css`.
+In atomic builds the atomic CSS is part of the stylesheet of the chunk importing `@style-this/core/atomic`
+(the single bundled stylesheet without CSS code splitting, the default in library mode), at the position of
+the import like in dev. It's minified and hashed like the rest of the stylesheet. Without the import the atomic
+CSS is dropped with a warning.

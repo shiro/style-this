@@ -1,11 +1,3 @@
-@layer theme, base, components, utilities;.CounterStyle-zodu74 { /* marker */ }
-.FancyButton-otinw9 { /* marker */ }
-.FancyButton2-wtirkd { /* marker */ }.ContainerStyle-3wxanc { /* marker */ }
-.colorStyle-v856z4 { /* marker */ }
-.highlightStyle-s1ybc1 { /* marker */ }
-.Global__Main {
-    background: lightyellow;
-  }
 @layer theme, base, components, utilities;
 @layer utilities {
 .b-ZeplZ { border: 1px solid blue }
@@ -27,4 +19,11 @@
 .min-h-LEqJt { min-height: var(--var2-spq7g9) }
 .r-K5PNW { border-radius: 8px }
 .r-TbAuj { border-radius: 2px }
-}
+}.CounterStyle-zodu74 { /* marker */ }
+.FancyButton-otinw9 { /* marker */ }
+.FancyButton2-wtirkd { /* marker */ }.ContainerStyle-3wxanc { /* marker */ }
+.colorStyle-v856z4 { /* marker */ }
+.highlightStyle-s1ybc1 { /* marker */ }
+.Global__Main {
+    background: lightyellow;
+  }

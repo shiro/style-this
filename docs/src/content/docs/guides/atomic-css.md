@@ -105,7 +105,7 @@ outer === "outer-mvwhqz w-Yb3Gw";
 ### Where the atomic CSS is loaded
 
 - **Vite**: all atomic rules are collected into one stylesheet, served by the
-  `@style-this/core/atomic` import. In builds it's appended to the stylesheet of the chunk containing
+  `@style-this/core/atomic` import. In builds it's part of the stylesheet of the chunk containing
   that import.
 - **webpack and Next.js**: there's no step that collects the CSS of all files, so every file's
   stylesheet includes the atomic rules it uses. The `@style-this/core/atomic` import only declares
