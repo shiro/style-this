@@ -95,5 +95,5 @@ The plugin adjusts your Vite config:
 
 In atomic builds the atomic CSS is part of the stylesheet of the chunk importing `@style-this/core/atomic`
 (the single bundled stylesheet without CSS code splitting, the default in library mode), at the position of
-the import like in dev. It's minified and hashed like the rest of the stylesheet. Without the import the atomic
-CSS is dropped with a warning.
+the import like in dev. Like any other CSS, it's processed by your PostCSS config, minified and hashed with the
+rest of the stylesheet. Without the import the atomic CSS is dropped with a warning.

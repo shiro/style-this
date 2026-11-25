@@ -81,12 +81,16 @@ describe("atomic CSS layer", () => {
     const buildCss = async (
       plugin: ReturnType<typeof vitePlugin>,
       config: InlineConfig["build"],
-      transformSource: (code: string) => string = (code) => code,
+      {
+        transformSource = (code) => code,
+        css,
+      }: { transformSource?: (code: string) => string; css?: InlineConfig["css"] } = {},
     ) => {
       const result = (await build({
         root,
         configFile: false,
         logLevel: "silent",
+        css,
         plugins: [
           plugin,
           {
@@ -107,7 +111,7 @@ describe("atomic CSS layer", () => {
         buildCss(
           vitePlugin({ useRequire: true, atomic: true }),
           { cssMinify: true, rollupOptions: { input: `${root}/main.ts` } },
-          (code) => code.replace("red", color),
+          { transformSource: (code) => code.replace("red", color) },
         );
       const red = await buildWithColor("red");
       const blue = await buildWithColor("blue");
@@ -116,6 +120,30 @@ describe("atomic CSS layer", () => {
       expect(red[0].source).toMatch(/@layer utilities\{\.[\w-]+\{color:red\}\}/);
       expect(blue[0].source).toMatch(/@layer utilities\{\.[\w-]+\{color:#?\w+\}\}/);
       expect(red[0].fileName).not.toBe(blue[0].fileName);
+    });
+
+    test("atomic CSS is processed by the PostCSS config like in dev", async () => {
+      const css = await buildCss(
+        vitePlugin({ useRequire: true, atomic: true }),
+        { rollupOptions: { input: `${root}/main.ts` } },
+        {
+          css: {
+            postcss: {
+              plugins: [
+                {
+                  postcssPlugin: "test:recolor",
+                  Declaration(declaration) {
+                    if (declaration.value === "red") declaration.value = "green";
+                  },
+                },
+              ],
+            },
+          },
+        },
+      );
+
+      expect(css).toHaveLength(1);
+      expect(css[0].source).toContain("color: green");
     });
 
     test("library mode: atomic CSS is part of the library stylesheet", async () => {
@@ -134,7 +162,7 @@ describe("atomic CSS layer", () => {
         {
           rollupOptions: { input: `${root}/main.ts`, onwarn: (warning) => void warnings.push(warning.message) },
         },
-        (code) => code.replace('import "@style-this/core/atomic";', ""),
+        { transformSource: (code) => code.replace('import "@style-this/core/atomic";', "") },
       );
 
       expect(css.map((file) => file.source).join()).not.toContain("color");

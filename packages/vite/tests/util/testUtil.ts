@@ -292,9 +292,10 @@ export const setupPlugin = async (
     /** Renders a build chunk containing the atomic entrypoint, returns the CSS it passes to vite's CSS plugin. */
     renderAtomicCss: async () => {
       let css: string | undefined;
+      const cssPlugin = { name: "vite:css", transform: { handler: (code: string) => ({ code }) } };
       const cssPostPlugin = { name: "vite:css-post", transform: { handler: (code: string) => void (css = code) } };
       await (plugin.renderChunk as Function).call(
-        { ...ctx, environment: { mode: "build", plugins: [cssPostPlugin] } },
+        { ...ctx, environment: { mode: "build", plugins: [cssPlugin, cssPostPlugin] } },
         "",
         { modules: { "\0virtual:style-this:__style_this_atomic_entrypoint.css": {} } },
       );

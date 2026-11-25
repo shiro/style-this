@@ -508,17 +508,22 @@ const vitePlugin = (options: StyleThisViteOptions = {}): Plugin & ExtraFields =>
 
     /**
      * Sets the atomic CSS of the entrypoint before vite's CSS plugin collects the chunk's stylesheet (this plugin's
-     * hooks run first), so it's minified and hashed like any other CSS.
+     * hooks run first). It goes through vite's CSS transforms like in dev, so it's processed by the user's PostCSS
+     * config, minified and hashed like any other CSS.
      */
     async renderChunk(_code, chunk) {
       if (!atomic || devServer(this.environment) || !(atomicEntrypointId in chunk.modules)) return null;
 
-      // the build CSS is recorded by the plugin's `transform`, it doesn't use the plugin context
-      const transform = this.environment.plugins.find((plugin) => plugin.name === "vite:css-post")?.transform;
-      const handler = typeof transform === "function" ? transform : transform?.handler;
-      if (!handler) this.error("vite's 'vite:css-post' plugin wasn't found, the atomic CSS can't be emitted");
+      const transformCss = async (pluginName: string, css: string) => {
+        const transform = this.environment.plugins.find((plugin) => plugin.name === pluginName)?.transform;
+        const handler = typeof transform === "function" ? transform : transform?.handler;
+        if (!handler) this.error(`vite's '${pluginName}' plugin wasn't found, the atomic CSS can't be emitted`);
+        const result = await handler.call(this as any, css, atomicEntrypointId);
+        return (typeof result === "string" ? result : result?.code) ?? css;
+      };
 
-      await handler.call(this as any, wrapAtomicCss(styleThis.get_atomic_css()), atomicEntrypointId);
+      // `vite:css-post` records the build CSS in its `transform`
+      await transformCss("vite:css-post", await transformCss("vite:css", wrapAtomicCss(styleThis.get_atomic_css())));
       return null;
     },
 
