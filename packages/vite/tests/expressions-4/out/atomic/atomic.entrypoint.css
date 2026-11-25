@@ -1,0 +1,11 @@
+@layer theme, base, components, utilities;
+@layer utilities {
+.c-AMx_p { color: green }
+.c-Aq33O { color: white }
+.c-DYDh7 { color: teal }
+.c-U7IxM { color: orange }
+.c-UAroB { color: lime }
+.c-Uhjsu { color: pink }
+.c-WzsQA { color: olive }
+.c-Y3xVO { color: black }
+}

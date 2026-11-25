@@ -866,6 +866,31 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         Some(temporary_variable_name)
     }
 
+    /// The template copied into the virtual program, nested templates point to their variables.
+    fn build_virtual_template_literal(
+        &self,
+        span: Span,
+        mut quasis: oxc_allocator::Vec<'alloc, oxc_ast::ast::TemplateElement<'alloc>>,
+        mut expressions: oxc_allocator::Vec<'alloc, Expression<'alloc>>,
+    ) -> Expression<'alloc> {
+        utils::trim_newlines(self.ast_builder, &mut quasis);
+        utils::escape_raw_quasis(self.ast_builder, &mut quasis);
+
+        for expression in expressions.iter_mut() {
+            replace_in_expression_using_spans(
+                self.ast_builder,
+                expression,
+                &self.replacement_points,
+            );
+            replace_in_expression_using_identifiers(self.ast_builder, expression, &|name| {
+                self.get_alias(name).map(|v| v.to_string())
+            });
+        }
+
+        self.ast_builder
+            .expression_template_literal(span, quasis, expressions)
+    }
+
     /// inserts the `var.css = \`...\`` part
     fn insert_into_virtual_program_css(
         &mut self,
@@ -930,16 +955,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             });
         }
 
-        utils::trim_newlines(self.ast_builder, &mut new_quasis);
-        utils::escape_raw_quasis(self.ast_builder, &mut new_quasis);
-
-        let mut right =
-            self.ast_builder
-                .expression_template_literal(span, new_quasis, new_expressions);
-
-        replace_in_expression_using_identifiers(self.ast_builder, &mut right, &|name| {
-            self.get_alias(name).map(|v| v.to_string())
-        });
+        let right = self.build_virtual_template_literal(span, new_quasis, new_expressions);
 
         // Store the CSS variable identifier for the evaluator
         self.css_variable_identifiers
@@ -995,6 +1011,114 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     .alloc_identifier_reference(span, self.ast_builder.atom(variable_name)),
             ),
         );
+    }
+
+    /// Copies a `css`/`style` template into the virtual program, returns its runtime value.
+    fn transform_template(
+        &mut self,
+        template: &mut TaggedTemplateExpression<'alloc>,
+        export: LibraryExport,
+        variable_name: &str,
+    ) -> Option<Expression<'alloc>> {
+        let pos = self.tmp_program_statement_buffer.last().unwrap().len();
+        // before the walk rewrites the CSS inside
+        let right_references = utils::tagged_template_expression_get_references(template);
+
+        oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
+
+        // the statements are reversed later, templates nested in this one have to come first
+        let nested_statements = self
+            .tmp_program_statement_buffer
+            .last_mut()
+            .unwrap()
+            .split_off(pos);
+
+        let span = template.span;
+
+        if self.check_dynamic_variable_access(&right_references, span.start) {
+            return None;
+        }
+
+        self.reference_variable(variable_name.to_string());
+        for ident in right_references {
+            self.reference_variable(ident);
+        }
+
+        let resolved_variable_name = self
+            .get_alias(variable_name)
+            .unwrap_or(variable_name)
+            .to_string();
+
+        let value = match export {
+            LibraryExport::Css => {
+                // by the binding, styled components (bound to `__styleThis__class`) are never global
+                let global = variable_name.starts_with("_Global");
+                let display_name = self.get_display_name(span, variable_name).to_string();
+                let class_name = self.create_virtual_css_template(&display_name, global);
+                let extra_classes = self.extract_extra_classes(template);
+
+                self.insert_into_virtual_program_css(
+                    template,
+                    &resolved_variable_name,
+                    &class_name,
+                    global,
+                    extra_classes.clone(),
+                );
+
+                self.insert_css_class_into_virtual_program(
+                    span,
+                    &resolved_variable_name,
+                    &class_name,
+                );
+
+                self.build_css_class_value(
+                    span,
+                    &resolved_variable_name,
+                    &class_name,
+                    &extra_classes,
+                )
+            }
+            LibraryExport::Style => {
+                let variable_declarator = ast::build_variable_declarator(
+                    self.ast_builder,
+                    span,
+                    &resolved_variable_name,
+                    self.build_virtual_template_literal(
+                        span,
+                        template.quasi.quasis.clone_in(self.allocator),
+                        template.quasi.expressions.clone_in(self.allocator),
+                    ),
+                );
+
+                self.style_variable_identifiers
+                    .insert(variable_name.to_string());
+
+                self.insert_into_virtual_program(
+                    VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                    None,
+                );
+
+                self.replacement_points.insert(
+                    span,
+                    Expression::Identifier(self.ast_builder.alloc_identifier_reference(
+                        span,
+                        self.ast_builder.atom(&resolved_variable_name),
+                    )),
+                );
+
+                ast::build_undefined(self.ast_builder, span)
+            }
+            _ => {
+                unreachable!()
+            }
+        };
+
+        self.tmp_program_statement_buffer
+            .last_mut()
+            .unwrap()
+            .extend(nested_statements);
+
+        Some(value)
     }
 
     /// Builds the runtime value of a `css` template, atomic mode references the class list
@@ -1403,90 +1527,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if let Expression::TaggedTemplateExpression(template) = it
             && let Some(export) = self.template_export(template)
         {
-            oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
-
-            let span = template.span;
-            let variable_name = &format!("{PREFIX}_{}", self.anonymous_number());
-
-            let right_references = utils::tagged_template_expression_get_references(template);
-
-            if self.check_dynamic_variable_access(&right_references, template.span().start) {
+            let variable_name = format!("{PREFIX}_{}", self.anonymous_number());
+            let Some(value) = self.transform_template(template, export, &variable_name) else {
                 return;
-            }
-
-            self.reference_variable(variable_name.to_string());
-            for ident in right_references {
-                self.reference_variable(ident);
-            }
-
-            let resolved_variable_name = self
-                .get_alias(variable_name)
-                .unwrap_or(variable_name)
-                .to_string();
-
-            match export {
-                LibraryExport::Css => {
-                    let class_name = self.create_virtual_css_template(variable_name, false);
-                    let extra_classes = self.extract_extra_classes(template);
-
-                    self.insert_into_virtual_program_css(
-                        template,
-                        &resolved_variable_name,
-                        &class_name,
-                        false,
-                        extra_classes.clone(),
-                    );
-
-                    self.insert_css_class_into_virtual_program(
-                        span,
-                        &resolved_variable_name,
-                        &class_name,
-                    );
-
-                    *it = self.build_css_class_value(
-                        span,
-                        &resolved_variable_name,
-                        &class_name,
-                        &extra_classes,
-                    );
-                }
-                LibraryExport::Style => {
-                    let mut quasis = template.quasi.quasis.clone_in(self.allocator);
-                    utils::trim_newlines(self.ast_builder, &mut quasis);
-                    utils::escape_raw_quasis(self.ast_builder, &mut quasis);
-                    let variable_declarator = ast::build_variable_declarator(
-                        self.ast_builder,
-                        span,
-                        &resolved_variable_name,
-                        self.ast_builder.expression_template_literal(
-                            span,
-                            quasis,
-                            template.quasi.expressions.clone_in(self.allocator),
-                        ),
-                    );
-
-                    self.style_variable_identifiers
-                        .insert(variable_name.to_string());
-
-                    self.insert_into_virtual_program(
-                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                        None,
-                    );
-
-                    self.replacement_points.insert(
-                        span,
-                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                            span,
-                            self.ast_builder.atom(&resolved_variable_name),
-                        )),
-                    );
-
-                    *it = ast::build_undefined(self.ast_builder, span);
-                }
-                _ => {
-                    unreachable!()
-                }
             };
+            *it = value;
         };
 
         oxc_ast_visit::walk_mut::walk_expression(self, it);
@@ -1554,103 +1599,18 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 return;
             };
 
-            oxc_ast_visit::walk_mut::walk_tagged_template_expression(self, template);
-
-            let span = template.span;
-            let variable_name = variable_name.name.as_str();
-
-            let right_references = utils::tagged_template_expression_get_references(template);
-
-            if self.check_dynamic_variable_access(&right_references, template.span().start) {
-                return;
+            let variable_name = variable_name.name.to_string();
+            if let Some(value) = self.transform_template(template, export, &variable_name) {
+                *init = value;
             }
-
-            self.reference_variable(variable_name.to_string());
-            for ident in right_references {
-                self.reference_variable(ident);
-            }
-
-            let resolved_variable_name = self
-                .get_alias(variable_name)
-                .unwrap_or(variable_name)
-                .to_string();
-
-            match export {
-                LibraryExport::Css => {
-                    // by the binding, styled components (bound to `__styleThis__class`) are never global
-                    let global = variable_name.starts_with("_Global");
-                    let display_name = self.get_display_name(span, variable_name).to_string();
-                    let class_name = self.create_virtual_css_template(&display_name, global);
-                    let extra_classes = self.extract_extra_classes(template);
-
-                    self.insert_into_virtual_program_css(
-                        template,
-                        &resolved_variable_name,
-                        &class_name,
-                        global,
-                        extra_classes.clone(),
-                    );
-
-                    self.insert_css_class_into_virtual_program(
-                        span,
-                        &resolved_variable_name,
-                        &class_name,
-                    );
-
-                    *init = self.build_css_class_value(
-                        span,
-                        &resolved_variable_name,
-                        &class_name,
-                        &extra_classes,
-                    );
-                }
-                LibraryExport::Style => {
-                    let mut quasis = template.quasi.quasis.clone_in(self.allocator);
-                    utils::trim_newlines(self.ast_builder, &mut quasis);
-                    utils::escape_raw_quasis(self.ast_builder, &mut quasis);
-                    let variable_declarator = ast::build_variable_declarator(
-                        self.ast_builder,
-                        span,
-                        &resolved_variable_name,
-                        self.ast_builder.expression_template_literal(
-                            span,
-                            quasis,
-                            template.quasi.expressions.clone_in(self.allocator),
-                        ),
-                    );
-
-                    self.style_variable_identifiers
-                        .insert(variable_name.to_string());
-
-                    self.insert_into_virtual_program(
-                        VirtualProgramInsert::VariableDeclarator(variable_declarator),
-                        None,
-                    );
-
-                    self.replacement_points.insert(
-                        span,
-                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                            span,
-                            self.ast_builder.atom(&resolved_variable_name),
-                        )),
-                    );
-
-                    *init = ast::build_undefined(self.ast_builder, span);
-                }
-                _ => {
-                    unreachable!()
-                }
-            };
-
             return;
         };
 
         let pos = self.tmp_program_statement_buffer.last().unwrap().len();
+        // before the walk rewrites the CSS inside
+        let right_references = utils::expression_get_references(init);
 
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
-
-        let Some(init) = &it.init else { return };
-        let right_references = utils::expression_get_references(init);
 
         self.include_or_defer_declaration(
             VirtualProgramInsert::VariableDeclarator(it.clone_in(self.allocator)),

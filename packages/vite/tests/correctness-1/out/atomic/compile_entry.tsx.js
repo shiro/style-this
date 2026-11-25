@@ -18,7 +18,7 @@ __styleThis_2.css = `color: hotpink;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
-// /packages/vite/tests/correctness-1/entry.tsx: {"Size", "__styleThis_1", "__styleThis_10", "__styleThis_11", "__styleThis_12", "__styleThis_13", "__styleThis_14", "__styleThis_15", "__styleThis_16", "__styleThis_2", "__styleThis_3", "__styleThis_4", "__styleThis_5", "__styleThis_6", "__styleThis_7", "__styleThis_8", "__styleThis_9", "_styleThisClasses", "a", "a1", "accent", "b", "card", "carded", "color", "comp", "css", "gapped", "margined", "mib", "mutate", "redeclared", "s2", "sized", "spaced", "spacedOut", "spacing", "st", "style", "theme", "themed", "undefined", "unrelated"}
+// /packages/vite/tests/correctness-1/entry.tsx: {"Size", "__styleThis_1", "__styleThis_10", "__styleThis_11", "__styleThis_12", "__styleThis_13", "__styleThis_14", "__styleThis_15", "__styleThis_16", "__styleThis_2", "__styleThis_3", "__styleThis_4", "__styleThis_5", "__styleThis_6", "__styleThis_7", "__styleThis_8", "__styleThis_9", "a", "a1", "accent", "b", "card", "carded", "color", "comp", "css", "gapped", "margined", "mib", "mutate", "redeclared", "s2", "sized", "spaced", "spacedOut", "spacing", "st", "style", "theme", "themed", "undefined", "unrelated"}
 "use strict";
 const a = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"];
 const mib = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
