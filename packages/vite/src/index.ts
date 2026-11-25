@@ -222,7 +222,6 @@ const vitePlugin = (options: StyleThisViteOptions = {}): Plugin & ExtraFields =>
             sourcemapData: sourcemapData.map((entry) => ({
               ...entry,
               start: mapOffset(entry.start),
-              end: mapOffset(entry.end),
             })),
             originalSource,
           });

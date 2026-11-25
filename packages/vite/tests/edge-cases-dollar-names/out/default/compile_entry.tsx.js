@@ -20,4 +20,4 @@ ${$Global.css}
 `.wrapper-ol6bkd {
 ${wrapper.css}
 }`
-].join('\n');
+];

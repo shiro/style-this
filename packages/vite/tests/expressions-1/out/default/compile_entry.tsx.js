@@ -11,4 +11,4 @@ return [
 `.a-f45qro {
 ${a.css}
 }`
-].join('\n');
+];

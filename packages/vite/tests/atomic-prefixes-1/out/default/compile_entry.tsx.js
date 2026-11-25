@@ -51,4 +51,4 @@ ${important.css}
 `.fallbacks-v4pm30 {
 ${fallbacks.css}
 }`
-].join('\n');
+];

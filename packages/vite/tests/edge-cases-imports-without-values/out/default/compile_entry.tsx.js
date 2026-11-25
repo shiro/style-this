@@ -14,7 +14,7 @@ return [
 `.box-63wxif {
 ${box.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/edge-cases-imports-without-values/types.ts (/packages/vite/tests/edge-cases-imports-without-values/entry.tsx): {"Theme", "__global__export__", "__star__"}

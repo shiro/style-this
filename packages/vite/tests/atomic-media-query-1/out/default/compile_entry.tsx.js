@@ -21,4 +21,4 @@ ${innerStyle.css}
 `.outerStyle-mvwhqz {
 ${outerStyle.css}
 }`
-].join('\n');
+];

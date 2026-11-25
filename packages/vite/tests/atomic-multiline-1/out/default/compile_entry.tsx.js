@@ -16,4 +16,4 @@ return [
 `.grid-1ajg1y {
 ${grid.css}
 }`
-].join('\n');
+];

@@ -8,7 +8,7 @@
 //     "import { css } from \"@style-this/core\";\nimport Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from \"./b\";\nimport rounded from \"./c\";\n\nconst color = \"red\";\n\nconst nav = css`\n  .${getLink()}, .${Theme.accent} {\n    font-weight: ${weight};\n  }\n`;\n\nconst page = css`\n  .${Page()} > .${Palette.accent}, .${rounded()}, .${Sizes.card} {\n    gap: ${Sizes.gap};\n    font-weight: ${Weight.Bold};\n    color: ${Badge.color};\n  }\n`;\n\nexport function Button() {\n  const button = css`\n    color: ${color};\n  `;\n  return button;\n}\n\nexport class Card {\n  card = css`\n    padding: 4px;\n  `;\n\n  render() {\n    return css`\n      margin: 8px;\n    `;\n  }\n}\n\nexport default function Page() {\n  return css`\n    display: flex;\n  `;\n}\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAMY;;;AAMC,eA4BJ;;;;;AAnBQ;AAYN;AALF"
+//   "mappings": "AAMY;;;AAMC;;;;;AASI;AAYN;AALF;AAYA"
 // }
 
 import { css } from "@style-this/core";

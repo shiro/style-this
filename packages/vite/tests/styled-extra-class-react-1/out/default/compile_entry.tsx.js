@@ -17,4 +17,4 @@ ${__styleThis_var_FancyButton_2.css}
 `.unrelated-l2rcte {
 ${unrelated.css}
 }`
-].join('\n');
+];

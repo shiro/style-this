@@ -10,7 +10,7 @@ return [
 `.a-gxu385 {
 ${a.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/edge-cases-1/shared.tsx (/packages/vite/tests/edge-cases-1/entry-1.tsx): {"Math", "css", "num", "shared", "top"}

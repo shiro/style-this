@@ -18,7 +18,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-1/b.tsx"] = 
 `.exported-w5y7wh {
 ${exported.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/multi-1/entry.tsx: {"a", "color", "css"}
@@ -31,4 +31,4 @@ return [
 `.a-8pm3ch {
 ${a.css}
 }`
-].join('\n');
+];

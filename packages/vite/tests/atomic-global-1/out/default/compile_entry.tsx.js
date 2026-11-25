@@ -21,4 +21,4 @@ ${mainStyle.css}
 }`,
 `${_GlobalMain.css}
 `
-].join('\n');
+];

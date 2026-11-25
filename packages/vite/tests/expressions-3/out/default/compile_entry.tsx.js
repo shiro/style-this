@@ -29,4 +29,4 @@ return [
 `.button-st6jwl {
 ${__styleThis_var_button_1.css}
 }`
-].join('\n');
+];

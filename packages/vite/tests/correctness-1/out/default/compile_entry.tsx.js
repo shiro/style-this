@@ -284,4 +284,4 @@ ${carded.css}
 `.unrelated-5y7cxe {
 ${unrelated.css}
 }`
-].join('\n');
+];

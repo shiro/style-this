@@ -59,7 +59,7 @@ return [
 `.box-wt6b8t {
 ${box.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/reexports-2/palette.ts (/packages/vite/tests/reexports-2/b.ts): {"__star__", "__styleThis_star_namespace_0", "__styleThis_star_reexport_0", "secondary"}

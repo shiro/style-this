@@ -27,4 +27,4 @@ return [
 `.a-k1mv0l {
 ${a.css}
 }`
-].join('\n');
+];

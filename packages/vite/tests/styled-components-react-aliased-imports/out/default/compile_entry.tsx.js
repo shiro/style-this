@@ -11,4 +11,4 @@ ${__styleThis_var_NsLink_4.css}
 `.FancyButton-rkxuj4 {
 ${__styleThis_var_FancyButton_2.css}
 }`
-].join('\n');
+];

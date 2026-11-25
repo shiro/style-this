@@ -29,4 +29,4 @@ ${Base.css}
 `.FancyButton-e781ej {
 ${__styleThis_var_FancyButton_2.css}
 }`
-].join('\n');
+];

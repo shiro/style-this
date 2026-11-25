@@ -1118,9 +1118,10 @@ pub async fn evaluate_program<'alloc>(
                 .collect::<Vec<_>>()
                 .join(",\n");
 
+            // joined by `join_css_rules`
             eval_program_js.push_str(&formatdoc!(
                 "
-                return [\n{css}\n].join('\\n');
+                return [\n{css}\n];
                 ",
             ));
         }
@@ -1193,19 +1194,19 @@ pub async fn evaluate_program<'alloc>(
         // Parse each CSS block into atomic + non-atomic classes
         let mut variable_to_atomics: HashMap<String, BTreeSet<String>> = HashMap::new();
         let mut atomic_declarations = BTreeSet::new();
-        let mut module_css = String::new();
+        let mut rules = Vec::new();
 
         for css_var in css_variable_identifiers.iter() {
-            if let Some(css_string) = css_blocks.get(&css_var.variable_name) {
+            if let Some(css_string) = css_blocks.remove(&css_var.variable_name) {
                 let classname = &css_var.classname;
 
                 // Global styles don't need a wrapper selector
                 if css_var.global {
-                    module_css.push_str(&format!("{}\n", css_string));
+                    rules.push((css_var, css_string));
                     continue;
                 }
 
-                let parse_result = css_parser::parse_css(css_string);
+                let parse_result = css_parser::parse_css(&css_string);
 
                 let declarations = dedupe_atomic_declarations(parse_result.atomizable);
                 let atomic_classes: BTreeSet<String> = declarations
@@ -1216,11 +1217,12 @@ pub async fn evaluate_program<'alloc>(
 
                 variable_to_atomics.insert(css_var.variable_name.clone(), atomic_classes);
 
-                if let Some(non_atomizable) = parse_result.non_atomizable {
-                    module_css.push_str(&format!(".{classname} {{ {} }}\n", non_atomizable));
+                let rule = if let Some(non_atomizable) = parse_result.non_atomizable {
+                    format!(".{classname} {{ {} }}", non_atomizable)
                 } else {
-                    module_css.push_str(&format!(".{classname} {{ /* marker */ }}\n"));
-                }
+                    format!(".{classname} {{ /* marker */ }}")
+                };
+                rules.push((css_var, rule));
             }
         }
 
@@ -1246,8 +1248,9 @@ pub async fn evaluate_program<'alloc>(
             .collect::<Vec<_>>()
             .join(";\n");
 
-        // CSS string already contains all non-atomizable CSS, trim trailing newline
-        let css = module_css.trim_end();
+        // the rules contain all non-atomizable CSS
+        let (mut css, rules) = join_css_rules(rules);
+        css.truncate(css.trim_end().len());
 
         transformer
             .cache_registry
@@ -1255,7 +1258,7 @@ pub async fn evaluate_program<'alloc>(
 
         // Stage 2: Resolve .style-this.js with atomic exports and .css with non-atomizable CSS.
         if let Some(entries) = &entries {
-            entries.resolve_css(&css.into(), &css_variable_identifiers);
+            entries.resolve_css(&css, &rules);
             entries.resolve_atomic(&atomic_module.into());
         }
 
@@ -1292,8 +1295,11 @@ pub async fn evaluate_program<'alloc>(
 
     if let Some(entries) = &entries {
         if has_css {
-            // non-atomic entrypoints return their CSS
-            entries.resolve_css(&evaluated, &css_variable_identifiers);
+            // non-atomic entrypoints return the CSS rules of their declarations
+            let rules = evaluated.unchecked_into::<js_sys::Array>();
+            let rules = rules.iter().map(|rule| rule.as_string().unwrap_or_default());
+            let (css, rules) = join_css_rules(css_variable_identifiers.iter().zip(rules));
+            entries.resolve_css(&css, &rules);
         } else {
             // entrypoints without any CSS still get their virtual modules requested, resolve them
             // as empty so they don't wait forever
@@ -1389,22 +1395,25 @@ impl VirtualModuleEntries {
         }
     }
 
-    fn resolve_css(&self, css: &JsValue, css_variable_identifiers: &[CssVariableIdentifier]) {
-        let sourcemap_data = css_variable_identifiers
+    fn resolve_css(&self, css: &str, rules: &[(&CssVariableIdentifier, usize)]) {
+        let sourcemap_data = rules
             .iter()
-            .map(|css_var| {
+            .map(|(css_var, css_offset)| {
                 let data = js_sys::Object::new();
                 let set = |key: &str, value: JsValue| {
                     js_sys::Reflect::set(&data, &JsValue::from_str(key), &value).unwrap();
                 };
-                set("className", JsValue::from_str(&css_var.classname));
+                set("cssOffset", (*css_offset as u32).into());
                 set("start", css_var.span.start.into());
-                set("end", css_var.span.end.into());
                 data
             })
             .collect::<js_sys::Array>();
 
-        let args = js_sys::Array::of3(css, &sourcemap_data, &JsValue::from_str(&self.css_filepath));
+        let args = js_sys::Array::of3(
+            &JsValue::from_str(css),
+            &sourcemap_data,
+            &JsValue::from_str(&self.css_filepath),
+        );
         Self::resolve(&self.css, &args);
     }
 
@@ -1417,6 +1426,23 @@ impl VirtualModuleEntries {
         Self::resolve(&self.css, &args);
         Self::resolve(&self.atomic, &args);
     }
+}
+
+/// Joins the CSS rules of declarations with newlines, keeping each rule's UTF-8 byte offset in the
+/// CSS for its source map.
+fn join_css_rules<'a>(
+    rules: impl IntoIterator<Item = (&'a CssVariableIdentifier, String)>,
+) -> (String, Vec<(&'a CssVariableIdentifier, usize)>) {
+    let mut css = String::new();
+    let mut offsets = Vec::new();
+    for (index, (css_var, rule)) in rules.into_iter().enumerate() {
+        if index > 0 {
+            css.push('\n');
+        }
+        offsets.push((css_var, css.len()));
+        css.push_str(&rule);
+    }
+    (css, offsets)
 }
 
 /// Entrypoints report errors through their virtual modules, dependencies pass them on to their

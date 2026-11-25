@@ -19,4 +19,4 @@ return [
 `.outer-folqvg {
 ${outer.css}
 }`
-].join('\n');
+];

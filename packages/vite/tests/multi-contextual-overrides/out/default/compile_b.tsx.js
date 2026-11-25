@@ -18,7 +18,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-contextual-o
 `.inner-wxav4x {
 ${inner.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/multi-contextual-overrides/entry.tsx: {"css", "inner", "outer"}
@@ -33,4 +33,4 @@ return [
 `.outer-folqvg {
 ${outer.css}
 }`
-].join('\n');
+];

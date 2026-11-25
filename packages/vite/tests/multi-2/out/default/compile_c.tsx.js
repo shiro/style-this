@@ -20,7 +20,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"] = 
 `.exported-ev01qj {
 ${exported.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/multi-2/c.tsx (/packages/vite/tests/multi-2/b.tsx): {"color", "css", "exported"}
@@ -52,7 +52,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/c.tsx"] = 
 `.exported-4lyf89 {
 ${exported.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/multi-2/entry.tsx: {"a", "color", "css"}
@@ -65,4 +65,4 @@ return [
 `.a-k1mv0l {
 ${a.css}
 }`
-].join('\n');
+];

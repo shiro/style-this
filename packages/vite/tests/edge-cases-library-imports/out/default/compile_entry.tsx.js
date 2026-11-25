@@ -8,4 +8,4 @@ return [
 `.a-tej8d6 {
 ${a.css}
 }`
-].join('\n');
+];

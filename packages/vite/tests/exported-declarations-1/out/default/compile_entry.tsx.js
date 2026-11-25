@@ -140,4 +140,4 @@ ${__styleThis_2.css}
 `.__styleThis_1-t6jshu {
 ${__styleThis_1.css}
 }`
-].join('\n');
+];

@@ -19,4 +19,4 @@ ${__styleThis_var_Extended_2.css}
 `.override-w9ezgl {
 ${override.css}
 }`
-].join('\n');
+];

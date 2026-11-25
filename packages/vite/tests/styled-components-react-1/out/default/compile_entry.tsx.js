@@ -65,4 +65,4 @@ ${__styleThis_var_StyleFunctions_4.css}
 `._GlobalBar-hqnklm {
 ${__styleThis_var__GlobalBar_2.css}
 }`
-].join('\n');
+];

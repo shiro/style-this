@@ -7,4 +7,4 @@ return [
 `.a-7ohiv8 {
 ${a.css}
 }`
-].join('\n');
+];

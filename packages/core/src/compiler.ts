@@ -33,10 +33,12 @@ export interface Transformer extends Omit<_Transformer, "transform"> {
   >;
 }
 
+/** Offsets are UTF-8 byte offsets */
 export type CssSourceMapData = Array<{
-  className: string;
+  /** Start of the declaration's rule in the CSS */
+  cssOffset: number;
+  /** Start of the declaration in the source */
   start: number;
-  end: number;
 }>;
 
 export type CssCachEntry = Promise<string | Error> & {

@@ -9,7 +9,7 @@ return [
 `.button-glmn01 {
 ${button.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/ignored-imports-1/lib.ts (/packages/vite/tests/ignored-imports-1/entry.tsx): {"color"}

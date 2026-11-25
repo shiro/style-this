@@ -13,4 +13,4 @@ ${a.css}
 `.b-w5irkh {
 ${b.css}
 }`
-].join('\n');
+];

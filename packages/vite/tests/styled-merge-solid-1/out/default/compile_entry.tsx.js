@@ -19,4 +19,4 @@ ${__styleThis_var_Extended_2.css}
 `.override-k1mzgd {
 ${override.css}
 }`
-].join('\n');
+];

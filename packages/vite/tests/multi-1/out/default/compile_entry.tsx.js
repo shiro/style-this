@@ -17,4 +17,4 @@ return [
 `.a-8pm3ch {
 ${a.css}
 }`
-].join('\n');
+];

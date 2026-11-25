@@ -65,4 +65,4 @@ ${test6.css}
 `.test7-ijc9m3 {
 ${test7.css}
 }`
-].join('\n');
+];

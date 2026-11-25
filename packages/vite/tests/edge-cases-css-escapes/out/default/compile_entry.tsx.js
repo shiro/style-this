@@ -19,4 +19,4 @@ ${dash.css}
 `.iconFont-234xiz {
 ${iconFont.css}
 }`
-].join('\n');
+];

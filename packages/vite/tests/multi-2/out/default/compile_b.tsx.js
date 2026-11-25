@@ -20,7 +20,7 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/multi-2/b.tsx"] = 
 `.exported-ev01qj {
 ${exported.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/multi-2/c.tsx (/packages/vite/tests/multi-2/b.tsx): {"color", "css", "exported"}
@@ -51,4 +51,4 @@ return [
 `.a-k1mv0l {
 ${a.css}
 }`
-].join('\n');
+];

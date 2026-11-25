@@ -56,4 +56,4 @@ return [
 `.box-qnol2j {
 ${box.css}
 }`
-].join('\n');
+];

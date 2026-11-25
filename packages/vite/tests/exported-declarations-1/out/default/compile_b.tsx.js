@@ -145,7 +145,7 @@ ${grid.css}
 `.__styleThis_1-hi3g5a {
 ${__styleThis_1.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/exported-declarations-1/c.tsx (/packages/vite/tests/exported-declarations-1/entry.tsx): {"__global__export__", "rounded"}
@@ -213,4 +213,4 @@ ${__styleThis_2.css}
 `.__styleThis_1-t6jshu {
 ${__styleThis_1.css}
 }`
-].join('\n');
+];

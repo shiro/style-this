@@ -10,7 +10,7 @@ return [
 `.a-gxu385 {
 ${a.css}
 }`
-].join('\n');
+];
 
 
 // /packages/vite/tests/edge-cases-1/shared.tsx (/packages/vite/tests/edge-cases-1/entry-1.tsx): {"Math", "css", "num", "shared", "top"}
@@ -38,4 +38,4 @@ global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/edge-cases-1/share
 `.shared-ar0tez {
 ${shared.css}
 }`
-].join('\n');
+];

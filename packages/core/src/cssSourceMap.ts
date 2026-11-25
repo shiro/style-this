@@ -27,28 +27,21 @@ export function generateCssSourceMap(
   originalSource: string,
   generatedFilepath?: string,
 ): SourceMap {
-  const segments: SourceMapSegment[] = [];
-  // the compiler's offsets are UTF-8 byte offsets
-  const originalBytes = new TextEncoder().encode(originalSource);
-  const decoder = new TextDecoder();
+  const generatedPosition = positionOfByteOffset(cssContent);
+  const originalPosition = positionOfByteOffset(originalSource);
 
-  // For each CSS class, find its position in the generated CSS and map it back
-  for (const entry of sourcemapData) {
-    const selector = `.${entry.className}`;
-    const position = findSelectorInCss(cssContent, selector);
-
-    if (position) {
-      const originalPos = getLineAndColumn(decoder.decode(originalBytes.subarray(0, entry.start)));
-
-      segments.push({
-        generatedLine: position.line,
-        generatedColumn: position.column,
-        originalLine: originalPos.line,
-        originalColumn: originalPos.column,
-        source: originalFilepath,
-      });
-    }
-  }
+  // map the start of each declaration's rule back to the declaration
+  const segments = sourcemapData.map((entry): SourceMapSegment => {
+    const generated = generatedPosition(entry.cssOffset);
+    const original = originalPosition(entry.start);
+    return {
+      generatedLine: generated.line,
+      generatedColumn: generated.column,
+      originalLine: original.line,
+      originalColumn: original.column,
+      source: originalFilepath,
+    };
+  });
 
   // Convert segments to VLQ mappings
   const mappings = segmentsToVLQ(segments);
@@ -63,27 +56,26 @@ export function generateCssSourceMap(
   };
 }
 
-function findSelectorInCss(
-  css: string,
-  selector: string,
-): { line: number; column: number } | null {
-  const index = css.indexOf(selector);
-  if (index === -1) return null;
+/** Line and (UTF-16) column of UTF-8 byte offsets in `text` */
+function positionOfByteOffset(text: string): (offset: number) => { line: number; column: number } {
+  const bytes = new TextEncoder().encode(text);
+  const decoder = new TextDecoder();
+  const lineStarts = [0];
+  bytes.forEach((byte, index) => {
+    if (byte === 0x0a) lineStarts.push(index + 1);
+  });
 
-  const beforeSelector = css.substring(0, index);
-  const line = (beforeSelector.match(/\n/g) || []).length;
-  const lastNewline = beforeSelector.lastIndexOf("\n");
-  const column = index - lastNewline - 1;
-
-  return { line, column };
-}
-
-/** Line and column at the end of `beforeOffset` */
-function getLineAndColumn(beforeOffset: string): { line: number; column: number } {
-  const line = (beforeOffset.match(/\n/g) || []).length;
-  const column = beforeOffset.length - beforeOffset.lastIndexOf("\n") - 1;
-
-  return { line, column };
+  return (offset) => {
+    // the last line starting at or before the offset
+    let line = 0;
+    let high = lineStarts.length - 1;
+    while (line < high) {
+      const middle = (line + high + 1) >> 1;
+      if (lineStarts[middle] <= offset) line = middle;
+      else high = middle - 1;
+    }
+    return { line, column: decoder.decode(bytes.subarray(lineStarts[line], offset)).length };
+  };
 }
 
 /**
