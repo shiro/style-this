@@ -44,9 +44,11 @@ export namespace Sizes {
   export namespace Inner {
     export const gap = "3px";
   }
+  // hoisted with the template
+  import Nested = Inner;
   export const card = css`
     gap: ${gap};
-    padding: ${Inner.gap};
+    padding: ${Nested.gap};
   `;
 }
 
@@ -62,8 +64,14 @@ export namespace Badge {
   export const color = "olive";
 }
 
+// aliases, like `const`
+import Inner = Sizes.Inner;
+export import InnerSizes = Sizes.Inner;
+import type InnerType = Sizes.Inner;
+
 const grid = css`
   gap: ${Sizes.gap};
+  padding: ${Inner.gap};
   font-weight: ${Weight.Bold};
   color: ${Badge.color};
 `;

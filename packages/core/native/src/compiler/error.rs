@@ -44,6 +44,13 @@ pub enum TransformError {
         row: usize,
         column: usize,
     },
+    #[error("'import {name} = require(...)' isn't supported, use an ES import instead")]
+    ImportRequireError {
+        name: String,
+        filepath: String,
+        row: usize,
+        column: usize,
+    },
     #[error("invalid option '{option}', expected {expected}")]
     InvalidOption {
         option: &'static str,
@@ -117,6 +124,12 @@ impl From<&TransformError> for JsValue {
                 ..
             }
             | TransformError::DestructuredTemplateError {
+                filepath,
+                row,
+                column,
+                ..
+            }
+            | TransformError::ImportRequireError {
                 filepath,
                 row,
                 column,

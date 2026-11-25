@@ -1,6 +1,10 @@
 import { css } from "@style-this/core";
 import Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from "./b";
+import * as b from "./b";
 import rounded from "./c";
+
+// a member of a namespace import
+import InnerSizes = b.InnerSizes;
 
 const color = "red";
 
@@ -15,6 +19,7 @@ const page = css`
     gap: ${Sizes.gap};
     font-weight: ${Weight.Bold};
     color: ${Badge.color};
+    padding: ${InnerSizes.gap};
   }
 `;
 

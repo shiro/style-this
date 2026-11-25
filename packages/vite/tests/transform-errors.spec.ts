@@ -17,6 +17,8 @@ const syntaxError = `${cssImport}\n\nexport const style = css\`\n  color: blue;\
 const dynamicVariableAccess = `${cssImport}\n\nexport const style = (color: string) => css\`\n  color: \${color};\n\`;\n`;
 // used to panic, which hung the transform
 const destructuredTemplate = `${cssImport}\n\nexport const [style] = css\`\n  color: blue;\n\`;\n`;
+// CommonJS, its module isn't evaluated as a dependency
+const importRequire = `${cssImport}\nimport other = require("./other");\n\nexport const style = css\`\n  color: \${other.color};\n\`;\n`;
 
 const createEnvironment = () => {
   const modules = new Map<string, { id: string; url: string; file: string; lastHMRTimestamp: number; importers: Set<unknown> }>();
@@ -110,6 +112,7 @@ describe.each([false, true])("transform errors (atomic: %s)", (atomic) => {
     ["syntax errors", syntaxError, "failed to parse program", { line: 8, column: 1 }],
     ["dynamic variable access", dynamicVariableAccess, "tried to access dynamic variable 'color'", { line: 3, column: 41 }],
     ["destructured templates", destructuredTemplate, "'css' templates can't be destructured", { line: 3, column: 14 }],
+    ["import require", importRequire, "'import other = require(...)' isn't supported", { line: 2, column: 1 }],
   ])("%s don't block the virtual modules", async (_, code, message, loc) => {
     await writeFile(path("broken.tsx"), code);
     await expect(transform("broken.tsx")).rejects.toMatchObject({

@@ -7,7 +7,8 @@ pub(crate) enum VirtualProgramInsert<'alloc> {
     VariableDeclarator(VariableDeclarator<'alloc>),
     FunctionDeclaration(Function<'alloc>),
     ClassDeclaration(Class<'alloc>),
-    /// namespaces and enums, compiled to JS with the rest of the virtual program
+    /// namespaces, enums and `import A = N.B` aliases, compiled to JS with the rest of the
+    /// virtual program
     TSDeclaration(Declaration<'alloc>),
 }
 

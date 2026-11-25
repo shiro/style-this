@@ -30,6 +30,8 @@ export namespace Sizes {
 	export namespace Inner {
 		export const gap = "3px";
 	}
+	// hoisted with the template
+import Nested = Inner;
 	export const card = "card-7styr4";
 }
 export enum Weight {
@@ -42,6 +44,10 @@ export function Badge() {
 export namespace Badge {
 	export const color = "olive";
 }
+// aliases, like `const`
+import Inner = Sizes.Inner;
+export import InnerSizes = Sizes.Inner;
+import InnerType = Sizes.Inner;
 const grid = "grid-9erkd2";
 // references itself under its local name
 export default class Palette {

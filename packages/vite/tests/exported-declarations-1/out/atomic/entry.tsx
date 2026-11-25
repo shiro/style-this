@@ -1,9 +1,12 @@
 // @ts-nocheck
 import { css } from "@style-this/core";
 import Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from "./b";
+import * as b from "./b";
 import rounded from "./c";
 import * as _styleThisClasses from "virtual:style-this:./entry.tsx.style-this.js";
 import "virtual:style-this:/entry.tsx.css";
+// a member of a namespace import
+import InnerSizes = b.InnerSizes;
 const color = "red";
 const nav = _styleThisClasses.nav;
 const page = _styleThisClasses.page;

@@ -394,6 +394,14 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
         self.declare(enum_member_names(it), false);
         walk::walk_ts_enum_body(self, it);
     }
+    fn visit_ts_import_equals_declaration(
+        &mut self,
+        it: &oxc_ast::ast::TSImportEqualsDeclaration<'a>,
+    ) {
+        self.visit_named(Some(&it.id), true, |this| {
+            walk::walk_ts_import_equals_declaration(this, it)
+        });
+    }
     fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
         self.declare(binding_pattern_kind_get_idents(&it.pattern.kind), false);
         walk::walk_formal_parameter(self, it);
@@ -411,12 +419,18 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
     }
 }
 
-/// The name of a namespace or enum declaration that exists at runtime, i.e. isn't `declare`d.
+/// The name of a namespace, enum or `import A = ...` declaration that exists at runtime, i.e.
+/// isn't `declare`d or type-only.
 pub fn ts_declaration_id<'b, 'a>(
     declaration: &'b Declaration<'a>,
 ) -> Option<&'b oxc_ast::ast::BindingIdentifier<'a>> {
     match declaration {
         Declaration::TSEnumDeclaration(declaration) if !declaration.declare => Some(&declaration.id),
+        Declaration::TSImportEqualsDeclaration(declaration)
+            if declaration.import_kind.is_value() =>
+        {
+            Some(&declaration.id)
+        }
         Declaration::TSModuleDeclaration(declaration)
             if !declaration.declare && !declaration.kind.is_global() =>
         {

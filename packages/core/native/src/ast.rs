@@ -69,6 +69,30 @@ pub fn build_identifier<'alloc>(
     Expression::Identifier(ast_builder.alloc_identifier_reference(span, ast_builder.atom(name)))
 }
 
+/// e.g. `N.B` of `import A = N.B`
+pub fn build_ts_type_name_expression<'alloc>(
+    ast_builder: &AstBuilder<'alloc>,
+    name: &oxc_ast::ast::TSTypeName<'alloc>,
+) -> Expression<'alloc> {
+    use oxc_allocator::CloneIn;
+    use oxc_ast::ast::TSTypeName;
+
+    match name {
+        TSTypeName::IdentifierReference(ident) => {
+            Expression::Identifier(ident.clone_in(ast_builder.allocator))
+        }
+        TSTypeName::QualifiedName(name) => Expression::StaticMemberExpression(
+            ast_builder.alloc_static_member_expression(
+                name.span,
+                build_ts_type_name_expression(ast_builder, &name.left),
+                name.right.clone_in(ast_builder.allocator),
+                false,
+            ),
+        ),
+        TSTypeName::ThisExpression(this) => ast_builder.expression_this(this.span),
+    }
+}
+
 #[allow(dead_code)]
 pub fn build_assignment<'alloc>(
     ast_builder: &AstBuilder<'alloc>,

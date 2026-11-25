@@ -17,10 +17,10 @@ use crate::utils::{
 use oxc_allocator::{Allocator, CloneIn};
 use oxc_ast::AstBuilder;
 use oxc_ast::ast::{
-    BindingPatternKind, ChainElement, ExportDefaultDeclaration,
+    BindingPatternKind, ChainElement, Declaration, ExportDefaultDeclaration,
     ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, LogicalOperator, Program,
-    ForStatementInit, ForStatementLeft, Statement, TaggedTemplateExpression, VariableDeclaration,
-    VariableDeclarationKind, VariableDeclarator,
+    ForStatementInit, ForStatementLeft, Statement, TSModuleReference, TSTypeName,
+    TaggedTemplateExpression, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 use oxc_ast_visit::VisitMut;
 use oxc_semantic::ScopeFlags;
@@ -239,7 +239,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         self.leave_scope();
     }
 
-    /// Namespaces and enums, see `VirtualProgramInsert::TSDeclaration`.
+    /// See `VirtualProgramInsert::TSDeclaration`.
     fn visit_ts_declaration(&mut self, it: &mut Statement<'alloc>) {
         let pos = self.tmp_program_statement_buffer.last().unwrap().len();
         // before the walk rewrites the CSS inside
@@ -513,6 +513,20 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             VirtualProgramInsert::TSDeclaration(mut declaration) => {
                 if self.check_dynamic_variable_access(&right_references, declaration.span().start)
                 {
+                    return;
+                }
+                // CommonJS, its module isn't evaluated as a dependency
+                if let Declaration::TSImportEqualsDeclaration(import) = &declaration
+                    && let TSModuleReference::ExternalModuleReference(_) = import.module_reference
+                {
+                    let (row, column) =
+                        get_pos_from_offset(self.program_code, import.span.start as usize);
+                    self.error = Some(TransformError::ImportRequireError {
+                        name: import.id.name.to_string(),
+                        filepath: self.program_filepath.to_string(),
+                        row,
+                        column,
+                    });
                     return;
                 }
 
@@ -883,10 +897,34 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 class.name().unwrap().to_string(),
                 Statement::ClassDeclaration(self.ast_builder.alloc(class)),
             ),
-            VirtualProgramInsert::TSDeclaration(declaration) => (
-                utils::ts_declaration_id(&declaration).unwrap().name.to_string(),
-                Statement::from(declaration),
-            ),
+            VirtualProgramInsert::TSDeclaration(declaration) => {
+                let name = utils::ts_declaration_id(&declaration).unwrap().name.to_string();
+                let statement = match &declaration {
+                    // as `let A = N.B`, oxc drops aliases without value references, e.g. the ones
+                    // only read by importers
+                    Declaration::TSImportEqualsDeclaration(import) => {
+                        let value = ast::build_ts_type_name_expression(
+                            self.ast_builder,
+                            import.module_reference.to_ts_type_name(),
+                        );
+                        Statement::VariableDeclaration(
+                            self.ast_builder.alloc_variable_declaration(
+                                span,
+                                kind,
+                                self.ast_builder.vec1(ast::build_variable_declarator(
+                                    self.ast_builder,
+                                    span,
+                                    &name,
+                                    value,
+                                )),
+                                false,
+                            ),
+                        )
+                    }
+                    _ => Statement::from(declaration),
+                };
+                (name, statement)
+            }
         };
 
         self.tmp_program_statement_buffer
@@ -1539,6 +1577,40 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
 
         oxc_ast_visit::walk_mut::walk_member_expression(self, it);
+    }
+
+    /// `ns.X` of `import A = ns.X` is a type name, not a member expression.
+    fn visit_ts_import_equals_declaration(
+        &mut self,
+        it: &mut oxc_ast::ast::TSImportEqualsDeclaration<'alloc>,
+    ) {
+        if !self.scan_pass
+            && let Some(name) = it.module_reference.as_ts_type_name()
+        {
+            let (namespace, property) = match name {
+                TSTypeName::IdentifierReference(ident) => (Some(ident), None),
+                TSTypeName::QualifiedName(name) => {
+                    let mut name = &**name;
+                    while let TSTypeName::QualifiedName(left) = &name.left {
+                        name = left;
+                    }
+                    match &name.left {
+                        TSTypeName::IdentifierReference(ident) => {
+                            (Some(ident), Some(name.right.name.to_string()))
+                        }
+                        _ => (None, None),
+                    }
+                }
+                TSTypeName::ThisExpression(_) => (None, None),
+            };
+            if let Some(namespace) = namespace
+                && let Some(remote_referenced_idents) = self.namespace_import_mut(&namespace.name)
+            {
+                remote_referenced_idents.insert(property.unwrap_or(STAR_IMPORT.to_string()));
+            }
+        }
+
+        oxc_ast_visit::walk_mut::walk_ts_import_equals_declaration(self, it);
     }
 
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {

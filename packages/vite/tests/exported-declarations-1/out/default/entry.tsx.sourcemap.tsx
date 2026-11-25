@@ -5,15 +5,19 @@
 //     "/packages/vite/tests/exported-declarations-1/entry.tsx"
 //   ],
 //   "sourcesContent": [
-//     "import { css } from \"@style-this/core\";\nimport Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from \"./b\";\nimport rounded from \"./c\";\n\nconst color = \"red\";\n\nconst nav = css`\n  .${getLink()}, .${Theme.accent} {\n    font-weight: ${weight};\n  }\n`;\n\nconst page = css`\n  .${Page()} > .${Palette.accent}, .${rounded()}, .${Sizes.card} {\n    gap: ${Sizes.gap};\n    font-weight: ${Weight.Bold};\n    color: ${Badge.color};\n  }\n`;\n\nexport function Button() {\n  const button = css`\n    color: ${color};\n  `;\n  return button;\n}\n\nexport class Card {\n  card = css`\n    padding: 4px;\n  `;\n\n  render() {\n    return css`\n      margin: 8px;\n    `;\n  }\n}\n\nexport default function Page() {\n  return css`\n    display: flex;\n  `;\n}\n"
+//     "import { css } from \"@style-this/core\";\nimport Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from \"./b\";\nimport * as b from \"./b\";\nimport rounded from \"./c\";\n\n// a member of a namespace import\nimport InnerSizes = b.InnerSizes;\n\nconst color = \"red\";\n\nconst nav = css`\n  .${getLink()}, .${Theme.accent} {\n    font-weight: ${weight};\n  }\n`;\n\nconst page = css`\n  .${Page()} > .${Palette.accent}, .${rounded()}, .${Sizes.card} {\n    gap: ${Sizes.gap};\n    font-weight: ${Weight.Bold};\n    color: ${Badge.color};\n    padding: ${InnerSizes.gap};\n  }\n`;\n\nexport function Button() {\n  const button = css`\n    color: ${color};\n  `;\n  return button;\n}\n\nexport class Card {\n  card = css`\n    padding: 4px;\n  `;\n\n  render() {\n    return css`\n      margin: 8px;\n    `;\n  }\n}\n\nexport default function Page() {\n  return css`\n    display: flex;\n  `;\n}\n"
 //   ],
 //   "names": [],
-//   "mappings": "AAMY;;;;;AAMC;;;;;;;AASI;;;;AAYN;;;;AALF;;;;AAYA"
+//   "mappings": "AAUY;;;;;AAMC;;;;;;;;AAUI;;;;AAYN;;;;AALF;;;;AAYA"
 // }
 
 import { css } from "@style-this/core";
 import Palette, { Badge, getLink, Sizes, Theme, weight, Weight } from "./b";
+import * as b from "./b";
 import rounded from "./c";
+
+// a member of a namespace import
+import InnerSizes = b.InnerSizes;
 
 const color = "red";
 
@@ -28,6 +32,7 @@ const page = css`
     gap: ${Sizes.gap};
     font-weight: ${Weight.Bold};
     color: ${Badge.color};
+    padding: ${InnerSizes.gap};
   }
 `;
 
