@@ -8,16 +8,15 @@ use super::dependency_tracker::{DEFAULT_EXPORT, STAR_IMPORT};
 use super::evaluator::{program_imports, slice_program};
 use super::transformer::Transformer;
 use crate::utils::{
-    binding_pattern_kind_get_idents, statement_get_references, transformed_source_type,
+    binding_pattern_get_idents, statement_get_references, transformed_source_type,
     ts_declaration_id,
 };
 use js_sys::Array;
 use oxc_allocator::{Allocator, CloneIn};
-use oxc_ast::AstBuilder;
 use oxc_ast::ast::{Expression, ImportDeclarationSpecifier, Program, Statement};
+use oxc_ast::builder::AstBuilder;
 use oxc_codegen::Codegen;
 use oxc_parser::{ParseOptions, Parser};
-use oxc_span::SourceType;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
@@ -97,7 +96,7 @@ fn slice_exports(
             ..ParseOptions::default()
         })
         .parse();
-    if parsed.panicked || !parsed.errors.is_empty() {
+    if parsed.fatal_error || parsed.diagnostics.has_errors() {
         return HashMap::new();
     }
 
@@ -162,7 +161,7 @@ fn slice_export<'alloc>(
                 }
             };
             if references.contains(local) {
-                imports.insert((import.source.value.to_string(), imported));
+                imports.insert((import.source.value.display().to_string(), imported));
             }
         }
     }
@@ -219,7 +218,7 @@ fn statement_declared_names(stmt: &Statement) -> Option<HashSet<String>> {
             declaration
                 .declarations
                 .iter()
-                .flat_map(|declarator| binding_pattern_kind_get_idents(&declarator.id.kind))
+                .flat_map(|declarator| binding_pattern_get_idents(&declarator.id))
                 .collect(),
         ),
         Statement::FunctionDeclaration(function) => {
@@ -406,6 +405,7 @@ impl Transformer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use oxc_span::SourceType;
 
     fn prune(code: &str, export: &str) -> (String, BTreeSet<String>) {
         let allocator = Allocator::default();

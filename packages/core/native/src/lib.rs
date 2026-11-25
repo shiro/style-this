@@ -8,7 +8,8 @@ use std::path::Path;
 
 use oxc_allocator::Allocator;
 use oxc_allocator::CloneIn;
-use oxc_ast::ast::BindingPatternKind;
+use oxc_allocator::{ArenaVec, GetAllocator};
+use oxc_ast::ast::{Ident, Str};
 use oxc_ast::ast::ClassBody;
 use oxc_ast::ast::ExportDefaultDeclarationKind;
 use oxc_ast::ast::Expression;
@@ -18,10 +19,7 @@ use oxc_ast::ast::TaggedTemplateExpression;
 use oxc_ast::ast::TemplateElement;
 use oxc_ast::ast::VariableDeclarationKind;
 use oxc_ast::ast::VariableDeclarator;
-use oxc_ast::{
-    AstBuilder,
-    ast::Statement,
-};
+use oxc_ast::{ast::Statement, builder::AstBuilder};
 use oxc_ast_visit::{Visit, VisitMut};
 use oxc_parser::{ParseOptions, Parser};
 use oxc_span::GetSpan;

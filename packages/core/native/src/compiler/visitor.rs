@@ -8,20 +8,22 @@ use crate::error_mapping::get_pos_from_offset;
 use crate::library_references::{LibraryExport, LibraryReferences};
 use crate::styled_component_transformer::{CSS_TAG_LOCAL_NAME, ClassDisplayNames};
 use crate::utils::{
-    self, binding_pattern_kind_get_idents, replace_in_class_body_using_spans,
+    self, binding_pattern_get_idents, replace_in_class_body_using_spans,
     replace_in_class_using_identifiers, replace_in_declaration_using_identifiers,
     replace_in_declaration_using_spans, replace_in_expression_using_identifiers,
     replace_in_expression_using_spans, replace_in_function_using_identifiers,
     replace_in_function_using_spans, declared_values, program_declared_values,
 };
-use oxc_allocator::{Allocator, CloneIn};
-use oxc_ast::AstBuilder;
+use oxc_allocator::{Allocator, ArenaBox, ArenaVec, CloneIn, TakeIn};
 use oxc_ast::ast::{
-    BindingPatternKind, ChainElement, Declaration, ExportDefaultDeclaration,
-    ExportDefaultDeclarationKind, Expression, ImportDeclarationSpecifier, LogicalOperator, Program,
-    ForStatementInit, ForStatementLeft, Statement, TSModuleReference, TSTypeName,
-    TaggedTemplateExpression, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    BindingIdentifier, BindingPattern, ChainElement, Declaration, ExportDeclaration,
+    ExportDefaultDeclaration, ExportDefaultDeclarationKind, ExportFromDeclaration,
+    ExportNamedDeclaration, Expression, ForStatementInit, ForStatementLeft, Ident,
+    IdentifierName, ImportDeclarationSpecifier, LogicalOperator, ObjectPropertyKind, Program, Str,
+    Statement, TSModuleReference, TSTypeName, TaggedTemplateExpression, TemplateElement,
+    TemplateElementValue, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
+use oxc_ast::builder::AstBuilder;
 use oxc_ast_visit::VisitMut;
 use oxc_semantic::ScopeFlags;
 use oxc_span::{GetSpan, Span};
@@ -50,6 +52,8 @@ pub struct VisitorTransformer<'a, 'alloc> {
     exported_idents: HashMap<String, String>,
     scope_depth: u32,
     scope_flags: Vec<ScopeFlags>,
+    /// kind of the declaration whose declarators are being visited
+    declaration_kind: VariableDeclarationKind,
 
     scan_pass: bool,
     /// depth of the scope whose statements are being scanned
@@ -121,6 +125,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             exported_idents: Default::default(),
             scope_depth: 0,
             scope_flags: Default::default(),
+            declaration_kind: VariableDeclarationKind::Let,
 
             replacement_points: Default::default(),
 
@@ -231,7 +236,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             let declarator =
                 ast::build_variable_declarator(self.ast_builder, span, name, expression);
             self.include_declaration(
-                VirtualProgramInsert::VariableDeclarator(declarator),
+                VirtualProgramInsert::VariableDeclarator(declarator, VariableDeclarationKind::Const),
                 right_references,
                 0,
             );
@@ -260,13 +265,13 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let variable_declarator =
             ast::build_variable_declarator(self.ast_builder, span, DEFAULT_EXPORT, expression);
 
-        let mut statement =
-            Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
-                span,
-                VariableDeclarationKind::Let,
-                self.ast_builder.vec1(variable_declarator),
-                false,
-            ));
+        let mut statement = Statement::new_variable_declaration(
+            span,
+            VariableDeclarationKind::Let,
+            [variable_declarator],
+            false,
+            self.ast_builder,
+        );
         self.visit_statement(&mut statement);
     }
 
@@ -282,9 +287,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         // a `var` in a nested block can be referenced anywhere in the function
         let depth = match &declaration {
-            VirtualProgramInsert::VariableDeclarator(declarator) => {
-                self.declaration_depth(declarator.kind)
-            }
+            VirtualProgramInsert::VariableDeclarator(_, kind) => self.declaration_depth(*kind),
             _ => self.current_depth(),
         };
 
@@ -517,7 +520,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 }
                 // CommonJS, its module isn't evaluated as a dependency
                 if let Declaration::TSImportEqualsDeclaration(import) = &declaration
-                    && let TSModuleReference::ExternalModuleReference(_) = import.module_reference
+                    && let TSModuleReference::ExternalModuleReference(_) = &import.module_reference
                 {
                     let (row, column) =
                         get_pos_from_offset(self.program_code, import.span.start as usize);
@@ -547,14 +550,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
                 VirtualProgramInsert::TSDeclaration(declaration)
             }
-            VirtualProgramInsert::VariableDeclarator(declarator) => {
-                let VariableDeclarator {
-                    span,
-                    kind,
-                    id,
-                    init,
-                    ..
-                } = declarator;
+            VirtualProgramInsert::VariableDeclarator(declarator, kind) => {
+                let VariableDeclarator { span, id, init, .. } = declarator;
                 let Some(mut right) = init else { return };
                 let init_span = right.span();
 
@@ -576,23 +573,18 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     self.get_alias(name).map(|v| v.to_string())
                 });
 
-                let mut aliased_idents = id.kind;
+                let mut aliased_idents = id;
                 self.alias_binding_pattern(&mut aliased_idents);
 
                 let variable_declarator = ast::build_variable_declarator_pattern(
                     self.ast_builder,
                     span,
-                    kind,
-                    self.ast_builder.binding_pattern(
-                        aliased_idents,
-                        None as Option<oxc_allocator::Box<_>>,
-                        false,
-                    ),
+                    aliased_idents,
                     right,
                 );
 
                 let ret = self.insert_into_virtual_program(
-                    VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                    VirtualProgramInsert::VariableDeclarator(variable_declarator, kind),
                     Some(pos),
                 );
 
@@ -600,10 +592,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 if let Some(variable_name) = ret {
                     self.replacement_points.insert(
                         init_span,
-                        Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                            span,
-                            self.ast_builder.atom(&variable_name),
-                        )),
+                        ast::build_identifier(self.ast_builder, span, &variable_name),
                     );
                 };
                 return;
@@ -752,7 +741,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let depth = self.declaration_depth(it.kind);
         for declarator in it.declarations.iter_mut() {
             self.dynamic_variable_names[depth]
-                .extend(binding_pattern_kind_get_idents(&declarator.id.kind));
+                .extend(binding_pattern_get_idents(&declarator.id));
             oxc_ast_visit::walk_mut::walk_variable_declarator(self, declarator);
         }
     }
@@ -784,7 +773,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let span = it.span();
         // `var`s can be redeclared, e.g. `var a = 1; var a = 2;`
         let kind = match &it {
-            VirtualProgramInsert::VariableDeclarator(declarator) if declarator.kind.is_var() => {
+            VirtualProgramInsert::VariableDeclarator(_, kind) if kind.is_var() => {
                 VariableDeclarationKind::Var
             }
             _ => VariableDeclarationKind::Let,
@@ -824,17 +813,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
         // copy the entire variable/function/class declaration verbatim
         let (temporary_variable_name, statement) = match it {
-            VirtualProgramInsert::VariableDeclarator(mut variable_declarator) => {
-                if let BindingPatternKind::BindingIdentifier(left) = &variable_declarator.id.kind {
+            VirtualProgramInsert::VariableDeclarator(mut variable_declarator, _) => {
+                if let BindingPattern::BindingIdentifier(left) = &variable_declarator.id {
                     (
                         left.name.to_string(),
-                        Statement::VariableDeclaration(
-                            self.ast_builder.alloc_variable_declaration(
-                                span,
-                                kind,
-                                self.ast_builder.vec1(variable_declarator),
-                                false,
-                            ),
+                        Statement::new_variable_declaration(
+                            span,
+                            kind,
+                            [variable_declarator],
+                            false,
+                            self.ast_builder,
                         ),
                     )
                 } else {
@@ -844,33 +832,25 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     // declaration destructuring the values out of it
                     let pattern = std::mem::replace(
                         &mut variable_declarator.id,
-                        self.ast_builder.binding_pattern(
-                            BindingPatternKind::BindingIdentifier(
-                                self.ast_builder.alloc_binding_identifier(
-                                    span,
-                                    self.ast_builder.atom(&variable_name),
-                                ),
-                            ),
-                            None as Option<oxc_allocator::Box<_>>,
-                            false,
+                        BindingPattern::new_binding_identifier(
+                            span,
+                            Ident::from_str_in(&variable_name, self.ast_builder),
+                            self.ast_builder,
                         ),
                     );
                     let destructure_declarator = ast::build_variable_declarator_pattern(
                         self.ast_builder,
                         span,
-                        kind,
                         pattern,
                         ast::build_identifier(self.ast_builder, span, &variable_name),
                     );
 
-                    let variable_declaration = Statement::VariableDeclaration(
-                        self.ast_builder.alloc_variable_declaration(
-                            span,
-                            VariableDeclarationKind::Let,
-                            self.ast_builder
-                                .vec1(variable_declarator.clone_in(self.allocator)),
-                            false,
-                        ),
+                    let variable_declaration = Statement::new_variable_declaration(
+                        span,
+                        VariableDeclarationKind::Let,
+                        [variable_declarator.clone_in(self.allocator)],
+                        false,
+                        self.ast_builder,
                     );
 
                     self.tmp_program_statement_buffer
@@ -878,24 +858,23 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                         .unwrap()
                         .insert(pos, variable_declaration);
 
-                    let s = Statement::VariableDeclaration(
-                        self.ast_builder.alloc_variable_declaration(
-                            span,
-                            kind,
-                            self.ast_builder.vec1(destructure_declarator),
-                            false,
-                        ),
+                    let s = Statement::new_variable_declaration(
+                        span,
+                        kind,
+                        [destructure_declarator],
+                        false,
+                        self.ast_builder,
                     );
                     (variable_name, s)
                 }
             }
             VirtualProgramInsert::FunctionDeclaration(function) => (
                 function.name().unwrap().to_string(),
-                Statement::FunctionDeclaration(self.ast_builder.alloc(function)),
+                Statement::FunctionDeclaration(ArenaBox::new_in(function, self.ast_builder)),
             ),
             VirtualProgramInsert::ClassDeclaration(class) => (
                 class.name().unwrap().to_string(),
-                Statement::ClassDeclaration(self.ast_builder.alloc(class)),
+                Statement::ClassDeclaration(ArenaBox::new_in(class, self.ast_builder)),
             ),
             VirtualProgramInsert::TSDeclaration(declaration) => {
                 let name = utils::ts_declaration_id(&declaration).unwrap().name.to_string();
@@ -903,22 +882,28 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     // as `let A = N.B`, oxc drops aliases without value references, e.g. the ones
                     // only read by importers
                     Declaration::TSImportEqualsDeclaration(import) => {
-                        let value = ast::build_ts_type_name_expression(
-                            self.ast_builder,
-                            import.module_reference.to_ts_type_name(),
-                        );
-                        Statement::VariableDeclaration(
-                            self.ast_builder.alloc_variable_declaration(
+                        let type_name = match &import.module_reference {
+                            TSModuleReference::IdentifierReference(ident) => {
+                                TSTypeName::IdentifierReference(ident.clone_in(self.allocator))
+                            }
+                            TSModuleReference::QualifiedName(name) => {
+                                TSTypeName::QualifiedName(name.clone_in(self.allocator))
+                            }
+                            TSModuleReference::ExternalModuleReference(_) => unreachable!(),
+                        };
+                        let value =
+                            ast::build_ts_type_name_expression(self.ast_builder, &type_name);
+                        Statement::new_variable_declaration(
+                            span,
+                            kind,
+                            [ast::build_variable_declarator(
+                                self.ast_builder,
                                 span,
-                                kind,
-                                self.ast_builder.vec1(ast::build_variable_declarator(
-                                    self.ast_builder,
-                                    span,
-                                    &name,
-                                    value,
-                                )),
-                                false,
-                            ),
+                                &name,
+                                value,
+                            )],
+                            false,
+                            self.ast_builder,
                         )
                     }
                     _ => Statement::from(declaration),
@@ -939,8 +924,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
     fn build_virtual_template_literal(
         &self,
         span: Span,
-        mut quasis: oxc_allocator::Vec<'alloc, oxc_ast::ast::TemplateElement<'alloc>>,
-        mut expressions: oxc_allocator::Vec<'alloc, Expression<'alloc>>,
+        mut quasis: ArenaVec<'alloc, TemplateElement<'alloc>>,
+        mut expressions: ArenaVec<'alloc, Expression<'alloc>>,
     ) -> Expression<'alloc> {
         utils::trim_newlines(self.ast_builder, &mut quasis);
         utils::escape_raw_quasis(self.ast_builder, &mut quasis);
@@ -956,8 +941,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             });
         }
 
-        self.ast_builder
-            .expression_template_literal(span, quasis, expressions)
+        Expression::new_template_literal(span, quasis, expressions, self.ast_builder)
     }
 
     /// inserts the `var.css = \`...\`` part
@@ -972,8 +956,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         let span = it.span;
 
         // Filter out extraClass calls from expressions and adjust quasis accordingly
-        let mut new_quasis = oxc_allocator::Vec::new_in(self.allocator);
-        let mut new_expressions = oxc_allocator::Vec::new_in(self.allocator);
+        let mut new_quasis = ArenaVec::new_in(self.ast_builder);
+        let mut new_expressions = ArenaVec::new_in(self.ast_builder);
 
         let mut quasi_iter = it.quasi.quasis.iter();
 
@@ -989,21 +973,22 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
                 if is_extra_class {
                     // Merge this quasi with the next one
-                    let merged_value = format!("{}{}", current_quasi_raw, next_quasi.value.raw);
+                    let merged_value = format!("{}{}", current_quasi_raw, next_quasi.value.raw.as_str());
                     current_quasi_raw = self.allocator.alloc_str(&merged_value);
                     current_tail = next_quasi.tail;
                 } else {
                     // Keep the expression and add current quasi
-                    let value = oxc_ast::ast::TemplateElementValue {
-                        raw: self.ast_builder.atom(current_quasi_raw),
-                        cooked: Some(self.ast_builder.atom(current_quasi_raw)),
+                    let raw = Str::from_str_in(current_quasi_raw, self.ast_builder);
+                    let value = TemplateElementValue {
+                        raw,
+                        cooked: Some(raw.into()),
                     };
-                    new_quasis.push(oxc_ast::ast::TemplateElement {
-                        span: current_span,
-                        tail: current_tail,
+                    new_quasis.push(TemplateElement::new(
+                        current_span,
                         value,
-                        lone_surrogates: false,
-                    });
+                        current_tail,
+                        self.ast_builder,
+                    ));
                     new_expressions.push(expr.clone_in(self.allocator));
                     current_quasi_raw = next_quasi.value.raw.as_str();
                     current_span = next_quasi.span;
@@ -1012,16 +997,17 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             }
 
             // Add the final quasi
-            let value = oxc_ast::ast::TemplateElementValue {
-                raw: self.ast_builder.atom(current_quasi_raw),
-                cooked: Some(self.ast_builder.atom(current_quasi_raw)),
+            let raw = Str::from_str_in(current_quasi_raw, self.ast_builder);
+            let value = TemplateElementValue {
+                raw,
+                cooked: Some(raw.into()),
             };
-            new_quasis.push(oxc_ast::ast::TemplateElement {
-                span: current_span,
-                tail: current_tail,
+            new_quasis.push(TemplateElement::new(
+                current_span,
                 value,
-                lone_surrogates: false,
-            });
+                current_tail,
+                self.ast_builder,
+            ));
         }
 
         let right = self.build_virtual_template_literal(span, new_quasis, new_expressions);
@@ -1036,7 +1022,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 span,
             ));
 
-        let stmt = Statement::ExpressionStatement(self.ast_builder.alloc_expression_statement(
+        let stmt = Statement::new_expression_statement(
             span,
             ast::build_object_member_string_assignment(
                 self.ast_builder,
@@ -1045,7 +1031,8 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                 "css",
                 right,
             ),
-        ));
+            self.ast_builder,
+        );
 
         self.tmp_program_statement_buffer
             .last_mut()
@@ -1069,16 +1056,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         );
 
         self.insert_into_virtual_program(
-            VirtualProgramInsert::VariableDeclarator(variable_declarator),
+            VirtualProgramInsert::VariableDeclarator(
+                variable_declarator,
+                VariableDeclarationKind::Const,
+            ),
             None,
         );
 
         self.replacement_points.insert(
             span,
-            Expression::Identifier(
-                self.ast_builder
-                    .alloc_identifier_reference(span, self.ast_builder.atom(variable_name)),
-            ),
+            ast::build_identifier(self.ast_builder, span, variable_name),
         );
     }
 
@@ -1163,16 +1150,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     .insert(variable_name.to_string());
 
                 self.insert_into_virtual_program(
-                    VirtualProgramInsert::VariableDeclarator(variable_declarator),
+                    VirtualProgramInsert::VariableDeclarator(
+                        variable_declarator,
+                        VariableDeclarationKind::Const,
+                    ),
                     None,
                 );
 
                 self.replacement_points.insert(
                     span,
-                    Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                        span,
-                        self.ast_builder.atom(&resolved_variable_name),
-                    )),
+                    ast::build_identifier(self.ast_builder, span, &resolved_variable_name),
                 );
 
                 ast::build_undefined(self.ast_builder, span)
@@ -1201,17 +1188,16 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         extra_classes: &BTreeSet<String>,
     ) -> Expression<'alloc> {
         if self.atomic {
-            return Expression::StaticMemberExpression(
-                self.ast_builder.alloc_static_member_expression(
+            return Expression::new_static_member_expression(
+                span,
+                ast::build_identifier(self.ast_builder, span, ATOMIC_CLASSES_IDENT),
+                IdentifierName::new(
                     span,
-                    Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                        span,
-                        self.ast_builder.atom(ATOMIC_CLASSES_IDENT),
-                    )),
-                    self.ast_builder
-                        .identifier_name(span, self.ast_builder.atom(variable_name)),
-                    false,
+                    Ident::from_str_in(variable_name, self.ast_builder),
+                    self.ast_builder,
                 ),
+                false,
+                self.ast_builder,
             );
         }
 
@@ -1228,7 +1214,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
             for arg in &call.arguments {
                 if let oxc_ast::ast::Argument::StringLiteral(str_lit) = arg {
                     // Split by whitespace and collect class names
-                    for class in str_lit.value.split_whitespace() {
+                    for class in str_lit.value.as_str().into_iter().flat_map(str::split_whitespace) {
                         extra_classes.insert(class.to_string());
                     }
                 }
@@ -1238,36 +1224,36 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         extra_classes
     }
 
-    fn alias_binding_pattern(&self, pattern: &mut BindingPatternKind<'alloc>) {
+    fn alias_binding_pattern(&self, pattern: &mut BindingPattern<'alloc>) {
         match pattern {
-            BindingPatternKind::BindingIdentifier(it) => {
+            BindingPattern::BindingIdentifier(it) => {
                 if let Some(name) = self.get_alias(&it.name) {
-                    it.name = self.ast_builder.atom(name);
+                    it.name = Ident::from_str_in(name, self.ast_builder);
                 }
             }
-            BindingPatternKind::ObjectPattern(pattern) => {
+            BindingPattern::ObjectPattern(pattern) => {
                 pattern
                     .properties
                     .iter_mut()
-                    .for_each(|v| self.alias_binding_pattern(&mut v.value.kind));
+                    .for_each(|v| self.alias_binding_pattern(&mut v.value));
 
                 if let Some(rest) = &mut pattern.rest {
-                    self.alias_binding_pattern(&mut rest.argument.kind);
+                    self.alias_binding_pattern(&mut rest.argument);
                 }
             }
-            BindingPatternKind::ArrayPattern(pattern) => {
+            BindingPattern::ArrayPattern(pattern) => {
                 pattern
                     .elements
                     .iter_mut()
                     .filter_map(|element| element.as_mut())
-                    .for_each(|element| self.alias_binding_pattern(&mut element.kind));
+                    .for_each(|element| self.alias_binding_pattern(element));
 
                 if let Some(rest) = &mut pattern.rest {
-                    self.alias_binding_pattern(&mut rest.argument.kind);
+                    self.alias_binding_pattern(&mut rest.argument);
                 }
             }
-            BindingPatternKind::AssignmentPattern(pattern) => {
-                self.alias_binding_pattern(&mut pattern.left.kind);
+            BindingPattern::AssignmentPattern(pattern) => {
+                self.alias_binding_pattern(&mut pattern.left);
             }
         };
     }
@@ -1319,7 +1305,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                             self.namespace_imports.insert(
                                 local.clone(),
                                 (
-                                    export.source.value.to_string(),
+                                    export.source.value.display().to_string(),
                                     HashSet::from([STAR_IMPORT.to_string()]),
                                 ),
                             );
@@ -1328,21 +1314,28 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     }
                     None => star_reexports.push((
                         utils::star_reexport_namespace_name(star_reexport_idx - 1),
-                        export.source.value.to_string(),
+                        export.source.value.display().to_string(),
                     )),
                 }
                 continue;
             }
 
-            let Statement::ExportNamedDeclaration(export) = stmt else {
-                continue;
+            let (specifiers, export_kind, has_source) = match stmt {
+                Statement::ExportNamedDeclaration(export) => {
+                    (&export.specifiers, export.export_kind, false)
+                }
+                Statement::ExportFromDeclaration(export) => {
+                    (&export.specifiers, export.export_kind, true)
+                }
+                _ => continue,
             };
-            if export.export_kind.is_type() {
+            if export_kind.is_type() {
                 continue;
             }
 
-            for specifier in &export.specifiers {
-                let exported = match specifier.exported.name().as_str() {
+            for specifier in specifiers {
+                let exported_name = specifier.exported.name().to_string();
+                let exported = match exported_name.as_str() {
                     "default" => DEFAULT_EXPORT.to_string(),
                     name => name.to_string(),
                 };
@@ -1352,21 +1345,21 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
                     continue;
                 }
 
-                let local = if export.source.is_some() {
-                    utils::reexport_local_name(&specifier.exported.name())
+                let local = if has_source {
+                    utils::reexport_local_name(&exported_name)
                 } else {
-                    let local = specifier.local.name();
+                    let local = specifier.local.name().to_string();
                     // e.g. types, which don't exist at runtime
-                    if !declared_values.contains(local.as_str()) {
+                    if !declared_values.contains(&local) {
                         continue;
                     }
                     // e.g. `import * as ns from "./b"; export { ns };`
                     if let Some((_, remote_referenced_idents)) =
-                        self.namespace_imports.get_mut(local.as_str())
+                        self.namespace_imports.get_mut(&local)
                     {
                         remote_referenced_idents.insert(STAR_IMPORT.to_string());
                     }
-                    local.to_string()
+                    local
                 };
 
                 self.referenced_idents
@@ -1398,55 +1391,61 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         for (idx, name) in forwarded_names.into_iter().enumerate() {
             let local = format!("{PREFIX}_star_reexport_{idx}");
             let value = if name == STAR_IMPORT {
-                self.ast_builder.expression_object(
+                Expression::new_object_expression(
                     span,
-                    self.ast_builder
-                        .vec_from_iter(star_reexports.iter().rev().map(|(namespace, _)| {
-                            self.ast_builder.object_property_kind_spread_property(
+                    ArenaVec::from_iter_in(
+                        star_reexports.iter().rev().map(|(namespace, _)| {
+                            ObjectPropertyKind::new_spread_property(
                                 span,
                                 ast::build_identifier(self.ast_builder, span, namespace),
+                                self.ast_builder,
                             )
-                        })),
+                        }),
+                        self.ast_builder,
+                    ),
+                    self.ast_builder,
                 )
             } else {
                 star_reexports
                     .iter()
                     .map(|(namespace, _)| {
-                        Expression::ChainExpression(self.ast_builder.alloc_chain_expression(
+                        Expression::new_chain_expression(
                             span,
-                            ChainElement::ComputedMemberExpression(
-                                self.ast_builder.alloc_computed_member_expression(
-                                    span,
-                                    ast::build_identifier(self.ast_builder, span, namespace),
-                                    ast::build_string(self.ast_builder, span, &name),
-                                    true,
-                                ),
+                            ChainElement::new_computed_member_expression(
+                                span,
+                                ast::build_identifier(self.ast_builder, span, namespace),
+                                ast::build_string(self.ast_builder, span, &name),
+                                true,
+                                self.ast_builder,
                             ),
-                        ))
+                            self.ast_builder,
+                        )
                     })
                     .reduce(|left, right| {
-                        self.ast_builder.expression_logical(
+                        Expression::new_logical_expression(
                             span,
                             left,
                             LogicalOperator::Coalesce,
                             right,
+                            self.ast_builder,
                         )
                     })
                     .unwrap()
             };
 
             self.tmp_program_statement_buffer.last_mut().unwrap().push(
-                Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+                Statement::new_variable_declaration(
                     span,
                     VariableDeclarationKind::Const,
-                    self.ast_builder.vec1(ast::build_variable_declarator(
+                    [ast::build_variable_declarator(
                         self.ast_builder,
                         span,
                         &local,
                         value,
-                    )),
+                    )],
                     false,
-                )),
+                    self.ast_builder,
+                ),
             );
             self.referenced_idents
                 .first_mut()
@@ -1474,7 +1473,7 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
 
 impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
     // do a forward scan for variable declarations, then move backwards through statements
-    fn visit_statements(&mut self, it: &mut oxc_allocator::Vec<'alloc, Statement<'alloc>>) {
+    fn visit_statements(&mut self, it: &mut ArenaVec<'alloc, Statement<'alloc>>) {
         if self.error.is_some() {
             return;
         }
@@ -1556,7 +1555,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
                 if let ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace_spec) =
                     specifier
                 {
-                    let remote_module_id = it.source.value.to_string();
+                    let remote_module_id = it.source.value.display().to_string();
                     let namespace_name = namespace_spec.local.name.to_string();
                     self.namespace_imports
                         .insert(namespace_name, (remote_module_id, Default::default()));
@@ -1571,7 +1570,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             && let Some(object) = it.object().get_identifier_reference()
             && let Some(remote_referenced_idents) = self.namespace_import_mut(&object.name)
         {
-            remote_referenced_idents.insert(property.to_string());
+            remote_referenced_idents.insert(property.display().to_string());
             // the namespace object isn't used as a whole, see `visit_expression`
             return;
         }
@@ -1584,24 +1583,22 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         &mut self,
         it: &mut oxc_ast::ast::TSImportEqualsDeclaration<'alloc>,
     ) {
-        if !self.scan_pass
-            && let Some(name) = it.module_reference.as_ts_type_name()
-        {
-            let (namespace, property) = match name {
-                TSTypeName::IdentifierReference(ident) => (Some(ident), None),
-                TSTypeName::QualifiedName(name) => {
+        if !self.scan_pass {
+            let (namespace, property) = match &it.module_reference {
+                TSModuleReference::IdentifierReference(ident) => (Some(&**ident), None),
+                TSModuleReference::QualifiedName(name) => {
                     let mut name = &**name;
                     while let TSTypeName::QualifiedName(left) = &name.left {
                         name = left;
                     }
                     match &name.left {
                         TSTypeName::IdentifierReference(ident) => {
-                            (Some(ident), Some(name.right.name.to_string()))
+                            (Some(&**ident), Some(name.right.name.to_string()))
                         }
                         _ => (None, None),
                     }
                 }
-                TSTypeName::ThisExpression(_) => (None, None),
+                TSModuleReference::ExternalModuleReference(_) => (None, None),
             };
             if let Some(namespace) = namespace
                 && let Some(remote_referenced_idents) = self.namespace_import_mut(&namespace.name)
@@ -1649,7 +1646,10 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         let right_references = utils::function_get_references(it);
         self.visit_named_expression(&name, right_references, |this| {
             oxc_ast_visit::walk_mut::walk_function(this, it, flags);
-            Expression::FunctionExpression(this.ast_builder.alloc(it.clone_in(this.allocator)))
+            Expression::FunctionExpression(ArenaBox::new_in(
+                it.clone_in(this.allocator),
+                this.ast_builder,
+            ))
         });
     }
 
@@ -1662,13 +1662,16 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         let right_references = utils::class_get_references(it);
         self.visit_named_expression(&name, right_references, |this| {
             oxc_ast_visit::walk_mut::walk_class(this, it);
-            Expression::ClassExpression(this.ast_builder.alloc(it.clone_in(this.allocator)))
+            Expression::ClassExpression(ArenaBox::new_in(
+                it.clone_in(this.allocator),
+                this.ast_builder,
+            ))
         });
     }
 
     fn visit_variable_declarators(
         &mut self,
-        it: &mut oxc_allocator::Vec<'alloc, VariableDeclarator<'alloc>>,
+        it: &mut ArenaVec<'alloc, VariableDeclarator<'alloc>>,
     ) {
         if self.scan_pass {
             oxc_ast_visit::walk_mut::walk_variable_declarators(self, it);
@@ -1684,11 +1687,12 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if self.error.is_some() {
             return;
         }
+        let kind = self.declaration_kind;
         if self.scan_pass {
-            let depth = self.declaration_depth(it.kind);
+            let depth = self.declaration_depth(kind);
             // nested blocks are only scanned for `var`s, the rest is scanned with the block
             let idents = if depth == self.scan_depth {
-                binding_pattern_kind_get_idents(&it.id.kind)
+                binding_pattern_get_idents(&it.id)
             } else {
                 Default::default()
             };
@@ -1717,7 +1721,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         if let Expression::TaggedTemplateExpression(template) = init
             && let Some(export) = self.template_export(template)
         {
-            let BindingPatternKind::BindingIdentifier(variable_name) = &it.id.kind else {
+            let BindingPattern::BindingIdentifier(variable_name) = &it.id else {
                 let (row, column) = get_pos_from_offset(self.program_code, it.span.start as usize);
                 self.error = Some(TransformError::DestructuredTemplateError {
                     tag: template.tag.span().source_text(self.program_code).to_string(),
@@ -1742,10 +1746,16 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         oxc_ast_visit::walk_mut::walk_variable_declarator(self, it);
 
         self.include_or_defer_declaration(
-            VirtualProgramInsert::VariableDeclarator(it.clone_in(self.allocator)),
+            VirtualProgramInsert::VariableDeclarator(it.clone_in(self.allocator), kind),
             right_references,
             pos,
         );
+    }
+
+    fn visit_variable_declaration(&mut self, it: &mut VariableDeclaration<'alloc>) {
+        let kind = std::mem::replace(&mut self.declaration_kind, it.kind);
+        oxc_ast_visit::walk_mut::walk_variable_declaration(self, it);
+        self.declaration_kind = kind;
     }
 
     fn visit_statement(&mut self, it: &mut Statement<'alloc>) {
@@ -1851,8 +1861,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
                 let mut function = function.clone_in(self.allocator);
                 function.id = Some(
-                    self.ast_builder
-                        .binding_identifier(span, self.ast_builder.atom(global_sentinel)),
+                    BindingIdentifier::new(
+                        span,
+                        Ident::from_str_in(global_sentinel, self.ast_builder),
+                        self.ast_builder,
+                    ),
                 );
 
                 let mut statement = Statement::FunctionDeclaration(function);
@@ -1863,8 +1876,11 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
 
                 let mut class = class.clone_in(self.allocator);
                 class.id = Some(
-                    self.ast_builder
-                        .binding_identifier(span, self.ast_builder.atom(global_sentinel)),
+                    BindingIdentifier::new(
+                        span,
+                        Ident::from_str_in(global_sentinel, self.ast_builder),
+                        self.ast_builder,
+                    ),
                 );
 
                 let mut statement = Statement::ClassDeclaration(class);
@@ -1879,24 +1895,22 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
     }
 
-    fn visit_export_named_declaration(
-        &mut self,
-        it: &mut oxc_ast::ast::ExportNamedDeclaration<'alloc>,
-    ) {
+    /// specifiers are handled by `reference_export_specifiers`
+    fn visit_export_named_declaration(&mut self, _it: &mut ExportNamedDeclaration<'alloc>) {}
+
+    /// specifiers are handled by `reference_export_specifiers`
+    fn visit_export_from_declaration(&mut self, _it: &mut ExportFromDeclaration<'alloc>) {}
+
+    fn visit_export_declaration(&mut self, it: &mut ExportDeclaration<'alloc>) {
         if self.error.is_some() {
             return;
         }
-
-        // specifiers are handled by `reference_export_specifiers`
-        let Some(declaration) = &it.declaration else {
-            return;
-        };
 
         // exports inside namespaces are members of the namespace, not of the program
         if !self.scan_pass && self.scope_depth == 1 {
             let requested = self.referenced_idents.first().unwrap();
             self.exported_idents.extend(
-                declared_values(declaration)
+                declared_values(&it.declaration)
                     .into_iter()
                     .filter(|name| requested.contains(name))
                     .map(|name| (name.clone(), name)),
@@ -1904,9 +1918,9 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         }
 
         // visit the declaration in place as a statement, so the rewrites end up in the output
-        let mut statement = Statement::from(it.declaration.take().unwrap());
+        let mut statement = Statement::from(it.declaration.take_in(self.ast_builder));
         self.visit_statement(&mut statement);
-        it.declaration = Some(statement.into_declaration());
+        it.declaration = statement.into_declaration();
     }
 
     fn visit_formal_parameters(&mut self, it: &mut oxc_ast::ast::FormalParameters<'alloc>) {
@@ -1914,13 +1928,13 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
             return;
         }
         // the rest element isn't a `FormalParameter`
-        let rest = it.rest.iter().map(|rest| &rest.argument.kind);
+        let rest = it.rest.iter().map(|rest| &rest.rest.argument);
         let idents = it
             .items
             .iter()
-            .map(|param| &param.pattern.kind)
+            .map(|param| &param.pattern)
             .chain(rest)
-            .flat_map(binding_pattern_kind_get_idents);
+            .flat_map(binding_pattern_get_idents);
 
         self.dynamic_variable_names
             .last_mut()
@@ -1935,7 +1949,7 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         self.dynamic_variable_names
             .last_mut()
             .unwrap()
-            .extend(binding_pattern_kind_get_idents(&it.pattern.kind));
+            .extend(binding_pattern_get_idents(&it.pattern));
         oxc_ast_visit::walk_mut::walk_catch_parameter(self, it);
     }
 
@@ -1996,14 +2010,17 @@ fn cached_locals(statements: &[Statement], value_cache: &HashSet<String>) -> Has
             Statement::ExportDefaultDeclaration(_) => {
                 insert(DEFAULT_EXPORT.to_string(), DEFAULT_EXPORT.to_string());
             }
-            Statement::ExportNamedDeclaration(export) if export.source.is_none() => {
+            Statement::ExportNamedDeclaration(export) => {
                 for specifier in &export.specifiers {
-                    let exported = match specifier.exported.name().as_str() {
+                    let exported_name = specifier.exported.name().to_string();
+                    let exported = match exported_name.as_str() {
                         "default" => DEFAULT_EXPORT.to_string(),
-                        name => name.to_string(),
+                        _ => exported_name,
                     };
                     insert(exported, specifier.local.name().to_string());
                 }
+            }
+            Statement::ExportDeclaration(_) => {
                 for name in program_declared_values(std::slice::from_ref(stmt)) {
                     insert(name.clone(), name);
                 }
@@ -2034,7 +2051,12 @@ fn program_exported_names(statements: &[Statement]) -> HashSet<String> {
                 names.insert(DEFAULT_EXPORT.to_string());
             }
             Statement::ExportAllDeclaration(export) => {
-                names.extend(export.exported.as_ref().map(|name| name.name().to_string()));
+                names.extend(
+                    export
+                        .exported
+                        .as_ref()
+                        .map(|name| name.name().to_string()),
+                );
             }
             Statement::ExportNamedDeclaration(export) => {
                 names.extend(
@@ -2043,6 +2065,16 @@ fn program_exported_names(statements: &[Statement]) -> HashSet<String> {
                         .iter()
                         .map(|specifier| specifier.exported.name().to_string()),
                 );
+            }
+            Statement::ExportFromDeclaration(export) => {
+                names.extend(
+                    export
+                        .specifiers
+                        .iter()
+                        .map(|specifier| specifier.exported.name().to_string()),
+                );
+            }
+            Statement::ExportDeclaration(_) => {
                 names.extend(program_declared_values(std::slice::from_ref(stmt)));
             }
             _ => {}

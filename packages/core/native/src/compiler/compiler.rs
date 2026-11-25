@@ -4,7 +4,6 @@ pub use crate::compiler::{TransformError, Transformer};
 use crate::utils::transformed_source_type;
 use crate::*;
 use oxc_allocator::Allocator;
-use oxc_ast::AstBuilder;
 use oxc_parser::{ParseOptions, Parser};
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -57,7 +56,7 @@ impl Transformer {
                 })
                 .parse();
 
-            if ast.panicked {
+            if ast.fatal_error {
                 report(tx, TransformError::parse_failed(filepath.clone(), &code, &ast));
                 return;
             }

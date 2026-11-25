@@ -33,6 +33,7 @@ export namespace Sizes {
 	}
 	// hoisted with the template
 import Nested = Inner;
+	import type NestedType = Inner;
 	export const card = _styleThisClasses.__styleThis_var_card_2;
 }
 export enum Weight {
@@ -48,7 +49,7 @@ export namespace Badge {
 // aliases, like `const`
 import Inner = Sizes.Inner;
 export import InnerSizes = Sizes.Inner;
-import InnerType = Sizes.Inner;
+import type InnerType = Sizes.Inner;
 const grid = _styleThisClasses.grid;
 // references itself under its local name
 export default class Palette {

@@ -100,7 +100,7 @@ const a1 = () => {
 };
 const b = _styleThisClasses.b;
 const comp = () => {
-("foob");
+	("foob");
 	const b = () => {
 		const c = () => _styleThisClasses.__styleThis_7;
 		const s1 = _styleThisClasses.__styleThis_var_s1_8;

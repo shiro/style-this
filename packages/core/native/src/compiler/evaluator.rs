@@ -14,13 +14,13 @@ use crate::styled_component_transformer::ClassDisplayNames;
 use crate::utils::{self, transpile_ts_to_js};
 use crate::LIBRARY_CORE_IMPORT_NAME;
 use indoc::formatdoc;
-use oxc_allocator::{Allocator, CloneIn};
-use oxc_ast::AstBuilder;
+use oxc_allocator::{Allocator, ArenaVec, CloneIn, GetAllocator};
 use oxc_ast::ast::{
-    BindingPatternKind, Expression, ImportDeclaration, ImportDeclarationSpecifier,
-    ImportOrExportKind, ModuleExportName, Program, PropertyKey, Statement, VariableDeclarationKind,
-    WithClause,
+    BindingIdentifier, BindingPattern, BindingProperty, Expression, Ident, ImportDeclaration,
+    ImportDeclarationSpecifier, ImportOrExportKind, ModuleExportName, Program, PropertyKey,
+    Statement, Str, StringLiteral, VariableDeclarationKind, VariableDeclarator,
 };
+use oxc_ast::builder::AstBuilder;
 use oxc_ast_visit::VisitMut;
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::{ParseOptions, Parser};
@@ -92,8 +92,8 @@ fn codegen_transform_result(program: &Program, program_filepath: &str) -> JsValu
     };
     let output_js = Codegen::new().with_options(options).build(program);
     // shift the mappings below the prepended `// @ts-nocheck` line
-    let sourcemap =
-        ConcatSourceMapBuilder::from_sourcemaps(&[(&output_js.map.unwrap(), 1)]).into_sourcemap();
+    let map = output_js.map.unwrap();
+    let sourcemap = ConcatSourceMapBuilder::from_sourcemaps(&[(&map, 1)]).into_sourcemap();
 
     let result = js_sys::Object::new();
     js_sys::Reflect::set(
@@ -169,7 +169,7 @@ fn evaluate_dependencies<'alloc>(
 
     // handle imports - resolve other modules and rewrite return values into variable declarations
     for import_declaration in program_imports(program, ast_builder) {
-        let remote_module_id = import_declaration.source.value.to_string();
+        let remote_module_id = import_declaration.source.value.display().to_string();
 
         // the `.style-this.js` module is generated from this program's evaluation, the other
         // inserted virtual module imports are side-effect imports and skipped below
@@ -182,11 +182,12 @@ fn evaluate_dependencies<'alloc>(
         };
 
         let ignored_list = transformer.ignored_imports.get(&remote_module_id);
-        let specifiers = ast_builder.vec_from_iter(
+        let specifiers = ArenaVec::from_iter_in(
             specifiers
                 .iter()
                 .filter(|specifier| !is_import_ignored(specifier, ignored_list))
-                .map(|specifier| specifier.clone_in(ast_builder.allocator)),
+                .map(|specifier| specifier.clone_in(ast_builder.allocator())),
+            ast_builder,
         );
 
         let mut remote_referenced_idents = namespace_imports
@@ -259,7 +260,7 @@ fn evaluate_dependencies<'alloc>(
 
                 for specifier in specifiers.iter() {
                     // ignore `css` imports from us
-                    if import_declaration.source.value == LIBRARY_CORE_IMPORT_NAME
+                    if import_declaration.source.value.as_str() == Some(LIBRARY_CORE_IMPORT_NAME)
                         && let ImportDeclarationSpecifier::ImportSpecifier(import_specifier) =
                             specifier
                         && !matches!(
@@ -281,36 +282,31 @@ fn evaluate_dependencies<'alloc>(
                                     continue;
                                 }
 
-                                let remote_name = import_specifier.imported.to_string();
+                                let remote_name = import_specifier.imported.name().to_string();
                                 let span = import_specifier.span;
 
                                 // node_modules imports
                                 if code.is_empty() {
-                                    let left = BindingPatternKind::ObjectPattern(
-                                ast_builder.alloc_object_pattern(
-                                    span,
-                                    ast_builder.vec1(ast_builder.binding_property(
+                                    let left = BindingPattern::new_object_pattern(
                                         span,
-                                        PropertyKey::StaticIdentifier(
-                                            ast_builder.alloc_identifier_name(
+                                        [BindingProperty::new(
+                                            span,
+                                            PropertyKey::new_static_identifier(
                                                 span,
-                                                ast_builder.atom(&remote_name),
+                                                Ident::from_str_in(&remote_name, ast_builder),
+                                                ast_builder,
                                             ),
-                                        ),
-                                        ast_builder.binding_pattern(
-                                            ast_builder.binding_pattern_kind_binding_identifier(
+                                            BindingPattern::new_binding_identifier(
                                                 span,
-                                                ast_builder.atom(&local_name),
+                                                Ident::from_str_in(&local_name, ast_builder),
+                                                ast_builder,
                                             ),
-                                            None as Option<oxc_allocator::Box<_>>,
-                                            false,
-                                        ),
-                                        true,
-                                        false,
-                                    )),
-                                    None as Option<oxc_allocator::Box<_>>,
-                                ),
-                            );
+                                            true,
+                                            ast_builder,
+                                        )],
+                                        None,
+                                        ast_builder,
+                                    );
                                     statements.push(
                                         if transformer.use_require {
                                             utils::make_require(
@@ -345,31 +341,26 @@ fn evaluate_dependencies<'alloc>(
 
                                 // node_modules imports
                                 if code.is_empty() {
-                                    let left = BindingPatternKind::ObjectPattern(
-                                ast_builder.alloc_object_pattern(
-                                    span,
-                                    ast_builder.vec1(ast_builder.binding_property(
+                                    let left = BindingPattern::new_object_pattern(
                                         span,
-                                        PropertyKey::StaticIdentifier(
-                                            ast_builder.alloc_identifier_name(
+                                        [BindingProperty::new(
+                                            span,
+                                            PropertyKey::new_static_identifier(
                                                 span,
-                                                ast_builder.atom("default"),
+                                                Ident::from_str_in("default", ast_builder),
+                                                ast_builder,
                                             ),
-                                        ),
-                                        ast_builder.binding_pattern(
-                                            ast_builder.binding_pattern_kind_binding_identifier(
+                                            BindingPattern::new_binding_identifier(
                                                 span,
-                                                ast_builder.atom(&local_name),
+                                                Ident::from_str_in(&local_name, ast_builder),
+                                                ast_builder,
                                             ),
-                                            None as Option<oxc_allocator::Box<_>>,
-                                            false,
-                                        ),
-                                        true,
-                                        false,
-                                    )),
-                                    None as Option<oxc_allocator::Box<_>>,
-                                ),
-                            );
+                                            true,
+                                            ast_builder,
+                                        )],
+                                        None,
+                                        ast_builder,
+                                    );
                                     statements.push(
                                         if transformer.use_require {
                                             utils::make_require(
@@ -409,11 +400,10 @@ fn evaluate_dependencies<'alloc>(
 
                                 // node_modules imports
                                 if code.is_empty() {
-                                    let left = BindingPatternKind::BindingIdentifier(
-                                        ast_builder.alloc_binding_identifier(
-                                            span,
-                                            ast_builder.atom(&namespace_name),
-                                        ),
+                                    let left = BindingPattern::new_binding_identifier(
+                                        span,
+                                        Ident::from_str_in(&namespace_name, ast_builder),
+                                        ast_builder,
                                     );
                                     statements.push(
                                         if transformer.use_require {
@@ -458,33 +448,28 @@ fn evaluate_dependencies<'alloc>(
                     };
 
                     // add new variable declaration to our tmp program
-                    let variable_declaration =
-                        Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+                    let variable_declaration = Statement::new_variable_declaration(
+                        span,
+                        VariableDeclarationKind::Const,
+                        [VariableDeclarator::new(
                             span,
-                            VariableDeclarationKind::Const,
-                            ast_builder.vec1(ast_builder.variable_declarator(
+                            BindingPattern::new_binding_identifier(
                                 span,
-                                VariableDeclarationKind::Const,
-                                ast_builder.binding_pattern(
-                                    BindingPatternKind::BindingIdentifier(
-                                        ast_builder.alloc_binding_identifier(
-                                            span,
-                                            ast_builder.atom(&local_name),
-                                        ),
-                                    ),
-                                    None as Option<oxc_allocator::Box<_>>,
-                                    false,
-                                ),
-                                Some(Expression::Identifier(
-                                    ast_builder.alloc_identifier_reference(
-                                        span,
-                                        ast_builder.atom(&cache_source),
-                                    ),
-                                )),
-                                false,
+                                Ident::from_str_in(&local_name, ast_builder),
+                                ast_builder,
+                            ),
+                            None,
+                            Some(Expression::new_identifier(
+                                span,
+                                Ident::from_str_in(&cache_source, ast_builder),
+                                ast_builder,
                             )),
                             false,
-                        ));
+                            ast_builder,
+                        )],
+                        false,
+                        ast_builder,
+                    );
                     statements.push(variable_declaration);
                     
                     // Track this import dependency
@@ -544,7 +529,7 @@ fn evaluate_dependencies<'alloc>(
                     })
                     .parse();
 
-                if ast.panicked {
+                if ast.fatal_error {
                     return Err(TransformError::parse_failed(remote_filepath, &code, &ast));
                 }
 
@@ -588,37 +573,46 @@ pub(crate) fn program_imports<'a, 'alloc>(
         .iter()
         .filter_map(|stmt| match stmt {
             Statement::ImportDeclaration(import) => Some(&**import),
-            Statement::ExportNamedDeclaration(export) => {
-                let source = export.source.as_ref()?;
-                let specifiers =
-                    ast_builder.vec_from_iter(export.specifiers.iter().map(|specifier| {
+            Statement::ExportFromDeclaration(export) => {
+                let specifiers = ArenaVec::from_iter_in(
+                    export.specifiers.iter().map(|specifier| {
                         let span = specifier.span;
-                        let local = ast_builder.binding_identifier(
+                        let local = BindingIdentifier::new(
                             span,
-                            ast_builder
-                                .atom(&utils::reexport_local_name(&specifier.exported.name())),
+                            Ident::from_str_in(
+                                &utils::reexport_local_name(&specifier.exported.name()),
+                                ast_builder,
+                            ),
+                            ast_builder,
                         );
                         if specifier.local.name() == "default" {
-                            ast_builder
-                                .import_declaration_specifier_import_default_specifier(span, local)
-                        } else {
-                            ast_builder.import_declaration_specifier_import_specifier(
+                            ImportDeclarationSpecifier::new_import_default_specifier(
                                 span,
-                                specifier.local.clone_in(ast_builder.allocator),
+                                local,
+                                ast_builder,
+                            )
+                        } else {
+                            ImportDeclarationSpecifier::new_import_specifier(
+                                span,
+                                specifier.local.clone_in(ast_builder.allocator()),
                                 local,
                                 specifier.export_kind,
+                                ast_builder,
                             )
                         }
-                    }));
-                let import = ast_builder.import_declaration(
+                    }),
+                    ast_builder,
+                );
+                let import = ImportDeclaration::new(
                     export.span,
                     Some(specifiers),
-                    source.clone_in(ast_builder.allocator),
+                    export.source.clone_in(ast_builder.allocator()),
                     None,
-                    None::<oxc_allocator::Box<WithClause>>,
+                    None,
                     export.export_kind,
+                    ast_builder,
                 );
-                Some(&*ast_builder.allocator.alloc(import))
+                Some(&*ast_builder.allocator().alloc(import))
             }
             Statement::ExportAllDeclaration(export) => {
                 let local = match &export.exported {
@@ -629,21 +623,28 @@ pub(crate) fn program_imports<'a, 'alloc>(
                         name
                     }
                 };
-                let local = ast_builder.binding_identifier(export.span, ast_builder.atom(&local));
-                let import = ast_builder.import_declaration(
+                let local = BindingIdentifier::new(
                     export.span,
-                    Some(ast_builder.vec1(
-                        ast_builder.import_declaration_specifier_import_namespace_specifier(
+                    Ident::from_str_in(&local, ast_builder),
+                    ast_builder,
+                );
+                let import = ImportDeclaration::new(
+                    export.span,
+                    Some(ArenaVec::from_iter_in(
+                        [ImportDeclarationSpecifier::new_import_namespace_specifier(
                             export.span,
                             local,
-                        ),
+                            ast_builder,
+                        )],
+                        ast_builder,
                     )),
-                    export.source.clone_in(ast_builder.allocator),
+                    export.source.clone_in(ast_builder.allocator()),
                     None,
-                    None::<oxc_allocator::Box<WithClause>>,
+                    None,
                     export.export_kind,
+                    ast_builder,
                 );
-                Some(&*ast_builder.allocator.alloc(import))
+                Some(&*ast_builder.allocator().alloc(import))
             }
             _ => None,
         })
@@ -723,13 +724,19 @@ fn insert_virtual_css_import<'alloc>(
 ) -> Result<(), TransformError> {
     let module_id = transformer.virtual_import(VirtualImport::Css, program_filepath)?;
 
-    let import_declaration = ast_builder.alloc_import_declaration(
+    let import_declaration = Statement::new_import_declaration(
         program.span,
         None,
-        ast_builder.string_literal(program.span, ast_builder.atom(&module_id), None),
+        StringLiteral::new(
+            program.span,
+            Str::from_str_in(&module_id, ast_builder),
+            None,
+            ast_builder,
+        ),
         None,
-        None::<oxc_allocator::Box<WithClause>>,
+        None,
         ImportOrExportKind::Value,
+        ast_builder,
     );
 
     let insert_pos = program
@@ -738,9 +745,7 @@ fn insert_virtual_css_import<'alloc>(
         .position(|stmt| !matches!(stmt, Statement::ImportDeclaration(_)))
         .unwrap_or(0);
 
-    program
-        .body
-        .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
+    program.body.insert(insert_pos, import_declaration);
     Ok(())
 }
 
@@ -819,7 +824,7 @@ pub(crate) fn slice_program<'alloc>(
     // This is necessary for dependency tracking to know what a file exports
     let mut css_transformer = VisitorTransformer::new(
         ast_builder,
-        ast_builder.allocator,
+        ast_builder.allocator(),
         &store,
         referenced_idents,
         cwd,
@@ -873,7 +878,7 @@ pub async fn evaluate_program<'alloc>(
     skip_css_eval: bool,
     import_chain: &[String],
 ) -> Result<(), TransformError> {
-    let allocator = &ast_builder.allocator;
+    let allocator = ast_builder.allocator();
 
     let entries = entrypoint.then(|| VirtualModuleEntries::capture(transformer, &program_filepath));
 
@@ -933,7 +938,7 @@ pub async fn evaluate_program<'alloc>(
     // the same file, the ones of files it no longer imports are outdated either way
     let module_ids = program_imports(program, ast_builder)
         .iter()
-        .map(|import| import.source.value.to_string())
+        .map(|import| import.source.value.display().to_string())
         .collect();
     transformer
         .cache_registry

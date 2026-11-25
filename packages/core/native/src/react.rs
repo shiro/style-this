@@ -1,6 +1,10 @@
 use crate::{styled_component_transformer::*, *};
 use crate::library_references::{LibraryExport, LibraryReferences};
-use oxc_ast::ast::JSXExpression;
+use oxc_ast::ast::{
+    Argument, ArrowFunctionBody, BindingPattern, BindingProperty, BindingRestElement,
+    FormalParameter, FormalParameterKind, FormalParameters, JSXAttributeItem, JSXAttributeName,
+    JSXAttributeValue, JSXExpression,
+};
 
 const FORWARD_REF_LOCAL_NAME: &str = "__styleThis__forwardRef";
 const REF_LOCAL_NAME: &str = "__styleThis__ref";
@@ -36,18 +40,16 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         };
 
         let mut simple_tagged_template_expression =
-            tagged_template_expression.clone_in(self.base.ast_builder.allocator);
-        simple_tagged_template_expression.tag = Expression::Identifier(
-            self.base.ast_builder
-                .alloc_identifier_reference(span, self.base.ast_builder.atom(CSS_TAG_LOCAL_NAME)),
-        );
+            tagged_template_expression.clone_in(self.base.ast_builder.allocator());
+        simple_tagged_template_expression.tag =
+            Expression::new_identifier(span, CSS_TAG_LOCAL_NAME, self.base.ast_builder);
 
         let captured_expressions =
             self.base.extract_and_replace_style_functions(&mut simple_tagged_template_expression);
 
         if self.base.skip_jsx {
             *tagged_template_expression =
-                simple_tagged_template_expression.clone_in(self.base.ast_builder.allocator);
+                simple_tagged_template_expression.clone_in(self.base.ast_builder.allocator());
             return;
         }
 
@@ -61,117 +63,65 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         let spread_identifier = if should_filter_props { REST_PROPS_LOCAL_NAME } else { PROPS_LOCAL_NAME };
         
         // Build destructuring statement: const { styleProps, style, ...rest } = props;
+        let ast_builder = self.base.ast_builder;
+        let binding_property = |key: &'static str, local: &'static str| {
+            BindingProperty::new(
+                span,
+                PropertyKey::new_static_identifier(span, key, ast_builder),
+                BindingPattern::new_binding_identifier(span, local, ast_builder),
+                false,
+                ast_builder,
+            )
+        };
         let destructure_statement = if should_filter_props {
-            Some(Statement::VariableDeclaration(
-                self.base.ast_builder.alloc_variable_declaration(
+            Some(Statement::new_variable_declaration(
+                span,
+                VariableDeclarationKind::Const,
+                [ast::build_variable_declarator_pattern(
+                    ast_builder,
                     span,
-                    VariableDeclarationKind::Const,
-                    self.base.ast_builder.vec1(self.base.ast_builder.variable_declarator(
+                    BindingPattern::new_object_pattern(
                         span,
-                        VariableDeclarationKind::Const,
-                        self.base.ast_builder.binding_pattern(
-                            BindingPatternKind::ObjectPattern(
-                                self.base.ast_builder.alloc_object_pattern(
-                                    span,
-                                    self.base.ast_builder.vec_from_iter([
-                                        // styleProps
-                                        self.base.ast_builder.binding_property(
-                                            span,
-                                            PropertyKey::StaticIdentifier(
-                                                self.base.ast_builder.alloc_identifier_name(
-                                                    span,
-                                                    self.base.ast_builder.atom("styleProps"),
-                                                ),
-                                            ),
-                                            self.base.ast_builder.binding_pattern(
-                                                BindingPatternKind::BindingIdentifier(
-                                                    self.base.ast_builder.alloc_binding_identifier(
-                                                        span,
-                                                        self.base.ast_builder.atom("__styleThis__styleProps"),
-                                                    ),
-                                                ),
-                                                None as Option<oxc_allocator::Box<_>>,
-                                                false,
-                                            ),
-                                            false,
-                                            false,
-                                        ),
-                                        // style
-                                        self.base.ast_builder.binding_property(
-                                            span,
-                                            PropertyKey::StaticIdentifier(
-                                                self.base.ast_builder.alloc_identifier_name(
-                                                    span,
-                                                    self.base.ast_builder.atom("style"),
-                                                ),
-                                            ),
-                                            self.base.ast_builder.binding_pattern(
-                                                BindingPatternKind::BindingIdentifier(
-                                                    self.base.ast_builder.alloc_binding_identifier(
-                                                        span,
-                                                        self.base.ast_builder.atom("__styleThis__style"),
-                                                    ),
-                                                ),
-                                                None as Option<oxc_allocator::Box<_>>,
-                                                false,
-                                            ),
-                                            false,
-                                            false,
-                                        ),
-                                    ]),
-                                    Some(self.base.ast_builder.binding_rest_element(
-                                        span,
-                                        self.base.ast_builder.binding_pattern(
-                                            BindingPatternKind::BindingIdentifier(
-                                                self.base.ast_builder.alloc_binding_identifier(
-                                                    span,
-                                                    self.base.ast_builder.atom(REST_PROPS_LOCAL_NAME),
-                                                ),
-                                            ),
-                                            None as Option<oxc_allocator::Box<_>>,
-                                            false,
-                                        ),
-                                    )),
-                                ),
-                            ),
-                            None as Option<oxc_allocator::Box<_>>,
-                            false,
-                        ),
-                        Some(Expression::Identifier(
-                            self.base.ast_builder.alloc_identifier_reference(
+                        [
+                            binding_property("styleProps", "__styleThis__styleProps"),
+                            binding_property("style", "__styleThis__style"),
+                        ],
+                        Some(BindingRestElement::boxed(
+                            span,
+                            BindingPattern::new_binding_identifier(
                                 span,
-                                self.base.ast_builder.atom(PROPS_LOCAL_NAME),
+                                REST_PROPS_LOCAL_NAME,
+                                ast_builder,
                             ),
+                            ast_builder,
                         )),
-                        false,
-                    )),
-                    false,
-                ),
+                        ast_builder,
+                    ),
+                    Expression::new_identifier(span, PROPS_LOCAL_NAME, ast_builder),
+                )],
+                false,
+                ast_builder,
             ))
         } else {
             None
         };
 
         let mut attributes = vec![
-            self.base.ast_builder.jsx_attribute_item_spread_attribute(
+            JSXAttributeItem::new_spread_attribute(
                 span,
-                Expression::Identifier(
-                    self.base.ast_builder
-                        .alloc_identifier_reference(span, self.base.ast_builder.atom(spread_identifier)),
-                ),
+                Expression::new_identifier(span, spread_identifier, ast_builder),
+                ast_builder,
             ),
             // ref={ref}
-            self.base.ast_builder.jsx_attribute_item_attribute(
+            JSXAttributeItem::new_attribute(
                 span,
-                self.base.ast_builder
-                    .jsx_attribute_name_identifier(span, self.base.ast_builder.atom("ref")),
-                Some(self.base.ast_builder.jsx_attribute_value_expression_container(
+                JSXAttributeName::new_identifier(span, "ref", ast_builder),
+                Some(JSXAttributeValue::new_expression_container(
                     span,
-                    JSXExpression::Identifier(self.base.ast_builder.alloc_identifier_reference(
-                        span,
-                        self.base.ast_builder.atom(REF_LOCAL_NAME),
-                    )),
+                    JSXExpression::new_identifier(span, REF_LOCAL_NAME, ast_builder),
+                    ast_builder,
                 )),
+                ast_builder,
             ),
             self.base.build_class_attribute(span, spread_identifier),
         ];
@@ -183,100 +133,76 @@ impl<'a, 'alloc> ReactStyledComponentTransformer<'a, 'alloc> {
         let jsx_element_expression = self.base.build_jsx_element(span, name, attributes);
 
         // For React, the component has a block body when filtering props
-        let component_body_statements = if should_filter_props {
-            let mut statements = Vec::new();
-            if let Some(destructure) = destructure_statement {
-                statements.push(destructure);
-            }
-            statements.push(Statement::ReturnStatement(
-                self.base.ast_builder.alloc_return_statement(
-                    span,
-                    Some(jsx_element_expression),
-                ),
+        let component_body = if should_filter_props {
+            let mut statements = Vec::from_iter(destructure_statement);
+            statements.push(Statement::new_return_statement(
+                span,
+                Some(jsx_element_expression),
+                ast_builder,
             ));
-            statements
+            ArrowFunctionBody::new_function_body(
+                span,
+                ArenaVec::new_in(ast_builder),
+                ArenaVec::from_iter_in(statements, ast_builder),
+                ast_builder,
+            )
         } else {
-            vec![Statement::ExpressionStatement(
-                self.base.ast_builder.alloc_expression_statement(
-                    span,
-                    jsx_element_expression,
-                ),
-            )]
+            ArrowFunctionBody::from(jsx_element_expression)
         };
 
-        let define_jsx_element_statement = Statement::VariableDeclaration(
-            self.base.ast_builder.alloc_variable_declaration(
+        let define_jsx_element_statement = Statement::new_variable_declaration(
+            span,
+            VariableDeclarationKind::Let,
+            [ast::build_variable_declarator(
+                ast_builder,
                 span,
-                VariableDeclarationKind::Let,
-                self.base.ast_builder.vec1(
-                    self.base.ast_builder.variable_declarator(
+                COMPONENT_LOCAL_NAME,
+                // forwardRef((props, ref) => ...)
+                Expression::new_call_expression(
+                    span,
+                    Expression::new_identifier(span, FORWARD_REF_LOCAL_NAME, ast_builder),
+                    None,
+                    [Argument::new_arrow_function_expression(
                         span,
-                        VariableDeclarationKind::Let,
-                        self.base.ast_builder.binding_pattern(
-                            BindingPatternKind::BindingIdentifier(
-                                self.base.ast_builder
-                                    .alloc_binding_identifier(span, self.base.ast_builder.atom(COMPONENT_LOCAL_NAME)),
-                            ),
-                            None as Option<oxc_allocator::Box<_>>,
-                            false,
-                        ),
-                        // forwardRef((props, ref) => ...)
-                        Some(Expression::CallExpression(self.base.ast_builder.alloc_call_expression(
-                            span,
-                            Expression::Identifier(self.base.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.base.ast_builder.atom(FORWARD_REF_LOCAL_NAME),
-                            )),
-                            None as Option<oxc_allocator::Box<_>>,
-                            self.base.ast_builder.vec1(oxc_ast::ast::Argument::from(
-                                Expression::ArrowFunctionExpression(
-                                    self.base.ast_builder.alloc_arrow_function_expression(
-                                        span,
-                                        !should_filter_props, // expression = true only when no filtering (inline JSX)
-                                        false,
-                                        None as Option<oxc_allocator::Box<_>>,
-                                        self.base.ast_builder.alloc_formal_parameters(
-                                            span,
-                                            oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-                                            self.base.ast_builder.vec_from_iter(
-                                                [PROPS_LOCAL_NAME, REF_LOCAL_NAME].map(|name| {
-                                                    self.base.ast_builder.formal_parameter(
-                                                        span,
-                                                        self.base.ast_builder.vec(),
-                                                        self.base.ast_builder.binding_pattern(
-                                                            BindingPatternKind::BindingIdentifier(
-                                                                self.base.ast_builder.alloc_binding_identifier(
-                                                                    span,
-                                                                    self.base.ast_builder.atom(name),
-                                                                ),
-                                                            ),
-                                                            None as Option<oxc_allocator::Box<_>>,
-                                                            false,
-                                                        ),
-                                                        None,
-                                                        false,
-                                                        false,
-                                                    )
-                                                }),
-                                            ),
-                                            None as Option<oxc_allocator::Box<_>>,
-                                        ),
-                                        None as Option<oxc_allocator::Box<_>>,
-                                        self.base.ast_builder.function_body(
-                                            span,
-                                            self.base.ast_builder.vec(),
-                                            self.base.ast_builder.vec_from_iter(component_body_statements),
-                                        ),
-                                    ),
-                                ),
-                            )),
-                            false,
-                        ))),
                         false,
-                    ),
+                        None,
+                        FormalParameters::boxed(
+                            span,
+                            FormalParameterKind::ArrowFormalParameters,
+                            ArenaVec::from_iter_in(
+                                [PROPS_LOCAL_NAME, REF_LOCAL_NAME].map(|name| {
+                                    FormalParameter::new(
+                                        span,
+                                        ArenaVec::new_in(ast_builder),
+                                        BindingPattern::new_binding_identifier(
+                                            span,
+                                            name,
+                                            ast_builder,
+                                        ),
+                                        None,
+                                        None,
+                                        false,
+                                        None,
+                                        false,
+                                        false,
+                                        ast_builder,
+                                    )
+                                }),
+                                ast_builder,
+                            ),
+                            None,
+                            ast_builder,
+                        ),
+                        None,
+                        component_body,
+                        ast_builder,
+                    )],
+                    false,
+                    ast_builder,
                 ),
-                false,
-            ),
+            )],
+            false,
+            ast_builder,
         );
 
         let mut function_body_statements = Vec::from_iter(base_declaration);
@@ -314,8 +240,8 @@ impl<'a, 'alloc> VisitMut<'alloc> for ReactStyledComponentTransformer<'a, 'alloc
 
     fn visit_variable_declarator(&mut self, it: &mut VariableDeclarator<'alloc>) {
         let prev = self.base.variable_name.take();
-        self.base.variable_name = match &it.id.kind {
-            BindingPatternKind::BindingIdentifier(binding_identifier) => {
+        self.base.variable_name = match &it.id {
+            BindingPattern::BindingIdentifier(binding_identifier) => {
                 Some(binding_identifier.name.to_string())
             }
             _ => None,

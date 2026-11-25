@@ -2,11 +2,12 @@ use super::cache_registry::CacheRegistry;
 use super::error::TransformError;
 use super::transformer::{Transformer, VirtualImport};
 use crate::LIBRARY_CORE_IMPORT_NAME;
-use oxc_ast::AstBuilder;
+use oxc_allocator::ArenaVec;
 use oxc_ast::ast::{
-    ImportDeclaration, ImportDeclarationSpecifier, ImportOrExportKind, Program, Statement,
-    WithClause,
+    BindingIdentifier, ImportDeclaration, ImportDeclarationSpecifier, ImportOrExportKind, Program,
+    Statement, Str, StringLiteral,
 };
+use oxc_ast::builder::AstBuilder;
 use once_cell::sync::Lazy;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -188,7 +189,7 @@ pub fn rewrite_merge_styles_imports<'alloc>(
         let Statement::ImportDeclaration(import_decl) = stmt else {
             continue;
         };
-        if import_decl.source.value.as_str() != LIBRARY_CORE_IMPORT_NAME {
+        if import_decl.source.value.as_str() != Some(LIBRARY_CORE_IMPORT_NAME) {
             continue;
         }
         let Some(specifiers) = import_decl.specifiers.as_mut() else {
@@ -198,8 +199,10 @@ pub fn rewrite_merge_styles_imports<'alloc>(
             if let ImportDeclarationSpecifier::ImportSpecifier(spec) = specifier
                 && spec.imported.name() == "mergeStyles"
             {
-                spec.imported = ModuleExportName::IdentifierName(
-                    ast_builder.identifier_name(spec.span, ast_builder.atom("joinStyles")),
+                spec.imported = ModuleExportName::new_identifier_name(
+                    spec.span,
+                    "joinStyles",
+                    ast_builder,
                 );
                 rewrote = true;
             }
@@ -232,31 +235,28 @@ pub fn insert_virtual_atomic_program_import<'alloc>(
     transformer: &Transformer,
     program_filepath: &str,
 ) -> Result<(), TransformError> {
-    use oxc_ast::ast::ImportNamespaceSpecifier;
-
-    let namespace_specifier = ast_builder.alloc(ImportNamespaceSpecifier {
-        span: program.span,
-        local: ast_builder.binding_identifier(program.span, ast_builder.atom(ATOMIC_CLASSES_IDENT)),
-    });
-
-    let specifiers = ast_builder.vec1(ImportDeclarationSpecifier::ImportNamespaceSpecifier(
-        namespace_specifier,
-    ));
+    let specifiers = [ImportDeclarationSpecifier::new_import_namespace_specifier(
+        program.span,
+        BindingIdentifier::new(program.span, ATOMIC_CLASSES_IDENT, ast_builder),
+        ast_builder,
+    )];
 
     let style_this_import_source =
         transformer.virtual_import(VirtualImport::AtomicProgram, program_filepath)?;
 
-    let style_this_import = ast_builder.alloc_import_declaration(
+    let style_this_import = Statement::new_import_declaration(
         program.span,
-        Some(specifiers),
-        ast_builder.string_literal(
+        Some(ArenaVec::from_iter_in(specifiers, ast_builder)),
+        StringLiteral::new(
             program.span,
-            ast_builder.atom(&style_this_import_source),
+            Str::from_str_in(&style_this_import_source, ast_builder),
             None,
+            ast_builder,
         ),
         None,
-        None::<oxc_allocator::Box<WithClause>>,
+        None,
         ImportOrExportKind::Value,
+        ast_builder,
     );
 
     let insert_pos = program
@@ -265,9 +265,7 @@ pub fn insert_virtual_atomic_program_import<'alloc>(
         .position(|stmt| !matches!(stmt, Statement::ImportDeclaration(_)))
         .unwrap_or(0);
 
-    program
-        .body
-        .insert(insert_pos, Statement::ImportDeclaration(style_this_import));
+    program.body.insert(insert_pos, style_this_import);
     Ok(())
 }
 

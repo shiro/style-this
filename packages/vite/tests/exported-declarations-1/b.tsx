@@ -46,6 +46,7 @@ export namespace Sizes {
   }
   // hoisted with the template
   import Nested = Inner;
+  import type NestedType = Inner;
   export const card = css`
     gap: ${gap};
     padding: ${Nested.gap};

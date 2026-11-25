@@ -99,7 +99,7 @@ const a1 = () => {
 };
 const b = "b-rcdyrk";
 const comp = () => {
-("foob");
+	("foob");
 	const b = () => {
 		const c = () => "__styleThis_7-ghy34l";
 		const s1 = "s1-7o5eb8";

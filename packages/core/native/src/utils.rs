@@ -1,4 +1,6 @@
 use crate::*;
+use oxc_allocator::GetAllocator;
+use oxc_ast::ast::{Argument, BindingPattern};
 
 pub fn set_panic_hook() {
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -19,17 +21,17 @@ pub fn transformed_source_type(filepath: &str) -> Option<SourceType> {
     SourceType::from_path(filepath).ok()
 }
 
-pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> HashSet<String> {
+pub fn binding_pattern_get_idents<'a>(pattern: &BindingPattern<'a>) -> HashSet<String> {
     let mut idents = HashSet::new();
-    match kind {
-        BindingPatternKind::BindingIdentifier(binding_identifier) => {
+    match pattern {
+        BindingPattern::BindingIdentifier(binding_identifier) => {
             idents.insert(binding_identifier.name.to_string());
         }
-        BindingPatternKind::ObjectPattern(object_pattern) => {
+        BindingPattern::ObjectPattern(object_pattern) => {
             let local_idents = object_pattern
                 .properties
                 .iter()
-                .map(|v| binding_pattern_kind_get_idents(&v.value.kind))
+                .map(|v| binding_pattern_get_idents(&v.value))
                 .fold(HashSet::new(), |mut acc, hashset| {
                     acc.extend(hashset);
                     acc
@@ -37,15 +39,15 @@ pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> Has
             idents.extend(local_idents);
 
             if let Some(rest) = &object_pattern.rest {
-                idents.extend(binding_pattern_kind_get_idents(&rest.argument.kind));
+                idents.extend(binding_pattern_get_idents(&rest.argument));
             }
         }
-        BindingPatternKind::ArrayPattern(array_pattern) => {
+        BindingPattern::ArrayPattern(array_pattern) => {
             let local_idents = array_pattern
                 .elements
                 .iter()
                 .filter_map(|element| element.as_ref())
-                .map(|element| binding_pattern_kind_get_idents(&element.kind))
+                .map(|element| binding_pattern_get_idents(element))
                 .fold(HashSet::new(), |mut acc, hashset| {
                     acc.extend(hashset);
                     acc
@@ -53,13 +55,11 @@ pub fn binding_pattern_kind_get_idents<'a>(kind: &BindingPatternKind<'a>) -> Has
             idents.extend(local_idents);
 
             if let Some(rest) = &array_pattern.rest {
-                idents.extend(binding_pattern_kind_get_idents(&rest.argument.kind));
+                idents.extend(binding_pattern_get_idents(&rest.argument));
             }
         }
-        BindingPatternKind::AssignmentPattern(assignment_pattern) => {
-            idents.extend(binding_pattern_kind_get_idents(
-                &assignment_pattern.left.kind,
-            ));
+        BindingPattern::AssignmentPattern(assignment_pattern) => {
+            idents.extend(binding_pattern_get_idents(&assignment_pattern.left));
         }
     };
     idents
@@ -99,7 +99,8 @@ pub fn export_default_declaration_to_expression<'alloc>(
         ExportDefaultDeclarationKind::StringLiteral(it) => Expression::StringLiteral(it),
         ExportDefaultDeclarationKind::TemplateLiteral(it) => Expression::TemplateLiteral(it),
         ExportDefaultDeclarationKind::Identifier(it) => Expression::Identifier(it),
-        ExportDefaultDeclarationKind::MetaProperty(it) => Expression::MetaProperty(it),
+        ExportDefaultDeclarationKind::ImportMeta(it) => Expression::ImportMeta(it),
+        ExportDefaultDeclarationKind::NewTarget(it) => Expression::NewTarget(it),
         ExportDefaultDeclarationKind::Super(it) => Expression::Super(it),
         ExportDefaultDeclarationKind::ArrayExpression(it) => Expression::ArrayExpression(it),
         ExportDefaultDeclarationKind::ArrowFunctionExpression(it) => {
@@ -163,32 +164,6 @@ pub fn export_default_declaration_to_expression<'alloc>(
         _ => unreachable!(),
     }
 }
-
-// pub fn binding_pattern_kind_build_TODO<'alloc>(
-//     ast_builder: &mut AstBuilder<'alloc>,
-//     span: Span,
-//     kind: &BindingPatternKind<'alloc>,
-// ) {
-//     let mut idents = HashSet::new();
-//
-//     let f = ast_builder.alloc_object_expression(span, ast_builder.vec_from_iter(iter));
-//
-//     match kind {
-//         BindingPatternKind::BindingIdentifier(binding_identifier) => {
-//             // idents.insert(binding_identifier.name.to_string());
-//             todo!()
-//         }
-//         BindingPatternKind::ObjectPattern(object_pattern) => {
-//             todo!()
-//         }
-//         BindingPatternKind::ArrayPattern(array_pattern) => {
-//             todo!()
-//         }
-//         BindingPatternKind::AssignmentPattern(assignment_pattern) => {
-//             todo!()
-//         }
-//     };
-// }
 
 pub fn generate_random_id(length: usize) -> String {
     (0..length)
@@ -343,7 +318,7 @@ impl ExpressionCollectorVisitor {
     }
 }
 
-use oxc_ast::ast::{Declaration, TSModuleDeclarationName};
+use oxc_ast::ast::Declaration;
 use oxc_ast_visit::walk;
 use oxc_syntax::scope::{ScopeFlags, ScopeId};
 
@@ -366,9 +341,11 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
         }
     }
 
-    fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
-        self.declare(binding_pattern_kind_get_idents(&it.id.kind), it.kind.is_var());
-        walk::walk_variable_declarator(self, it);
+    fn visit_variable_declaration(&mut self, it: &oxc_ast::ast::VariableDeclaration<'a>) {
+        for declarator in &it.declarations {
+            self.declare(binding_pattern_get_idents(&declarator.id), it.kind.is_var());
+            self.visit_variable_declarator(declarator);
+        }
     }
     fn visit_function(&mut self, it: &oxc_ast::ast::Function<'a>, flags: ScopeFlags) {
         self.visit_named(it.id.as_ref(), it.is_declaration(), |this| {
@@ -380,12 +357,10 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
             walk::walk_class(this, it)
         });
     }
-    fn visit_ts_module_declaration(&mut self, it: &oxc_ast::ast::TSModuleDeclaration<'a>) {
-        let id = match &it.id {
-            TSModuleDeclarationName::Identifier(id) => Some(id),
-            TSModuleDeclarationName::StringLiteral(_) => None,
-        };
-        self.visit_named(id, true, |this| walk::walk_ts_module_declaration(this, it));
+    fn visit_ts_namespace_declaration(&mut self, it: &oxc_ast::ast::TSNamespaceDeclaration<'a>) {
+        self.visit_named(Some(&it.id), true, |this| {
+            walk::walk_ts_namespace_declaration(this, it)
+        });
     }
     fn visit_ts_enum_declaration(&mut self, it: &oxc_ast::ast::TSEnumDeclaration<'a>) {
         self.visit_named(Some(&it.id), true, |this| walk::walk_ts_enum_declaration(this, it));
@@ -403,11 +378,11 @@ impl<'a> Visit<'a> for ExpressionCollectorVisitor {
         });
     }
     fn visit_formal_parameter(&mut self, it: &oxc_ast::ast::FormalParameter<'a>) {
-        self.declare(binding_pattern_kind_get_idents(&it.pattern.kind), false);
+        self.declare(binding_pattern_get_idents(&it.pattern), false);
         walk::walk_formal_parameter(self, it);
     }
     fn visit_catch_parameter(&mut self, it: &oxc_ast::ast::CatchParameter<'a>) {
-        self.declare(binding_pattern_kind_get_idents(&it.pattern.kind), false);
+        self.declare(binding_pattern_get_idents(&it.pattern), false);
         walk::walk_catch_parameter(self, it);
     }
     fn visit_identifier_reference(&mut self, it: &oxc_ast::ast::IdentifierReference<'a>) {
@@ -431,13 +406,8 @@ pub fn ts_declaration_id<'b, 'a>(
         {
             Some(&declaration.id)
         }
-        Declaration::TSModuleDeclaration(declaration)
-            if !declaration.declare && !declaration.kind.is_global() =>
-        {
-            match &declaration.id {
-                TSModuleDeclarationName::Identifier(id) => Some(id),
-                TSModuleDeclarationName::StringLiteral(_) => None,
-            }
+        Declaration::TSNamespaceDeclaration(declaration) if !declaration.declare => {
+            Some(&declaration.id)
         }
         _ => None,
     }
@@ -463,7 +433,7 @@ pub fn program_declared_values(statements: &[Statement]) -> HashSet<String> {
                 );
                 continue;
             }
-            Statement::ExportNamedDeclaration(export) => export.declaration.as_ref(),
+            Statement::ExportDeclaration(export) => Some(&export.declaration),
             stmt => stmt.as_declaration(),
         };
 
@@ -479,7 +449,7 @@ pub fn declared_values(declaration: &Declaration) -> Vec<String> {
         Declaration::VariableDeclaration(declaration) if !declaration.declare => declaration
             .declarations
             .iter()
-            .flat_map(|declarator| binding_pattern_kind_get_idents(&declarator.id.kind))
+            .flat_map(|declarator| binding_pattern_get_idents(&declarator.id))
             .collect(),
         Declaration::FunctionDeclaration(function) if !function.declare => {
             function.id.iter().map(|id| id.name.to_string()).collect()
@@ -498,7 +468,7 @@ pub fn declared_values(declaration: &Declaration) -> Vec<String> {
 fn enum_member_names(body: &oxc_ast::ast::TSEnumBody) -> HashSet<String> {
     body.members
         .iter()
-        .map(|member| member.id.static_name().to_string())
+        .map(|member| member.id.static_name().display().to_string())
         .collect()
 }
 
@@ -575,76 +545,73 @@ pub fn transpile_ts_to_js<'a>(allocator: &'a Allocator, program: &mut Program<'a
 
 pub fn make_require<'a>(
     ast_builder: &AstBuilder<'a>,
-    binding_pattern: BindingPatternKind<'a>,
+    binding_pattern: BindingPattern<'a>,
     source: &str,
     span: Span,
 ) -> Statement<'a> {
-    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+    Statement::new_variable_declaration(
         span,
         VariableDeclarationKind::Let,
-        ast_builder.vec1(ast_builder.variable_declarator(
+        [VariableDeclarator::new(
             span,
-            VariableDeclarationKind::Let,
-            ast_builder.binding_pattern(
-                binding_pattern,
-                None as Option<oxc_allocator::Box<_>>,
-                false,
-            ),
-            Some(Expression::CallExpression(
-                ast_builder.alloc_call_expression(
+            binding_pattern,
+            None,
+            Some(Expression::new_call_expression(
+                span,
+                Expression::new_identifier(span, "require", ast_builder),
+                None,
+                [Argument::new_string_literal(
                     span,
-                    Expression::Identifier(
-                        ast_builder.alloc_identifier_reference(span, ast_builder.atom("require")),
-                    ),
-                    None as Option<oxc_allocator::Box<_>>,
-                    ast_builder.vec1(oxc_ast::ast::Argument::StringLiteral(
-                        ast_builder.alloc_string_literal(span, ast_builder.atom(source), None),
-                    )),
-                    false,
-                ),
+                    Str::from_str_in(source, ast_builder),
+                    None,
+                    ast_builder,
+                )],
+                false,
+                ast_builder,
             )),
             false,
-        )),
+            ast_builder,
+        )],
         false,
-    ))
+        ast_builder,
+    )
 }
 
 pub fn make_dynamic_import<'a>(
     ast_builder: &AstBuilder<'a>,
-    binding_pattern: BindingPatternKind<'a>,
+    binding_pattern: BindingPattern<'a>,
     source: &str,
     span: Span,
 ) -> Statement<'a> {
-    Statement::VariableDeclaration(ast_builder.alloc_variable_declaration(
+    Statement::new_variable_declaration(
         span,
         VariableDeclarationKind::Let,
-        ast_builder.vec1(ast_builder.variable_declarator(
+        [VariableDeclarator::new(
             span,
-            VariableDeclarationKind::Let,
-            ast_builder.binding_pattern(
-                binding_pattern,
-                None as Option<oxc_allocator::Box<_>>,
-                false,
-            ),
-            Some(Expression::AwaitExpression(
-                ast_builder.alloc_await_expression(
+            binding_pattern,
+            None,
+            Some(Expression::new_await_expression(
+                span,
+                Expression::new_import_expression(
                     span,
-                    Expression::ImportExpression(ast_builder.alloc_import_expression(
+                    Expression::new_string_literal(
                         span,
-                        Expression::StringLiteral(ast_builder.alloc_string_literal(
-                            span,
-                            ast_builder.atom(source),
-                            None,
-                        )),
+                        Str::from_str_in(source, ast_builder),
                         None,
-                        None,
-                    )),
+                        ast_builder,
+                    ),
+                    None,
+                    None,
+                    ast_builder,
                 ),
+                ast_builder,
             )),
             false,
-        )),
+            ast_builder,
+        )],
         false,
-    ))
+        ast_builder,
+    )
 }
 
 pub fn trim_newlines<'alloc>(
@@ -657,9 +624,9 @@ pub fn trim_newlines<'alloc>(
             .value
             .raw
             .trim_start_matches([' ', '\n', '\r', '\t']);
-        quasis[0].value.raw = ast_builder.atom(trimmed_first);
+        quasis[0].value.raw = Str::from_str_in(trimmed_first, ast_builder);
         let trimmed = quasis[last_idx].value.raw.trim_end_matches(['\n']);
-        quasis[last_idx].value.raw = ast_builder.atom(trimmed);
+        quasis[last_idx].value.raw = Str::from_str_in(trimmed, ast_builder);
     }
 }
 
@@ -673,7 +640,7 @@ pub fn escape_raw_quasis<'alloc>(
     for quasi in quasis.iter_mut() {
         let raw = quasi.value.raw;
         if !raw.contains('\\') {
-            quasi.value.cooked = Some(raw);
+            quasi.value.cooked = Some(raw.into());
             continue;
         }
 
@@ -691,8 +658,8 @@ pub fn escape_raw_quasis<'alloc>(
             }
         }
 
-        quasi.value.cooked = Some(raw);
-        quasi.value.raw = ast_builder.atom(&escaped);
+        quasi.value.cooked = Some(raw.into());
+        quasi.value.raw = Str::from_str_in(&escaped, ast_builder);
     }
 }
 
@@ -770,7 +737,7 @@ pub fn replace_in_declaration_using_spans<'alloc>(
 impl<'a, 'alloc> VisitMut<'alloc> for SpanReplacer<'a, 'alloc> {
     fn visit_expression(&mut self, it: &mut Expression<'alloc>) {
         if let Some(replacement) = self.replacement_points.get(&it.span()) {
-            *it = replacement.clone_in(self.ast_builder.allocator);
+            *it = replacement.clone_in(self.ast_builder.allocator());
             return;
         }
 
@@ -855,13 +822,13 @@ where
 {
     fn visit_identifier_reference(&mut self, it: &mut oxc_ast::ast::IdentifierReference<'alloc>) {
         if let Some(replacement) = self.replacement(&it.name) {
-            it.name = self.ast_builder.atom(&replacement);
+            it.name = Ident::from_str_in(&replacement, self.ast_builder);
         }
     }
 
     fn visit_binding_identifier(&mut self, it: &mut oxc_ast::ast::BindingIdentifier<'alloc>) {
         if let Some(replacement) = self.replacement(&it.name) {
-            it.name = self.ast_builder.atom(&replacement);
+            it.name = Ident::from_str_in(&replacement, self.ast_builder);
         }
     }
 

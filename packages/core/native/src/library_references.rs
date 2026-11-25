@@ -44,7 +44,9 @@ impl LibraryReferences {
             let Statement::ImportDeclaration(import) = statement else {
                 continue;
             };
-            let source = import.source.value.as_str();
+            let Some(source) = import.source.value.as_str() else {
+                continue;
+            };
             if !matches!(
                 source,
                 LIBRARY_CORE_IMPORT_NAME | LIBRARY_SOLID_JS_IMPORT_NAME | LIBRARY_REACT_IMPORT_NAME
@@ -75,7 +77,7 @@ impl LibraryReferences {
             return references;
         }
 
-        let semantic = SemanticBuilder::new().build(program).semantic;
+        let semantic = SemanticBuilder::new().with_build_nodes(true).build(program).semantic;
         let nodes = semantic.nodes();
         for (source, local, export) in imports {
             for reference in semantic.scoping().get_resolved_references(local.symbol_id()) {

@@ -1,8 +1,11 @@
 use crate::library_references::{LibraryExport, LibraryReferences};
 use crate::{utils::SeededRandom, *};
 use oxc_ast::ast::{
-    JSXAttributeItem, JSXElementName, JSXMemberExpression, JSXMemberExpressionObject,
-    StaticMemberExpression,
+    Argument, ArrowFunctionBody, AssignmentOperator, AssignmentTarget, BindingPattern,
+    FormalParameterKind, FormalParameters, IdentifierName, JSXAttributeItem, JSXAttributeName,
+    JSXAttributeValue, JSXElement, JSXElementName, JSXIdentifier, JSXMemberExpression,
+    JSXMemberExpressionObject, JSXOpeningElement, LogicalOperator, ObjectPropertyKind,
+    PropertyKey, PropertyKind, StaticMemberExpression,
 };
 
 pub const MERGE_STYLES_LOCAL_NAME: &str = "__styleThis__mergeStyles";
@@ -46,24 +49,31 @@ pub fn insert_named_import<'alloc>(
     local: &str,
     source: &str,
 ) {
-    use oxc_ast::ast::{ImportDeclarationSpecifier, ImportOrExportKind, ImportSpecifier, ModuleExportName};
+    use oxc_ast::ast::{
+        BindingIdentifier, ImportDeclarationSpecifier, ImportOrExportKind, ModuleExportName,
+        StringLiteral,
+    };
 
-    let import_spec = ast_builder.alloc(ImportSpecifier {
-        span: program.span,
-        imported: ModuleExportName::IdentifierName(
-            ast_builder.identifier_name(program.span, ast_builder.atom(imported)),
-        ),
-        local: ast_builder.binding_identifier(program.span, ast_builder.atom(local)),
-        import_kind: ImportOrExportKind::Value,
-    });
-
-    let import_declaration = ast_builder.alloc_import_declaration(
+    let import_spec = ImportDeclarationSpecifier::new_import_specifier(
         program.span,
-        Some(ast_builder.vec1(ImportDeclarationSpecifier::ImportSpecifier(import_spec))),
-        ast_builder.string_literal(program.span, ast_builder.atom(source), None),
-        None,
-        None::<oxc_allocator::Box<oxc_ast::ast::WithClause>>,
+        ModuleExportName::IdentifierName(IdentifierName::new(
+            program.span,
+            Ident::from_str_in(imported, ast_builder),
+            ast_builder,
+        )),
+        BindingIdentifier::new(program.span, Ident::from_str_in(local, ast_builder), ast_builder),
         ImportOrExportKind::Value,
+        ast_builder,
+    );
+
+    let import_declaration = Statement::new_import_declaration(
+        program.span,
+        Some(ArenaVec::from_array_in([import_spec], ast_builder)),
+        StringLiteral::new(program.span, Str::from_str_in(source, ast_builder), None, ast_builder),
+        None,
+        None,
+        ImportOrExportKind::Value,
+        ast_builder,
     );
 
     let insert_pos = program
@@ -74,7 +84,7 @@ pub fn insert_named_import<'alloc>(
 
     program
         .body
-        .insert(insert_pos, Statement::ImportDeclaration(import_declaration));
+        .insert(insert_pos, import_declaration);
 }
 
 pub struct CapturedExpression<'alloc> {
@@ -163,11 +173,12 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
 
                 let prev_expression = std::mem::replace(
                     expression,
-                    Expression::StringLiteral(self.ast_builder.alloc_string_literal(
+                    Expression::new_string_literal(
                         expression.span(),
-                        self.ast_builder.atom(&var_name_with_var),
+                        Str::from_str_in(&var_name_with_var, self.ast_builder),
                         None,
-                    )),
+                        self.ast_builder,
+                    ),
                 );
 
                 captured_expressions.push(CapturedExpression {
@@ -190,29 +201,18 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         self.class_display_names
             .insert(simple_tagged_template_expression.span, class_display_name);
 
-        Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+        Statement::new_variable_declaration(
             span,
             VariableDeclarationKind::Let,
-            self.ast_builder.vec1(self.ast_builder.variable_declarator(
+            [ast::build_variable_declarator_pattern(
+                self.ast_builder,
                 span,
-                VariableDeclarationKind::Let,
-                self.ast_builder.binding_pattern(
-                    BindingPatternKind::BindingIdentifier(
-                        self.ast_builder.alloc_binding_identifier(
-                            span,
-                            self.ast_builder.atom(CLASS_LOCAL_NAME),
-                        ),
-                    ),
-                    None as Option<oxc_allocator::Box<_>>,
-                    false,
-                ),
-                Some(Expression::TaggedTemplateExpression(
-                    simple_tagged_template_expression,
-                )),
-                false,
-            )),
+                BindingPattern::new_binding_identifier(span, CLASS_LOCAL_NAME, self.ast_builder),
+                Expression::TaggedTemplateExpression(simple_tagged_template_expression),
+            )],
             false,
-        ))
+            self.ast_builder,
+        )
     }
 
     pub fn build_style_properties(
@@ -223,74 +223,64 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         captured_expressions
             .iter()
             .map(|captured| {
-                self.ast_builder.object_property_kind_object_property(
+                ObjectPropertyKind::new_object_property(
                     span,
-                    oxc_ast::ast::PropertyKind::Init,
-                    self.ast_builder
-                        .expression_string_literal(span, self.ast_builder.atom(&captured.var_name), None)
-                        .into(),
-                    Expression::CallExpression(
-                        self.ast_builder.alloc_call_expression(
+                    PropertyKind::Init,
+                    PropertyKey::new_static_string_literal(
+                        span,
+                        Str::from_str_in(&captured.var_name, self.ast_builder),
+                        None,
+                        self.ast_builder,
+                    ),
+                    Expression::new_call_expression(
+                        span,
+                        captured.expression.clone_in(self.ast_builder.allocator()),
+                        None,
+                        [Argument::new_object_expression(
                             span,
-                            captured.expression.clone_in(self.ast_builder.allocator),
-                            None as Option<oxc_allocator::Box<_>>,
-                            self.ast_builder.vec1(
-                                Expression::ObjectExpression(
-                                    self.ast_builder.alloc_object_expression(
+                            [
+                                ObjectPropertyKind::new_spread_property(
+                                    span,
+                                    Expression::new_static_member_expression(
                                         span,
-                                        self.ast_builder.vec_from_iter([
-                                            self.ast_builder.object_property_kind_spread_property(
-                                                span,
-                                                Expression::StaticMemberExpression(
-                                                    self.ast_builder
-                                                        .alloc_static_member_expression(
-                                                            span,
-                                                            Expression::Identifier(
-                                                                self.ast_builder
-                                                                    .alloc_identifier_reference(
-                                                                        span,
-                                                                        self.ast_builder.atom(PROPS_LOCAL_NAME),
-                                                                    ),
-                                                            ),
-                                                            self.ast_builder.identifier_name(
-                                                                span,
-                                                                self.ast_builder.atom("styleProps"),
-                                                            ),
-                                                            false,
-                                                        ),
-                                                ),
-                                            ),
-                                            self.ast_builder.object_property_kind_object_property(
-                                                span,
-                                                oxc_ast::ast::PropertyKind::Init,
-                                                self.ast_builder
-                                                    .expression_string_literal(
-                                                        span,
-                                                        self.ast_builder.atom("props"),
-                                                        None,
-                                                    )
-                                                    .into(),
-                                                Expression::Identifier(
-                                                    self.ast_builder.alloc_identifier_reference(
-                                                        span,
-                                                        self.ast_builder.atom(PROPS_LOCAL_NAME),
-                                                    ),
-                                                ),
-                                                false,
-                                                false,
-                                                false,
-                                            ),
-                                        ]),
+                                        Expression::new_identifier(
+                                            span,
+                                            PROPS_LOCAL_NAME,
+                                            self.ast_builder,
+                                        ),
+                                        IdentifierName::new(span, "styleProps", self.ast_builder),
+                                        false,
+                                        self.ast_builder,
                                     ),
-                                )
-                                .into(),
-                            ),
-                            false,
-                        ),
+                                    self.ast_builder,
+                                ),
+                                ObjectPropertyKind::new_object_property(
+                                    span,
+                                    PropertyKind::Init,
+                                    PropertyKey::new_static_string_literal(
+                                        span,
+                                        "props",
+                                        None,
+                                        self.ast_builder,
+                                    ),
+                                    Expression::new_identifier(
+                                        span,
+                                        PROPS_LOCAL_NAME,
+                                        self.ast_builder,
+                                    ),
+                                    false,
+                                    false,
+                                    self.ast_builder,
+                                ),
+                            ],
+                            self.ast_builder,
+                        )],
+                        false,
+                        self.ast_builder,
                     ),
                     false,
                     false,
-                    false,
+                    self.ast_builder,
                 )
             })
             .collect()
@@ -309,68 +299,64 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
             return None;
         }
 
-        let props_style = Expression::StaticMemberExpression(
-            self.ast_builder.alloc_static_member_expression(
-                span,
-                Expression::Identifier(
-                    self.ast_builder
-                        .alloc_identifier_reference(span, self.ast_builder.atom(PROPS_LOCAL_NAME)),
-                ),
-                self.ast_builder
-                    .identifier_name(span, self.ast_builder.atom("style")),
-                false,
-            ),
+        let props_style = Expression::new_static_member_expression(
+            span,
+            Expression::new_identifier(span, PROPS_LOCAL_NAME, self.ast_builder),
+            IdentifierName::new(span, "style", self.ast_builder),
+            false,
+            self.ast_builder,
         );
 
         let style_expression = if use_merge_inline_styles {
-            JSXExpression::CallExpression(self.ast_builder.alloc_call_expression(
+            JSXExpression::new_call_expression(
                 span,
-                Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                    span,
-                    self.ast_builder.atom(MERGE_INLINE_STYLES_LOCAL_NAME),
-                )),
-                None as Option<oxc_allocator::Box<_>>,
-                self.ast_builder.vec_from_iter([
-                    oxc_ast::ast::Argument::ObjectExpression(
-                        self.ast_builder.alloc_object_expression(
-                            span,
-                            self.ast_builder.vec_from_iter(style_properties),
-                        ),
+                Expression::new_identifier(span, MERGE_INLINE_STYLES_LOCAL_NAME, self.ast_builder),
+                None,
+                [
+                    Argument::new_object_expression(
+                        span,
+                        ArenaVec::from_iter_in(style_properties, self.ast_builder),
+                        self.ast_builder,
                     ),
                     props_style.into(),
-                ]),
+                ],
                 false,
-            ))
+                self.ast_builder,
+            )
         } else {
             let mut all_style_properties = style_properties;
-            all_style_properties.push(self.ast_builder.object_property_kind_spread_property(
+            all_style_properties.push(ObjectPropertyKind::new_spread_property(
                 span,
-                Expression::LogicalExpression(self.ast_builder.alloc_logical_expression(
+                Expression::new_logical_expression(
                     span,
                     props_style,
-                    oxc_ast::ast::LogicalOperator::Coalesce,
-                    Expression::ObjectExpression(
-                        self.ast_builder.alloc_object_expression(span, self.ast_builder.vec()),
+                    LogicalOperator::Coalesce,
+                    Expression::new_object_expression(
+                        span,
+                        ArenaVec::new_in(self.ast_builder),
+                        self.ast_builder,
                     ),
-                )),
+                    self.ast_builder,
+                ),
+                self.ast_builder,
             ));
-            JSXExpression::ObjectExpression(self.ast_builder.alloc_object_expression(
+            JSXExpression::new_object_expression(
                 span,
-                self.ast_builder.vec_from_iter(all_style_properties),
-            ))
+                ArenaVec::from_iter_in(all_style_properties, self.ast_builder),
+                self.ast_builder,
+            )
         };
 
-        Some(
-            self.ast_builder.jsx_attribute_item_attribute(
+        Some(JSXAttributeItem::new_attribute(
+            span,
+            JSXAttributeName::new_identifier(span, "style", self.ast_builder),
+            Some(JSXAttributeValue::new_expression_container(
                 span,
-                self.ast_builder
-                    .jsx_attribute_name_identifier(span, self.ast_builder.atom("style")),
-                Some(self.ast_builder.jsx_attribute_value_expression_container(
-                    span,
-                    style_expression,
-                )),
-            ),
-        )
+                style_expression,
+                self.ast_builder,
+            )),
+            self.ast_builder,
+        ))
     }
 
     /// Builds `class={__styleThis__mergeStyles(ClassVar, props.class)}` so classes passed in by the
@@ -380,46 +366,31 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         span: oxc_span::Span,
         props_identifier: &str,
     ) -> JSXAttributeItem<'alloc> {
-        self.ast_builder.jsx_attribute_item_attribute(
+        JSXAttributeItem::new_attribute(
             span,
-            self.ast_builder.jsx_attribute_name_identifier(
+            JSXAttributeName::new_identifier(span, self.class_prop_name, self.ast_builder),
+            Some(JSXAttributeValue::new_expression_container(
                 span,
-                self.ast_builder.atom(self.class_prop_name),
-            ),
-            Some(self.ast_builder.jsx_attribute_value_expression_container(
-                span,
-                JSXExpression::CallExpression(self.ast_builder.alloc_call_expression(
+                JSXExpression::new_call_expression(
                     span,
-                    Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                        span,
-                        self.ast_builder.atom(MERGE_STYLES_LOCAL_NAME),
-                    )),
-                    None as Option<oxc_allocator::Box<_>>,
-                    self.ast_builder.vec_from_iter([
-                        oxc_ast::ast::Argument::Identifier(
-                            self.ast_builder.alloc_identifier_reference(
-                                span,
-                                self.ast_builder.atom(CLASS_LOCAL_NAME),
-                            ),
+                    Expression::new_identifier(span, MERGE_STYLES_LOCAL_NAME, self.ast_builder),
+                    None,
+                    [
+                        Argument::new_identifier(span, CLASS_LOCAL_NAME, self.ast_builder),
+                        Argument::new_static_member_expression(
+                            span,
+                            ast::build_identifier(self.ast_builder, span, props_identifier),
+                            IdentifierName::new(span, self.class_prop_name, self.ast_builder),
+                            false,
+                            self.ast_builder,
                         ),
-                        oxc_ast::ast::Argument::StaticMemberExpression(
-                            self.ast_builder.alloc_static_member_expression(
-                                span,
-                                Expression::Identifier(self.ast_builder.alloc_identifier_reference(
-                                    span,
-                                    self.ast_builder.atom(props_identifier),
-                                )),
-                                self.ast_builder.identifier_name(
-                                    span,
-                                    self.ast_builder.atom(self.class_prop_name),
-                                ),
-                                false,
-                            ),
-                        ),
-                    ]),
+                    ],
                     false,
-                )),
+                    self.ast_builder,
+                ),
+                self.ast_builder,
             )),
+            self.ast_builder,
         )
     }
 
@@ -428,8 +399,8 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     /// to a capitalized local, since JSX would treat it as an HTML element or can't reference it.
     pub fn styled_element(&self, template: &TaggedTemplateExpression<'alloc>) -> Option<StyledElement<'alloc>> {
         let span = template.span;
-        let element = |name, is_component| StyledElement {
-            name: self.ast_builder.jsx_element_name_identifier(span, name),
+        let element = |name: Str<'alloc>, is_component| StyledElement {
+            name: JSXElementName::new_identifier(span, name, self.ast_builder),
             is_component,
             base_declaration: None,
         };
@@ -437,18 +408,23 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
             Expression::StaticMemberExpression(member)
                 if self.references.get(&member.object) == Some(self.styled) =>
             {
-                Some(element(member.property.name, false))
+                Some(element(member.property.name.into(), false))
             }
             Expression::CallExpression(call)
                 if self.references.get(&call.callee) == Some(self.styled) && call.arguments.len() == 1 =>
             {
                 let base = call.arguments[0].as_expression()?.get_inner_expression();
                 let direct = match base {
-                    Expression::StringLiteral(name) => Some(element(name.value, false)),
-                    Expression::TemplateLiteral(template) => template.single_quasi().map(|name| element(name, false)),
+                    Expression::StringLiteral(name) => {
+                        name.value.as_arena_str().map(|name| element(name, false))
+                    }
+                    Expression::TemplateLiteral(template) => template
+                        .single_quasi()
+                        .and_then(|name| name.as_arena_str())
+                        .map(|name| element(name, false)),
                     // JSX treats lowercase names as HTML elements
                     Expression::Identifier(component) if !component.name.starts_with(|c: char| c.is_ascii_lowercase()) => {
-                        Some(element(component.name, true))
+                        Some(element(component.name.into(), true))
                     }
                     Expression::StaticMemberExpression(member) => {
                         self.jsx_member_expression(span, member).map(|member| StyledElement {
@@ -461,7 +437,7 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
                 };
                 Some(direct.unwrap_or_else(|| StyledElement {
                     base_declaration: Some(self.build_base_declaration(span, base)),
-                    ..element(self.ast_builder.atom(BASE_LOCAL_NAME), true)
+                    ..element(Str::from(BASE_LOCAL_NAME), true)
                 }))
             }
             _ => None,
@@ -469,25 +445,18 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     }
 
     fn build_base_declaration(&self, span: oxc_span::Span, base: &Expression<'alloc>) -> Statement<'alloc> {
-        Statement::VariableDeclaration(self.ast_builder.alloc_variable_declaration(
+        Statement::new_variable_declaration(
             span,
             VariableDeclarationKind::Const,
-            self.ast_builder.vec1(self.ast_builder.variable_declarator(
+            [ast::build_variable_declarator(
+                self.ast_builder,
                 span,
-                VariableDeclarationKind::Const,
-                self.ast_builder.binding_pattern(
-                    BindingPatternKind::BindingIdentifier(
-                        self.ast_builder
-                            .alloc_binding_identifier(span, self.ast_builder.atom(BASE_LOCAL_NAME)),
-                    ),
-                    None as Option<oxc_allocator::Box<_>>,
-                    false,
-                ),
-                Some(base.clone_in(self.ast_builder.allocator)),
-                false,
-            )),
+                BASE_LOCAL_NAME,
+                base.clone_in(self.ast_builder.allocator()),
+            )],
             false,
-        ))
+            self.ast_builder,
+        )
     }
 
     /// `ui.Component` as a JSX element name, `None` for other member expressions (e.g. `this.x`).
@@ -498,15 +467,15 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
     ) -> Option<oxc_allocator::Box<'alloc, JSXMemberExpression<'alloc>>> {
         let object = match &member.object {
             Expression::Identifier(object) => {
-                self.ast_builder.jsx_member_expression_object_identifier_reference(span, object.name)
+                JSXMemberExpressionObject::new_identifier_reference(span, object.name, self.ast_builder)
             }
             Expression::StaticMemberExpression(object) => {
                 JSXMemberExpressionObject::MemberExpression(self.jsx_member_expression(span, object)?)
             }
             _ => return None,
         };
-        let property = self.ast_builder.jsx_identifier(span, member.property.name);
-        Some(self.ast_builder.alloc_jsx_member_expression(span, object, property))
+        let property = JSXIdentifier::new(span, member.property.name, self.ast_builder);
+        Some(JSXMemberExpression::boxed(span, object, property, self.ast_builder))
     }
 
     pub fn build_jsx_element(
@@ -515,16 +484,18 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         name: JSXElementName<'alloc>,
         attributes: Vec<JSXAttributeItem<'alloc>>,
     ) -> Expression<'alloc> {
-        Expression::JSXElement(self.ast_builder.alloc_jsx_element(
+        Expression::JSXElement(JSXElement::boxed(
             span,
-            self.ast_builder.alloc_jsx_opening_element(
+            JSXOpeningElement::boxed(
                 span,
                 name,
-                None as Option<oxc_allocator::Box<_>>,
-                self.ast_builder.vec_from_iter(attributes),
+                None,
+                ArenaVec::from_iter_in(attributes, self.ast_builder),
+                self.ast_builder,
             ),
-            self.ast_builder.vec(),
-            None as Option<oxc_allocator::Box<_>>,
+            ArenaVec::new_in(self.ast_builder),
+            None,
+            self.ast_builder,
         ))
     }
 
@@ -532,59 +503,17 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         &self,
         span: oxc_span::Span,
     ) -> Statement<'alloc> {
-        Statement::ExpressionStatement(
-            self.ast_builder.alloc_expression_statement(
+        self.build_assign_component_member_statement(
+            span,
+            "toString",
+            Expression::new_arrow_function_expression(
                 span,
-                Expression::AssignmentExpression(
-                    self.ast_builder.alloc_assignment_expression(
-                        span,
-                        oxc_ast::ast::AssignmentOperator::Assign,
-                        oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
-                            self.ast_builder.alloc_static_member_expression(
-                                span,
-                                Expression::Identifier(
-                                    self.ast_builder.alloc_identifier_reference(
-                                        span,
-                                        self.ast_builder.atom(COMPONENT_LOCAL_NAME),
-                                    ),
-                                ),
-                                self.ast_builder
-                                    .identifier_name(span, self.ast_builder.atom("toString")),
-                                false,
-                            ),
-                        ),
-                        Expression::ArrowFunctionExpression(
-                            self.ast_builder.alloc_arrow_function_expression(
-                                span,
-                                true,
-                                false,
-                                None as Option<oxc_allocator::Box<_>>,
-                                self.ast_builder.alloc_formal_parameters(
-                                    span,
-                                    oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-                                    self.ast_builder.vec(),
-                                    None as Option<oxc_allocator::Box<_>>,
-                                ),
-                                None as Option<oxc_allocator::Box<_>>,
-                                self.ast_builder.alloc_function_body(
-                                    span,
-                                    self.ast_builder.vec(),
-                                    self.ast_builder.vec1(Statement::ExpressionStatement(
-                                        self.ast_builder.alloc_expression_statement(
-                                            span,
-                                            Expression::Identifier(
-                                                self.ast_builder.alloc_identifier_reference(
-                                                    span,
-                                                    self.ast_builder.atom(CLASS_LOCAL_NAME),
-                                                ),
-                                            ),
-                                        ),
-                                    )),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
+                false,
+                None,
+                self.build_empty_arrow_params(span),
+                None,
+                ArrowFunctionBody::new_identifier(span, CLASS_LOCAL_NAME, self.ast_builder),
+                self.ast_builder,
             ),
         )
     }
@@ -593,56 +522,63 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         &self,
         span: oxc_span::Span,
     ) -> Statement<'alloc> {
-        Statement::ExpressionStatement(
-            self.ast_builder.alloc_expression_statement(
+        self.build_assign_component_member_statement(
+            span,
+            "css",
+            Expression::new_static_member_expression(
                 span,
-                Expression::AssignmentExpression(
-                    self.ast_builder.alloc_assignment_expression(
-                        span,
-                        oxc_ast::ast::AssignmentOperator::Assign,
-                        oxc_ast::ast::AssignmentTarget::StaticMemberExpression(
-                            self.ast_builder.alloc_static_member_expression(
-                                span,
-                                Expression::Identifier(
-                                    self.ast_builder.alloc_identifier_reference(
-                                        span,
-                                        self.ast_builder.atom(COMPONENT_LOCAL_NAME),
-                                    ),
-                                ),
-                                self.ast_builder
-                                    .identifier_name(span, self.ast_builder.atom("css")),
-                                false,
-                            ),
-                        ),
-                        Expression::StaticMemberExpression(
-                            self.ast_builder.alloc_static_member_expression(
-                                span,
-                                Expression::Identifier(
-                                    self.ast_builder.alloc_identifier_reference(
-                                        span,
-                                        self.ast_builder.atom(CLASS_LOCAL_NAME),
-                                    ),
-                                ),
-                                self.ast_builder
-                                    .identifier_name(span, self.ast_builder.atom("css")),
-                                false,
-                            ),
-                        ),
-                    ),
-                ),
+                Expression::new_identifier(span, CLASS_LOCAL_NAME, self.ast_builder),
+                IdentifierName::new(span, "css", self.ast_builder),
+                false,
+                self.ast_builder,
             ),
         )
     }
 
-    pub fn build_return_statement(&self, span: oxc_span::Span) -> Statement<'alloc> {
-        Statement::ReturnStatement(
-            self.ast_builder.alloc_return_statement(
+    /// `__styleThis__comp.<member> = <value>`
+    fn build_assign_component_member_statement(
+        &self,
+        span: oxc_span::Span,
+        member: &'static str,
+        value: Expression<'alloc>,
+    ) -> Statement<'alloc> {
+        Statement::new_expression_statement(
+            span,
+            Expression::new_assignment_expression(
                 span,
-                Some(Expression::Identifier(
-                    self.ast_builder
-                        .alloc_identifier_reference(span, self.ast_builder.atom(COMPONENT_LOCAL_NAME)),
-                )),
+                AssignmentOperator::Assign,
+                AssignmentTarget::new_static_member_expression(
+                    span,
+                    Expression::new_identifier(span, COMPONENT_LOCAL_NAME, self.ast_builder),
+                    IdentifierName::new(span, member, self.ast_builder),
+                    false,
+                    self.ast_builder,
+                ),
+                value,
+                self.ast_builder,
             ),
+            self.ast_builder,
+        )
+    }
+
+    fn build_empty_arrow_params(
+        &self,
+        span: oxc_span::Span,
+    ) -> oxc_allocator::Box<'alloc, FormalParameters<'alloc>> {
+        FormalParameters::boxed(
+            span,
+            FormalParameterKind::ArrowFormalParameters,
+            ArenaVec::new_in(self.ast_builder),
+            None,
+            self.ast_builder,
+        )
+    }
+
+    pub fn build_return_statement(&self, span: oxc_span::Span) -> Statement<'alloc> {
+        Statement::new_return_statement(
+            span,
+            Some(Expression::new_identifier(span, COMPONENT_LOCAL_NAME, self.ast_builder)),
+            self.ast_builder,
         )
     }
 
@@ -651,29 +587,26 @@ impl<'a, 'alloc> StyledComponentTransformer<'a, 'alloc> {
         span: oxc_span::Span,
         function_body_statements: Vec<Statement<'alloc>>,
     ) -> Expression<'alloc> {
-        Expression::CallExpression(self.ast_builder.alloc_call_expression(
+        Expression::new_call_expression(
             span,
-            Expression::ArrowFunctionExpression(self.ast_builder.alloc_arrow_function_expression(
+            Expression::new_arrow_function_expression(
                 span,
                 false,
-                false,
-                None as Option<oxc_allocator::Box<_>>,
-                self.ast_builder.alloc_formal_parameters(
+                None,
+                self.build_empty_arrow_params(span),
+                None,
+                ArrowFunctionBody::new_function_body(
                     span,
-                    oxc_ast::ast::FormalParameterKind::ArrowFormalParameters,
-                    self.ast_builder.vec(),
-                    None as Option<oxc_allocator::Box<_>>,
+                    ArenaVec::new_in(self.ast_builder),
+                    ArenaVec::from_iter_in(function_body_statements, self.ast_builder),
+                    self.ast_builder,
                 ),
-                None as Option<oxc_allocator::Box<_>>,
-                self.ast_builder.alloc_function_body(
-                    span,
-                    self.ast_builder.vec(),
-                    self.ast_builder.vec_from_iter(function_body_statements),
-                ),
-            )),
-            None as Option<oxc_allocator::Box<_>>,
-            self.ast_builder.vec(),
+                self.ast_builder,
+            ),
+            None,
+            ArenaVec::new_in(self.ast_builder),
             false,
-        ))
+            self.ast_builder,
+        )
     }
 }

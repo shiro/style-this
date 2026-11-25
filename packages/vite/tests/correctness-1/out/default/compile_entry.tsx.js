@@ -119,7 +119,7 @@ let __styleThis_var_s1_8 = new String("s1-7o5eb8");
 __styleThis_var_s1_8.css = `${__styleThis_var_c_9().css}
     `;
 let comp = () => {
-("foob");
+	("foob");
 	const b = () => {
 		const c = __styleThis_var_c_9;
 		const s1 = __styleThis_var_s1_8;

@@ -1,10 +1,10 @@
-use crate::utils::{binding_pattern_kind_get_idents, ts_declaration_id};
-use oxc_ast::ast::{Class, Declaration, Function, VariableDeclarator};
+use crate::utils::{binding_pattern_get_idents, ts_declaration_id};
+use oxc_ast::ast::{Class, Declaration, Function, VariableDeclarationKind, VariableDeclarator};
 use oxc_span::{GetSpan, Span};
 use std::collections::{BTreeSet, HashSet};
 
 pub(crate) enum VirtualProgramInsert<'alloc> {
-    VariableDeclarator(VariableDeclarator<'alloc>),
+    VariableDeclarator(VariableDeclarator<'alloc>, VariableDeclarationKind),
     FunctionDeclaration(Function<'alloc>),
     ClassDeclaration(Class<'alloc>),
     /// namespaces, enums and `import A = N.B` aliases, compiled to JS with the rest of the
@@ -15,8 +15,8 @@ pub(crate) enum VirtualProgramInsert<'alloc> {
 impl<'alloc> VirtualProgramInsert<'alloc> {
     pub fn name(&self) -> Option<HashSet<String>> {
         match self {
-            VirtualProgramInsert::VariableDeclarator(declarator) => {
-                let idents = binding_pattern_kind_get_idents(&declarator.id.kind);
+            VirtualProgramInsert::VariableDeclarator(declarator, _) => {
+                let idents = binding_pattern_get_idents(&declarator.id);
                 if idents.is_empty() {
                     None
                 } else {
@@ -40,7 +40,7 @@ impl<'alloc> VirtualProgramInsert<'alloc> {
 
     pub fn span(&self) -> Span {
         match self {
-            VirtualProgramInsert::VariableDeclarator(declarator) => declarator.span,
+            VirtualProgramInsert::VariableDeclarator(declarator, _) => declarator.span,
             VirtualProgramInsert::FunctionDeclaration(function) => function.span,
             VirtualProgramInsert::ClassDeclaration(class) => class.span,
             VirtualProgramInsert::TSDeclaration(declaration) => declaration.span(),

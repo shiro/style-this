@@ -61,10 +61,10 @@ pub enum TransformError {
 impl TransformError {
     /// Located at the first error of the failed parse of `code`.
     pub fn parse_failed(filepath: String, code: &str, ast: &ParserReturn) -> Self {
-        let error = ast.errors.first();
+        let error = ast.diagnostics.first();
         let offset = error
-            .and_then(|error| error.labels.iter().flatten().next())
-            .map_or(0, |label| label.offset());
+            .and_then(|error| error.labels.first())
+            .map_or(0, |label| label.offset() as usize);
         let (row, column) = get_pos_from_offset(code, offset);
         Self::RawParseFailed {
             filepath,

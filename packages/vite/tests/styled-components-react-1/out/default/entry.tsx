@@ -9,7 +9,7 @@ const props = { gap: 4 };
 export const FancyButton = (() => {
 	let __styleThis__class = "FancyButton-qv8lef";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
-		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
+		const { styleProps: __styleThis__styleProps, style: __styleThis__style, ...__styleThis__rest } = __styleThis__props;
 		return <button {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
 			"--var1-4lyfgx": (({ a }) => a)({
 				...__styleThis__props.styleProps,
@@ -31,7 +31,7 @@ const ui = {
 	Card: (() => {
 		let __styleThis__class = "ui-4lizkh";
 		let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
-			const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
+			const { styleProps: __styleThis__styleProps, style: __styleThis__style, ...__styleThis__rest } = __styleThis__props;
 			return <div {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
 				"--var1-52r4dq": (() => ui.accent)({
 					...__styleThis__props.styleProps,
@@ -47,7 +47,7 @@ const ui = {
 export default (() => {
 	let __styleThis__class = "component_0-nklaj4";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
-		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
+		const { styleProps: __styleThis__styleProps, style: __styleThis__style, ...__styleThis__rest } = __styleThis__props;
 		return <div {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
 			"--var1-9a7oly": (() => ui.accent)({
 				...__styleThis__props.styleProps,
@@ -63,7 +63,7 @@ const unrelated = "unrelated-lyr0tq";
 export const Link = (() => {
 	let __styleThis__class = "Link-azcdyb";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
-		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
+		const { styleProps: __styleThis__styleProps, style: __styleThis__style, ...__styleThis__rest } = __styleThis__props;
 		return <a {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
 			"--var1-o5uvsl": (({ size }) => size)({
 				...__styleThis__props.styleProps,
@@ -124,7 +124,7 @@ export const TemplateTag = (() => {
 export const StyleFunctions = (() => {
 	let __styleThis__class = "StyleFunctions-b05mnk";
 	let __styleThis__comp = __styleThis__forwardRef((__styleThis__props, __styleThis__ref) => {
-		const { styleProps: __styleThis__styleProps, style: __styleThis__style,...__styleThis__rest } = __styleThis__props;
+		const { styleProps: __styleThis__styleProps, style: __styleThis__style, ...__styleThis__rest } = __styleThis__props;
 		return <div {...__styleThis__rest} ref={__styleThis__ref} className={__styleThis__mergeStyles(__styleThis__class, __styleThis__rest.className)} style={{
 			"--var1-092f0p": function({ size }) {
 				return size;
