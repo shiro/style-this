@@ -8,10 +8,10 @@ function spaced() {
 	if (true) {
 		var gap = 2;
 	}
-	return _styleThisClasses.__styleThis_16;
+	return _styleThisClasses.__styleThis_18;
 }
 function margined() {
-	const margin = () => _styleThisClasses.__styleThis_15;
+	const margin = () => _styleThisClasses.__styleThis_17;
 	if (true) {
 		var gap = 4;
 	}
@@ -19,9 +19,9 @@ function margined() {
 }
 // the CSS in the closure is evaluated where it's called, below `gap`
 function gapped() {
-	const margin = () => _styleThisClasses.__styleThis_14;
+	const margin = () => _styleThisClasses.__styleThis_16;
 	const gap = 3;
-	return _styleThisClasses.__styleThis_13;
+	return _styleThisClasses.__styleThis_15;
 }
 // `var`s can be redeclared, also in nested blocks
 function redeclared() {
@@ -29,7 +29,7 @@ function redeclared() {
 	if (true) {
 		var gap = 6;
 	}
-	return _styleThisClasses.__styleThis_12;
+	return _styleThisClasses.__styleThis_14;
 }
 const spacedOut = _styleThisClasses.spacedOut;
 // the locals shadow the parameters, also when declared below their use or inside an expression
@@ -47,7 +47,7 @@ function Spacer(size, Unit, error) {
 				return error;
 			}
 		})();
-		return _styleThisClasses.__styleThis_11;
+		return _styleThisClasses.__styleThis_13;
 	}
 	return styles();
 }
@@ -62,8 +62,19 @@ function Counter(count, Count) {
 			return Count.size * 2;
 		}
 	};
-	return _styleThisClasses.__styleThis_10;
+	return _styleThisClasses.__styleThis_12;
 }
+// also for the CSS inside them, not the outer names
+const fib = 1;
+const Inner = 1;
+const fibbed = function fib() {
+	return _styleThisClasses.__styleThis_11;
+};
+const Sized = class Inner {
+	static size = 3;
+	static height = _styleThisClasses.__styleThis_10;
+};
+const named = _styleThisClasses.named;
 // locals shadowing the top level names used below
 const Button = ({ variant }) => {
 	const color = variant === "primary" ? "blue" : "gray";

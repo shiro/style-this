@@ -74,6 +74,21 @@ function Counter(count, Count) {
   return css`margin: ${countdown(3)}px ${Doubled.double()}px;`;
 }
 
+// also for the CSS inside them, not the outer names
+const fib = 1;
+const Inner = 1;
+const fibbed = function fib() {
+  return css`width: ${typeof fib === "function" ? 10 : 0}px;`;
+};
+const Sized = class Inner {
+  static size = 3;
+  static height = css`height: ${Inner.size}px;`;
+};
+const named = css`
+  ${fibbed().css}
+  ${Sized.height.css}
+`;
+
 // locals shadowing the top level names used below
 const Button = ({ variant }) => {
   const color = variant === "primary" ? "blue" : "gray";

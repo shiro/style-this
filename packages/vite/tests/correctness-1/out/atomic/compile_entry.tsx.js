@@ -18,57 +18,73 @@ __styleThis_2.css = `color: hotpink;
 
 global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] = {...(global.__styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"] ?? {}), __global__export__,foo};
 
-// /packages/vite/tests/correctness-1/entry.tsx: {"Size", "__styleThis_1", "__styleThis_10", "__styleThis_11", "__styleThis_12", "__styleThis_13", "__styleThis_14", "__styleThis_15", "__styleThis_16", "__styleThis_2", "__styleThis_3", "__styleThis_4", "__styleThis_5", "__styleThis_6", "__styleThis_7", "__styleThis_8", "__styleThis_9", "a", "a1", "accent", "b", "card", "carded", "color", "comp", "css", "gapped", "margined", "mib", "mutate", "redeclared", "s2", "sized", "spaced", "spacedOut", "spacing", "st", "style", "theme", "themed", "undefined", "unrelated"}
+// /packages/vite/tests/correctness-1/entry.tsx: {"Size", "Sized", "__styleThis_1", "__styleThis_10", "__styleThis_11", "__styleThis_12", "__styleThis_13", "__styleThis_14", "__styleThis_15", "__styleThis_16", "__styleThis_17", "__styleThis_18", "__styleThis_2", "__styleThis_3", "__styleThis_4", "__styleThis_5", "__styleThis_6", "__styleThis_7", "__styleThis_8", "__styleThis_9", "a", "a1", "accent", "b", "card", "carded", "color", "comp", "css", "fibbed", "gapped", "margined", "mib", "mutate", "named", "redeclared", "s2", "sized", "spaced", "spacedOut", "spacing", "st", "style", "theme", "themed", "undefined", "unrelated"}
 "use strict";
 const a = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"];
 const mib = __styleThis_value_cache_ggghhhii["/packages/vite/tests/correctness-1/a.tsx"]["__global__export__"];
 let { css } = require("/packages/core/dist/index.mjs");
-var __styleThis_var_gap_30 = 2;
-let __styleThis_16 = new String("__styleThis_16-7s1mr4");
-__styleThis_16.css = `padding: ${__styleThis_var_gap_30}px;`;
+var __styleThis_var_gap_34 = 2;
+let __styleThis_18 = new String("__styleThis_18-d2zcti");
+__styleThis_18.css = `padding: ${__styleThis_var_gap_34}px;`;
 function spaced() {
 	if (true) {
-		var gap = __styleThis_var_gap_30;
+		var gap = __styleThis_var_gap_34;
 	}
-	return __styleThis_16;
+	return __styleThis_18;
 }
-let __styleThis_15 = new String("__styleThis_15-sdiv41");
-var __styleThis_var_gap_28 = 4;
-__styleThis_15.css = `margin: ${__styleThis_var_gap_28}px;`;
+let __styleThis_17 = new String("__styleThis_17-2vsdiv");
+var __styleThis_var_gap_32 = 4;
+__styleThis_17.css = `margin: ${__styleThis_var_gap_32}px;`;
 function margined() {
-	const margin = () => __styleThis_15;
+	const margin = () => __styleThis_17;
 	if (true) {
-		var gap = __styleThis_var_gap_28;
+		var gap = __styleThis_var_gap_32;
 	}
 	return margin();
 }
-let __styleThis_var_gap_26 = 3;
-let __styleThis_14 = new String("__styleThis_14-xq3wdq");
-__styleThis_14.css = `margin: ${__styleThis_var_gap_26}px;`;
-let __styleThis_var_margin_27 = () => __styleThis_14;
-let __styleThis_13 = new String("__styleThis_13-o5mnsl");
-__styleThis_13.css = `${__styleThis_var_margin_27().css} gap: ${__styleThis_var_gap_26}px;`;
+let __styleThis_var_gap_30 = 3;
+let __styleThis_16 = new String("__styleThis_16-zkh2nk");
+__styleThis_16.css = `margin: ${__styleThis_var_gap_30}px;`;
+let __styleThis_var_margin_31 = () => __styleThis_16;
+let __styleThis_15 = new String("__styleThis_15-7s1mr4");
+__styleThis_15.css = `${__styleThis_var_margin_31().css} gap: ${__styleThis_var_gap_30}px;`;
 function gapped() {
-	const margin = __styleThis_var_margin_27;
-	const gap = __styleThis_var_gap_26;
-	return __styleThis_13;
+	const margin = __styleThis_var_margin_31;
+	const gap = __styleThis_var_gap_30;
+	return __styleThis_15;
 }
-var __styleThis_var_gap_25 = 5;
-var __styleThis_var_gap_25 = 6;
-let __styleThis_12 = new String("__styleThis_12-qnolav");
-__styleThis_12.css = `row-gap: ${__styleThis_var_gap_25}px;`;
+var __styleThis_var_gap_29 = 5;
+var __styleThis_var_gap_29 = 6;
+let __styleThis_14 = new String("__styleThis_14-sdiv41");
+__styleThis_14.css = `row-gap: ${__styleThis_var_gap_29}px;`;
 function redeclared() {
-	var gap = __styleThis_var_gap_25;
+	var gap = __styleThis_var_gap_29;
 	if (true) {
-		var gap = __styleThis_var_gap_25;
+		var gap = __styleThis_var_gap_29;
 	}
-	return __styleThis_12;
+	return __styleThis_14;
 }
-let spacedOut = new String("spacedOut-o96r4h");
+let spacedOut = new String("spacedOut-xq3wdq");
 spacedOut.css = `${spaced().css}
   ${margined().css}
   ${gapped().css}
   ${redeclared().css}`;
+let __styleThis_11 = new String("__styleThis_11-o96r4h");
+let __styleThis_var_fib_18 = function __styleThis_var_fib_18() {
+	return __styleThis_11;
+};
+__styleThis_11.css = `width: ${typeof __styleThis_var_fib_18 === "function" ? 10 : 0}px;`;
+let fibbed = __styleThis_var_fib_18;
+let __styleThis_10 = new String("__styleThis_10-zkhm3g");
+let __styleThis_var_Inner_17 = class __styleThis_var_Inner_17 {
+	static size = 3;
+	static height = __styleThis_10;
+};
+__styleThis_10.css = `height: ${__styleThis_var_Inner_17.size}px;`;
+let Sized = __styleThis_var_Inner_17;
+let named = new String("named-a381mv");
+named.css = `${fibbed().css}
+  ${Sized.height.css}`;
 let mutate = (v) => v;
 let __styleThis_8 = new String("__styleThis_8-1i78lu");
 __styleThis_8.css = `background: black;`;
@@ -180,20 +196,20 @@ function __styleThis_var_gap_14() {
 }
 let __styleThis_9 = new String("__styleThis_9-9ubgdi");
 __styleThis_9.css = `gap: ${__styleThis_var_gap_14()}px;`;
-let __styleThis_var_countdown_18 = function count(n) {
+let __styleThis_var_countdown_20 = function count(n) {
 	return n > 1 ? count(n - 1) : n;
 };
-let __styleThis_var_Doubled_17 = class Count {
+let __styleThis_var_Doubled_19 = class Count {
 	static size = 2;
 	static double() {
 		return Count.size * 2;
 	}
 };
-let __styleThis_10 = new String("__styleThis_10-a381mv");
-__styleThis_10.css = `margin: ${__styleThis_var_countdown_18(3)}px ${__styleThis_var_Doubled_17.double()}px;`;
-let __styleThis_var_size_21 = 4;
-let __styleThis_var_double_22 = () => __styleThis_var_size_21 * 2;
-let __styleThis_var_unit_20 = (() => {
+let __styleThis_12 = new String("__styleThis_12-qnolav");
+__styleThis_12.css = `margin: ${__styleThis_var_countdown_20(3)}px ${__styleThis_var_Doubled_19.double()}px;`;
+let __styleThis_var_size_25 = 4;
+let __styleThis_var_double_26 = () => __styleThis_var_size_25 * 2;
+let __styleThis_var_unit_24 = (() => {
 	class Unit {
 		static px = "px";
 	}
@@ -203,17 +219,20 @@ let __styleThis_var_unit_20 = (() => {
 		return error;
 	}
 })();
-let __styleThis_11 = new String("__styleThis_11-zkhm3g");
-__styleThis_11.css = `margin: ${__styleThis_var_double_22()}${__styleThis_var_unit_20};`;
+let __styleThis_13 = new String("__styleThis_13-o5mnsl");
+__styleThis_13.css = `margin: ${__styleThis_var_double_26()}${__styleThis_var_unit_24};`;
 return {
+"__styleThis_18": __styleThis_18.css,
+"__styleThis_17": __styleThis_17.css,
 "__styleThis_16": __styleThis_16.css,
 "__styleThis_15": __styleThis_15.css,
 "__styleThis_14": __styleThis_14.css,
+"spacedOut": spacedOut.css,
 "__styleThis_13": __styleThis_13.css,
 "__styleThis_12": __styleThis_12.css,
-"spacedOut": spacedOut.css,
 "__styleThis_11": __styleThis_11.css,
 "__styleThis_10": __styleThis_10.css,
+"named": named.css,
 "__styleThis_9": __styleThis_9.css,
 "__styleThis_8": __styleThis_8.css,
 "__styleThis_var_m_10": __styleThis_var_m_10.css,

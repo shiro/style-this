@@ -208,6 +208,37 @@ impl<'a, 'alloc> VisitorTransformer<'a, 'alloc> {
         );
     }
 
+    /// The name of a function or class expression is only declared inside it, like a local of a
+    /// scope around it, e.g. `const f = function fib() { return css\`${fib.length}\`; }`. The CSS
+    /// using it is hoisted out, so it's declared as a variable holding the expression.
+    fn visit_named_expression(
+        &mut self,
+        name: &str,
+        right_references: Vec<String>,
+        walk: impl FnOnce(&mut Self) -> Expression<'alloc>,
+    ) {
+        self.enter_scope(ScopeFlags::empty(), &Default::default());
+        let alias = format!("{PREFIX}_var_{name}_{}", self.unique_number());
+        self.aliases
+            .last_mut()
+            .unwrap()
+            .insert(name.to_string(), Some(alias));
+
+        let expression = walk(self);
+
+        if self.is_variable_referenced(name) {
+            let span = expression.span();
+            let declarator =
+                ast::build_variable_declarator(self.ast_builder, span, name, expression);
+            self.include_declaration(
+                VirtualProgramInsert::VariableDeclarator(declarator),
+                right_references,
+                0,
+            );
+        }
+        self.leave_scope();
+    }
+
     /// Namespaces and enums, see `VirtualProgramInsert::TSDeclaration`.
     fn visit_ts_declaration(&mut self, it: &mut Statement<'alloc>) {
         let pos = self.tmp_program_statement_buffer.last().unwrap().len();
@@ -1535,6 +1566,32 @@ impl<'a, 'alloc> VisitMut<'alloc> for VisitorTransformer<'a, 'alloc> {
         };
 
         oxc_ast_visit::walk_mut::walk_expression(self, it);
+    }
+
+    fn visit_function(&mut self, it: &mut oxc_ast::ast::Function<'alloc>, flags: ScopeFlags) {
+        let name = match &it.id {
+            Some(id) if !self.scan_pass && it.is_expression() => id.name.to_string(),
+            _ => return oxc_ast_visit::walk_mut::walk_function(self, it, flags),
+        };
+        // before the walk rewrites the CSS inside
+        let right_references = utils::function_get_references(it);
+        self.visit_named_expression(&name, right_references, |this| {
+            oxc_ast_visit::walk_mut::walk_function(this, it, flags);
+            Expression::FunctionExpression(this.ast_builder.alloc(it.clone_in(this.allocator)))
+        });
+    }
+
+    fn visit_class(&mut self, it: &mut oxc_ast::ast::Class<'alloc>) {
+        let name = match &it.id {
+            Some(id) if !self.scan_pass && it.is_expression() => id.name.to_string(),
+            _ => return oxc_ast_visit::walk_mut::walk_class(self, it),
+        };
+        // before the walk rewrites the CSS inside
+        let right_references = utils::class_get_references(it);
+        self.visit_named_expression(&name, right_references, |this| {
+            oxc_ast_visit::walk_mut::walk_class(this, it);
+            Expression::ClassExpression(this.ast_builder.alloc(it.clone_in(this.allocator)))
+        });
     }
 
     fn visit_variable_declarators(
