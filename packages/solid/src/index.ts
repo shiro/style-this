@@ -10,6 +10,11 @@ type TemplateExpression<StyleProps> =
   | number
   | ((styleProps: StyleProps) => string | number);
 
+// keeps the members of union (e.g. discriminated) props apart
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
+
 type StyledTemplateFn<
   BaseComponent extends Component<any> | keyof JSX.IntrinsicElements,
 > = <
@@ -23,7 +28,7 @@ type StyledTemplateFn<
     TemplateExpression<
       StyleProps &
         ComponentProps<BaseComponent>["styleProps"] & {
-          props: Omit<ComponentProps<BaseComponent>, "styleProps">;
+          props: DistributiveOmit<ComponentProps<BaseComponent>, "styleProps">;
         }
     >
   >

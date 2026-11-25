@@ -24,3 +24,19 @@ test("style functions get the style props, and the component's props in `props`"
     }};
   `;
 });
+
+test("`props` keeps the members of union props apart", () => {
+  const Base = (
+    _props: { className?: string } & (
+      | { kind: "a"; a: string }
+      | { kind: "b"; b: number }
+    ),
+  ) => null;
+
+  styled(Base)`
+    color: ${({ props }) => {
+      expectTypeOf(props.kind).toEqualTypeOf<"a" | "b">();
+      return props.kind === "a" ? props.a : props.b;
+    }};
+  `;
+});

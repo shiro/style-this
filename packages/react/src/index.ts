@@ -13,6 +13,11 @@ type PropsOf<BaseComponent> = BaseComponent extends ComponentType<infer P>
   ? P
   : JSX.IntrinsicElements[BaseComponent & keyof JSX.IntrinsicElements];
 
+// keeps the members of union (e.g. discriminated) props apart
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
+
 type StyledTemplateFn<
   BaseComponent extends ComponentType<any> | keyof JSX.IntrinsicElements,
 > = <
@@ -27,7 +32,10 @@ type StyledTemplateFn<
       StyleProps &
         (PropsOf<BaseComponent> extends { styleProps: infer BaseStyleProps } ? BaseStyleProps : {}) & {
           // forwardRef passes `ref` separately, React never passes `key`
-          props: Omit<PropsOf<BaseComponent>, "styleProps" | "key" | "ref">;
+          props: DistributiveOmit<
+            PropsOf<BaseComponent>,
+            "styleProps" | "key" | "ref"
+          >;
         }
     >
   >
